@@ -1,26 +1,28 @@
 # Scalyn Mail Relay Engineering Handbook
 
-This document is the single source of truth for developers and AI assistants working on this project.
+The official handbook lives in Google Drive / Word format.
 
-## Product Rule
+This repository copy contains the short operational version.
 
-We are not building another SMTP plugin. We are building a WordPress email diagnostics, monitoring, deliverability and remediation platform.
+## Core Rule
+
+Scalyn Mail Relay is not just an SMTP plugin. SMTP is only the transport layer.
 
 ## Product Pillars
 
-1. Deliverability
-2. Visibility
-3. Diagnostics
-4. Remediation
-5. Agency Management
+- Deliverability
+- Visibility
+- Diagnostics
+- Remediation
+- Agency Management
 
-## Developer Ownership
+## Team Ownership
 
-- Kim: Core, architecture, integration, reviews
-- Saturn: Mail transport, SMTP, providers, test email
-- Yaj: Database, logging, timeline, diagnostics, health score
-- Mikko: Admin UI, dashboard, setup wizard, reports
+- Kim: Core, architecture, integration, reviews, QA, releases
+- Saturn: SMTP, mail providers, PHPMailer, test email
+- Yaj: database, logging, diagnostics, health score, REST
+- Mikko: dashboard framework, setup wizard, reports, admin UI
 
 ## AI Rule
 
-Never ask AI to build the whole plugin. Ask AI to build only the assigned module.
+Use AI only inside your assigned module.

@@ -1,15 +1,12 @@
 <?xml version="1.0"?>
 <ruleset name="Scalyn Mail Relay">
 	<description>WordPress Coding Standards for Scalyn Mail Relay.</description>
-
 	<rule ref="WordPress"/>
-
 	<file>scalyn-mail-relay.php</file>
+	<file>uninstall.php</file>
 	<file>includes</file>
 	<file>admin</file>
-
 	<exclude-pattern>vendor/*</exclude-pattern>
 	<exclude-pattern>node_modules/*</exclude-pattern>
-
 	<config name="minimum_supported_wp_version" value="6.5"/>
 </ruleset>

@@ -1,0 +1,20 @@
+# Core architecture
+/includes/Core/ @Kim
+
+# Mail transport
+/includes/Mail/ @Saturn
+/includes/Providers/ @Saturn
+
+# Backend platform
+/includes/Database/ @Yaj
+/includes/Logging/ @Yaj
+/includes/Diagnostics/ @Yaj
+/includes/Rest/ @Yaj
+
+# UI
+/admin/ @Mikko
+/assets/ @Mikko
+
+# Documentation and default review
+/docs/ @Kim
+* @Kim

@@ -16,6 +16,7 @@
     "dealerdirect/phpcodesniffer-composer-installer": "^1.0"
   },
   "scripts": {
-    "lint": "phpcs --standard=WordPress includes admin scalyn-mail-relay.php"
+    "lint": "phpcs --standard=WordPress includes admin scalyn-mail-relay.php uninstall.php",
+    "autoload": "composer dump-autoload"
   }
 }

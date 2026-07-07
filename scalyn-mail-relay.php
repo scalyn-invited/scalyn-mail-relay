@@ -4,6 +4,9 @@
  * Plugin URI: https://github.com/scalyn-invited/scalyn-mail-relay
  * Description: WordPress email delivery, diagnostics, monitoring and remediation platform.
  * Version: 0.1.0
+ * Requires at least: 6.5
+ * Requires PHP: 8.2
+ * Update URI: https://github.com/scalyn-invited/scalyn-mail-relay
  * Author: Scalyn Studio
  * Text Domain: scalyn-mail-relay
  * Domain Path: /languages

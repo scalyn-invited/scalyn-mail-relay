@@ -8,9 +8,15 @@ This is not just an SMTP plugin. SMTP is only the transport layer.
 
 https://github.com/scalyn-invited/scalyn-mail-relay
 
-## Development Branches
+## Requirements
 
-- `main` – stable release branch
+- WordPress 6.5+
+- PHP 8.2+
+- MySQL 8+ or MariaDB 10.6+
+
+## Branches
+
+- `main` – stable releases
 - `develop` – integration branch
 - `feature/*` – developer work branches
 
@@ -23,10 +29,11 @@ https://github.com/scalyn-invited/scalyn-mail-relay
 - Timeline events
 - Diagnostics
 - Health score
-- Admin dashboard
-- Setup wizard
+- Admin dashboard framework
+- Setup wizard framework
 
 ## Developer Rule
 
-Do not work directly on `main` or `develop`.  
+Do not work directly on `main` or `develop`.
+
 Create a feature branch and submit a Pull Request.

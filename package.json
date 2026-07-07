@@ -2,7 +2,6 @@
   "name": "scalyn-mail-relay",
   "version": "0.1.0",
   "private": true,
-  "description": "Admin UI assets for Scalyn Mail Relay.",
   "scripts": {
     "build": "echo \"Build pipeline not configured yet\"",
     "lint": "echo \"JS/CSS linting not configured yet\""
