@@ -1,0 +1,21 @@
+{
+  "name": "scalyn/scalyn-mail-relay",
+  "description": "WordPress email diagnostics, monitoring, deliverability and remediation platform.",
+  "type": "wordpress-plugin",
+  "license": "proprietary",
+  "autoload": {
+    "psr-4": {
+      "Scalyn\\MailRelay\\": "includes/"
+    }
+  },
+  "require": {
+    "php": ">=8.2"
+  },
+  "require-dev": {
+    "wp-coding-standards/wpcs": "^3.0",
+    "dealerdirect/phpcodesniffer-composer-installer": "^1.0"
+  },
+  "scripts": {
+    "lint": "phpcs --standard=WordPress includes admin scalyn-mail-relay.php"
+  }
+}

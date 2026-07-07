@@ -1,0 +1,32 @@
+# Scalyn Mail Relay
+
+Scalyn Mail Relay is a WordPress email diagnostics, monitoring, deliverability and remediation platform.
+
+This is not just an SMTP plugin. SMTP is only the transport layer.
+
+## Repository
+
+https://github.com/scalyn-invited/scalyn-mail-relay
+
+## Development Branches
+
+- `main` – stable release branch
+- `develop` – integration branch
+- `feature/*` – developer work branches
+
+## MVP Scope
+
+- Core plugin bootstrap
+- SMTP configuration
+- Test email
+- Email logging
+- Timeline events
+- Diagnostics
+- Health score
+- Admin dashboard
+- Setup wizard
+
+## Developer Rule
+
+Do not work directly on `main` or `develop`.  
+Create a feature branch and submit a Pull Request.
