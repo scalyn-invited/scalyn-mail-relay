@@ -8,6 +8,7 @@
 namespace Scalyn\MailRelay\Core;
 
 use Scalyn\MailRelay\Admin\AdminMenu;
+use Scalyn\MailRelay\Mail\MailDispatcher;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -86,6 +87,15 @@ final class Plugin {
 	 */
 	private function register_services(): void {
 		$this->container->set( AdminMenu::class, static fn(): AdminMenu => new AdminMenu() );
+		$this->container->set( SettingsRepository::class, static fn(): SettingsRepository => new SettingsRepository() );
+		$this->container->set( ProviderRegistry::class, static fn(): ProviderRegistry => new ProviderRegistry() );
+		$this->container->set(
+			MailDispatcher::class,
+			static fn( Container $c ): MailDispatcher => new MailDispatcher(
+				$c->get( ProviderRegistry::class ),
+				$c->get( SettingsRepository::class )
+			)
+		);
 	}
 
 	/**
