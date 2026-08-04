@@ -11,15 +11,46 @@ use Scalyn\MailRelay\Admin\AdminMenu;
 
 defined( 'ABSPATH' ) || exit;
 
+/**
+ * Plugin singleton. Bootstraps the service container and registers WordPress hooks.
+ *
+ * Entry point: scalyn-mail-relay.php fires Plugin::instance()->boot() on plugins_loaded.
+ * The scalyn_mail_relay_booted action is fired after all services are registered,
+ * giving other modules and third-party code an opportunity to extend the container.
+ */
 final class Plugin {
+
+	/**
+	 * Singleton instance.
+	 *
+	 * @var Plugin|null
+	 */
 	private static ?Plugin $instance = null;
+
+	/**
+	 * The plugin service container.
+	 *
+	 * @var Container
+	 */
 	private Container $container;
+
+	/**
+	 * Whether boot() has already been called.
+	 *
+	 * @var bool
+	 */
 	private bool $booted = false;
 
+	/**
+	 * Private constructor — use instance() to obtain the singleton.
+	 */
 	private function __construct() {
 		$this->container = new Container();
 	}
 
+	/**
+	 * Returns the singleton plugin instance, creating it if necessary.
+	 */
 	public static function instance(): Plugin {
 		if ( null === self::$instance ) {
 			self::$instance = new self();
@@ -27,6 +58,10 @@ final class Plugin {
 		return self::$instance;
 	}
 
+	/**
+	 * Boots the plugin: registers services, hooks, and fires scalyn_mail_relay_booted.
+	 * Subsequent calls are no-ops.
+	 */
 	public function boot(): void {
 		if ( $this->booted ) {
 			return;
@@ -39,14 +74,23 @@ final class Plugin {
 		do_action( 'scalyn_mail_relay_booted', $this->container );
 	}
 
+	/**
+	 * Returns the plugin service container.
+	 */
 	public function container(): Container {
 		return $this->container;
 	}
 
+	/**
+	 * Registers core services in the container.
+	 */
 	private function register_services(): void {
 		$this->container->set( AdminMenu::class, static fn(): AdminMenu => new AdminMenu() );
 	}
 
+	/**
+	 * Registers WordPress action and filter hooks.
+	 */
 	private function register_hooks(): void {
 		load_plugin_textdomain( 'scalyn-mail-relay', false, dirname( plugin_basename( SCALYN_MAIL_RELAY_FILE ) ) . '/languages' );
 

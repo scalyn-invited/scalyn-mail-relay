@@ -1,5 +1,10 @@
 <?php
-/** Dashboard foundation. @package ScalynMailRelay */
+/**
+ * Dashboard foundation view.
+ *
+ * @package ScalynMailRelay
+ */
+
 defined( 'ABSPATH' ) || exit;
 ?>
 <div class="wrap scalyn-mail-relay">

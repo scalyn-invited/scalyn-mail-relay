@@ -1,12 +1,28 @@
 <?xml version="1.0"?>
 <ruleset name="Scalyn Mail Relay">
 	<description>WordPress Coding Standards for Scalyn Mail Relay.</description>
+
 	<rule ref="WordPress"/>
+
 	<file>scalyn-mail-relay.php</file>
 	<file>uninstall.php</file>
 	<file>includes</file>
 	<file>admin</file>
+
 	<exclude-pattern>vendor/*</exclude-pattern>
 	<exclude-pattern>node_modules/*</exclude-pattern>
+
 	<config name="minimum_supported_wp_version" value="6.5"/>
+
+	<!--
+		This project uses PSR-4 autoloading (via Composer) with PascalCase class
+		file names (e.g. MailMessage.php). The WordPress filename convention
+		(class-mail-message.php) is incompatible with PSR-4 and is excluded here.
+		All other WordPress Coding Standards rules remain enforced.
+	-->
+	<rule ref="WordPress.Files.FileName">
+		<exclude name="WordPress.Files.FileName.InvalidClassFileName"/>
+		<exclude name="WordPress.Files.FileName.NotHyphenatedLowercase"/>
+	</rule>
+
 </ruleset>
