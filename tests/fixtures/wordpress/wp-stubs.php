@@ -71,3 +71,21 @@ if ( ! function_exists( 'absint' ) ) {
 		return abs( (int) $maybeint );
 	}
 }
+
+if ( ! function_exists( 'is_admin' ) ) {
+	function is_admin(): bool {
+		return false;
+	}
+}
+
+if ( ! function_exists( 'plugin_basename' ) ) {
+	function plugin_basename( string $file ): string {
+		return basename( dirname( $file ) ) . '/' . basename( $file );
+	}
+}
+
+if ( ! function_exists( 'load_plugin_textdomain' ) ) {
+	function load_plugin_textdomain( string $domain, bool $deprecated = false, string|false $plugin_rel_path = false ): bool {
+		return true;
+	}
+}

@@ -8,6 +8,7 @@
 
 define( 'ABSPATH', __DIR__ . '/fixtures/wordpress/' );
 define( 'SCALYN_MAIL_RELAY_PATH', dirname( __DIR__ ) . '/' );
+define( 'SCALYN_MAIL_RELAY_FILE', SCALYN_MAIL_RELAY_PATH . 'scalyn-mail-relay.php' );
 
 require_once __DIR__ . '/fixtures/wordpress/wp-stubs.php';
 
