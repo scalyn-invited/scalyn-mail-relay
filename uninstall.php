@@ -30,7 +30,7 @@ $owned_tables = array(
 foreach ( $owned_tables as $suffix ) {
 	$table = $wpdb->prefix . $suffix;
 	// Table names cannot be parameterized; suffixes are fixed internal constants above.
-	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
 	$wpdb->query( "DROP TABLE IF EXISTS `{$table}`" );
 }
 

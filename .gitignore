@@ -12,4 +12,6 @@ Thumbs.db
 *.pem
 *.key
 .phpunit.result.cache
+.phpunit.cache/
 coverage/
+.claude/

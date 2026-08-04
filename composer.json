@@ -23,5 +23,10 @@
     "lint:wpcs": "phpcs --standard=phpcs.xml.dist",
     "test": "phpunit",
     "check": ["@lint:php", "@lint:wpcs", "@test"]
+  },
+  "config": {
+    "allow-plugins": {
+      "dealerdirect/phpcodesniffer-composer-installer": true
+    }
   }
 }

@@ -11,7 +11,18 @@ use Scalyn\MailRelay\Database\Migrator;
 
 defined( 'ABSPATH' ) || exit;
 
+/**
+ * Handles plugin activation, deactivation and environment assertion.
+ *
+ * Activation: runs database migrations, grants capabilities, schedules cron events.
+ * Deactivation: clears cron events (data is preserved).
+ * Uninstall: handled separately by uninstall.php.
+ */
 final class Lifecycle {
+
+	/**
+	 * Runs on plugin activation.
+	 */
 	public static function activate(): void {
 		self::assert_environment();
 		Migrator::migrate();
@@ -20,12 +31,19 @@ final class Lifecycle {
 		update_option( 'scalyn_mail_relay_version', SCALYN_MAIL_RELAY_VERSION, false );
 	}
 
+	/**
+	 * Runs on plugin deactivation. Preserves all data.
+	 */
 	public static function deactivate(): void {
 		foreach ( self::cron_hooks() as $hook ) {
 			wp_clear_scheduled_hook( $hook );
 		}
 	}
 
+	/**
+	 * Verifies minimum PHP and WordPress version requirements.
+	 * Calls wp_die() if requirements are not met.
+	 */
 	private static function assert_environment(): void {
 		global $wp_version;
 
@@ -38,6 +56,9 @@ final class Lifecycle {
 		}
 	}
 
+	/**
+	 * Adds all plugin capabilities to the Administrator role.
+	 */
 	private static function grant_capabilities(): void {
 		$role = get_role( 'administrator' );
 		if ( ! $role ) {
@@ -49,6 +70,9 @@ final class Lifecycle {
 		}
 	}
 
+	/**
+	 * Schedules recurring cron events if not already scheduled.
+	 */
 	private static function schedule_events(): void {
 		if ( ! wp_next_scheduled( 'scalyn_mail_relay_cleanup_logs' ) ) {
 			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'scalyn_mail_relay_cleanup_logs' );
@@ -59,6 +83,11 @@ final class Lifecycle {
 		}
 	}
 
+	/**
+	 * Returns all cron hook names owned by this plugin.
+	 *
+	 * @return string[]
+	 */
 	private static function cron_hooks(): array {
 		return array(
 			'scalyn_mail_relay_cleanup_logs',

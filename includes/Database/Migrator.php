@@ -9,7 +9,17 @@ namespace Scalyn\MailRelay\Database;
 
 defined( 'ABSPATH' ) || exit;
 
+/**
+ * Handles database schema creation and versioned upgrades via dbDelta().
+ *
+ * Ownership: Yaj / Database. Kim may add new migration version gates here
+ * when a schema change requires it.
+ */
 final class Migrator {
+
+	/**
+	 * Runs outstanding migrations if the installed DB version is behind the target.
+	 */
 	public static function migrate(): void {
 		$installed = (string) get_option( 'scalyn_mail_relay_db_version', '0.0.0' );
 
@@ -21,6 +31,10 @@ final class Migrator {
 		update_option( 'scalyn_mail_relay_db_version', SCALYN_MAIL_RELAY_DB_VERSION, false );
 	}
 
+	/**
+	 * Creates the full set of foundation tables using dbDelta().
+	 * dbDelta() is safe to run on existing tables — it only adds missing structures.
+	 */
 	private static function create_foundation_tables(): void {
 		global $wpdb;
 
@@ -28,7 +42,7 @@ final class Migrator {
 		$charset_collate = $wpdb->get_charset_collate();
 		$prefix          = $wpdb->prefix;
 
-		$sql = array();
+		$sql   = array();
 		$sql[] = "CREATE TABLE {$prefix}scalyn_mail_logs (
 			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
 			message_uuid char(36) NOT NULL,
