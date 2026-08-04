@@ -1,6 +1,6 @@
 <?php
 /**
- * Main plugin bootstrap.
+ * Main plugin application.
  *
  * @package ScalynMailRelay
  */
@@ -9,80 +9,49 @@ namespace Scalyn\MailRelay\Core;
 
 use Scalyn\MailRelay\Admin\AdminMenu;
 
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
+defined( 'ABSPATH' ) || exit;
 
-/**
- * Main plugin class.
- */
 final class Plugin {
-
-	/**
-	 * Plugin instance.
-	 *
-	 * @var Plugin|null
-	 */
 	private static ?Plugin $instance = null;
+	private Container $container;
+	private bool $booted = false;
 
-	/**
-	 * Get plugin instance.
-	 *
-	 * @return Plugin
-	 */
+	private function __construct() {
+		$this->container = new Container();
+	}
+
 	public static function instance(): Plugin {
 		if ( null === self::$instance ) {
 			self::$instance = new self();
 		}
-
 		return self::$instance;
 	}
 
-	/**
-	 * Plugin activation.
-	 *
-	 * @return void
-	 */
-	public static function activate(): void {
-		// Future: create database tables and default options.
-	}
+	public function boot(): void {
+		if ( $this->booted ) {
+			return;
+		}
 
-	/**
-	 * Plugin deactivation.
-	 *
-	 * @return void
-	 */
-	public static function deactivate(): void {
-		// Future: clear scheduled events if needed.
-	}
-
-	/**
-	 * Initialise plugin services.
-	 *
-	 * @return void
-	 */
-	public function init(): void {
-		$this->load_dependencies();
+		$this->register_services();
 		$this->register_hooks();
+		$this->booted = true;
+
+		do_action( 'scalyn_mail_relay_booted', $this->container );
 	}
 
-	/**
-	 * Load required files.
-	 *
-	 * @return void
-	 */
-	private function load_dependencies(): void {
-		require_once SCALYN_MAIL_RELAY_PATH . 'admin/AdminMenu.php';
+	public function container(): Container {
+		return $this->container;
 	}
 
-	/**
-	 * Register WordPress hooks.
-	 *
-	 * @return void
-	 */
+	private function register_services(): void {
+		$this->container->set( AdminMenu::class, static fn(): AdminMenu => new AdminMenu() );
+	}
+
 	private function register_hooks(): void {
+		load_plugin_textdomain( 'scalyn-mail-relay', false, dirname( plugin_basename( SCALYN_MAIL_RELAY_FILE ) ) . '/languages' );
+
 		if ( is_admin() ) {
-			( new AdminMenu() )->register();
+			$this->container->get( AdminMenu::class )->register();
 		}
 	}
 }

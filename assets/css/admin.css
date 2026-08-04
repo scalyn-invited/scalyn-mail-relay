@@ -1,8 +1,6 @@
-.scalyn-mail-relay .scalyn-card {
-	background: #fff;
-	border: 1px solid #dcdcde;
-	border-radius: 8px;
-	margin-top: 20px;
-	padding: 20px;
-	max-width: 900px;
-}
+.scalyn-mail-relay { max-width: 1200px; }
+.scalyn-mail-relay .scalyn-lead { font-size: 15px; color: #50575e; }
+.scalyn-mail-relay .scalyn-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(280px,1fr)); gap: 16px; margin-top: 20px; }
+.scalyn-mail-relay .scalyn-card { background: #fff; border: 1px solid #dcdcde; border-radius: 10px; padding: 20px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+.scalyn-mail-relay .scalyn-card h2 { margin-top: 0; }
+.scalyn-mail-relay .scalyn-score { display: block; font-size: 42px; line-height: 1; margin: 12px 0; }

@@ -5,6 +5,7 @@
   "license": "proprietary",
   "autoload": {
     "psr-4": {
+      "Scalyn\\MailRelay\\Admin\\": "admin/",
       "Scalyn\\MailRelay\\": "includes/"
     }
   },
@@ -12,11 +13,15 @@
     "php": ">=8.2"
   },
   "require-dev": {
-    "wp-coding-standards/wpcs": "^3.0",
-    "dealerdirect/phpcodesniffer-composer-installer": "^1.0"
+    "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+    "phpunit/phpunit": "^10.5",
+    "squizlabs/php_codesniffer": "^3.10",
+    "wp-coding-standards/wpcs": "^3.0"
   },
   "scripts": {
-    "lint": "phpcs --standard=WordPress includes admin scalyn-mail-relay.php uninstall.php",
-    "autoload": "composer dump-autoload"
+    "lint:php": "find . -path ./vendor -prune -o -path ./.git -prune -o -name '*.php' -print0 | xargs -0 -n1 php -l",
+    "lint:wpcs": "phpcs --standard=phpcs.xml.dist",
+    "test": "phpunit",
+    "check": ["@lint:php", "@lint:wpcs", "@test"]
   }
 }

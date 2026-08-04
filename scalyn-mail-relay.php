@@ -14,30 +14,30 @@
  * @package ScalynMailRelay
  */
 
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
+defined( 'ABSPATH' ) || exit;
 
 define( 'SCALYN_MAIL_RELAY_VERSION', '0.1.0' );
+define( 'SCALYN_MAIL_RELAY_DB_VERSION', '0.1.0' );
 define( 'SCALYN_MAIL_RELAY_FILE', __FILE__ );
 define( 'SCALYN_MAIL_RELAY_PATH', plugin_dir_path( __FILE__ ) );
 define( 'SCALYN_MAIL_RELAY_URL', plugin_dir_url( __FILE__ ) );
 
-require_once SCALYN_MAIL_RELAY_PATH . 'includes/Core/Plugin.php';
+$composer_autoload = SCALYN_MAIL_RELAY_PATH . 'vendor/autoload.php';
 
-register_activation_hook(
-	__FILE__,
-	array( '\Scalyn\MailRelay\Core\Plugin', 'activate' )
-);
+if ( is_readable( $composer_autoload ) ) {
+	require_once $composer_autoload;
+} else {
+	// Development/source fallback. Production packages should include Composer's autoloader.
+	require_once SCALYN_MAIL_RELAY_PATH . 'includes/Core/Autoloader.php';
+	\Scalyn\MailRelay\Core\Autoloader::register();
+}
 
-register_deactivation_hook(
-	__FILE__,
-	array( '\Scalyn\MailRelay\Core\Plugin', 'deactivate' )
-);
+register_activation_hook( __FILE__, array( '\\Scalyn\\MailRelay\\Core\\Lifecycle', 'activate' ) );
+register_deactivation_hook( __FILE__, array( '\\Scalyn\\MailRelay\\Core\\Lifecycle', 'deactivate' ) );
 
 add_action(
 	'plugins_loaded',
-	static function () {
-		\Scalyn\MailRelay\Core\Plugin::instance()->init();
+	static function (): void {
+		\Scalyn\MailRelay\Core\Plugin::instance()->boot();
 	}
 );

@@ -1,20 +1,11 @@
-# Core architecture
-/includes/Core/ @Kim
-
-# Mail transport
-/includes/Mail/ @Saturn
-/includes/Providers/ @Saturn
-
-# Backend platform
-/includes/Database/ @Yaj
-/includes/Logging/ @Yaj
-/includes/Diagnostics/ @Yaj
-/includes/Rest/ @Yaj
-
-# UI
-/admin/ @Mikko
-/assets/ @Mikko
-
-# Documentation and default review
-/docs/ @Kim
-* @Kim
+# Replace GitHub handles below with the actual team accounts.
+* @scalyn-invited
+/includes/Core/ @scalyn-invited
+/includes/Mail/ @scalyn-invited
+/includes/Providers/ @scalyn-invited
+/includes/Database/ @scalyn-invited
+/includes/Logging/ @scalyn-invited
+/includes/Diagnostics/ @scalyn-invited
+/includes/Rest/ @scalyn-invited
+/admin/ @scalyn-invited
+/docs/ @scalyn-invited

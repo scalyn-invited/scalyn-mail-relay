@@ -1,39 +1,42 @@
 # Scalyn Mail Relay
 
-Scalyn Mail Relay is a WordPress email diagnostics, monitoring, deliverability and remediation platform.
+Scalyn Mail Relay is a WordPress Email Operations Platform focused on delivery, diagnostics, monitoring, remediation and agency management.
 
-This is not just an SMTP plugin. SMTP is only the transport layer.
-
-## Repository
-
-https://github.com/scalyn-invited/scalyn-mail-relay
+> SMTP is the transport layer. Confidence, visibility and diagnostics are the product.
 
 ## Requirements
-
 - WordPress 6.5+
 - PHP 8.2+
 - MySQL 8+ or MariaDB 10.6+
 
-## Branches
+## Development setup
+```bash
+composer install
+composer check
+```
 
-- `main` – stable releases
-- `develop` – integration branch
-- `feature/*` – developer work branches
+## Branch model
+- `main` — releases only
+- `develop` — integration branch
+- `feature/<ticket>-<slug>` — feature branches
+- `fix/<ticket>-<slug>` — non-production fixes
+- `hotfix/<slug>` — urgent production fixes
 
-## MVP Scope
+Never commit directly to `main` or `develop`.
 
-- Core plugin bootstrap
-- SMTP configuration
-- Test email
-- Email logging
-- Timeline events
-- Diagnostics
-- Health score
-- Admin dashboard framework
-- Setup wizard framework
+## Module ownership
+- `includes/Core` — Lead Developer / Solution Architect
+- `includes/Mail`, `includes/Providers` — Mail Transport Engineer
+- `includes/Database`, `includes/Logging`, `includes/Diagnostics`, `includes/Rest` — Backend Platform Engineer
+- `admin`, `assets` — WordPress UI Engineer
 
-## Developer Rule
+## First vertical slice
+1. Configure provider.
+2. Verify provider connection.
+3. Send test email.
+4. Record normalized mail log and timeline.
+5. Display result in the dashboard.
+6. Run SPF/DKIM/DMARC/MX diagnostics.
+7. Generate explainable health score.
 
-Do not work directly on `main` or `develop`.
-
-Create a feature branch and submit a Pull Request.
+See `docs/ENGINEERING-HANDBOOK.md` and the v5.0 Engineering Handbook for architecture and release gates.
