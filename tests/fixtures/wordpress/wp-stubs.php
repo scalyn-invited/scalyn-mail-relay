@@ -89,3 +89,48 @@ if ( ! function_exists( 'load_plugin_textdomain' ) ) {
 		return true;
 	}
 }
+
+if ( ! function_exists( 'current_user_can' ) ) {
+	/**
+	 * @param string $capability
+	 * @return bool
+	 */
+	function current_user_can( string $capability ): bool {
+		return ! empty( $GLOBALS['_test_current_user_can'][ $capability ] );
+	}
+}
+
+if ( ! function_exists( 'wp_die' ) ) {
+	/**
+	 * Stub for wp_die — throws a RuntimeException so tests can assert rejection.
+	 *
+	 * @param string|\WP_Error $message
+	 * @param string           $title
+	 * @param string|array     $args
+	 * @return never
+	 */
+	function wp_die( $message = '', $title = '', $args = array() ): never {
+		throw new \RuntimeException( 'wp_die: ' . ( is_string( $message ) ? $message : '' ) );
+	}
+}
+
+if ( ! function_exists( 'esc_html__' ) ) {
+	/**
+	 * @param string $text
+	 * @param string $domain
+	 * @return string
+	 */
+	function esc_html__( string $text, string $domain = 'default' ): string {
+		return htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' );
+	}
+}
+
+if ( ! function_exists( 'wp_unslash' ) ) {
+	/**
+	 * @param string|array $value
+	 * @return string|array
+	 */
+	function wp_unslash( $value ) {
+		return is_array( $value ) ? array_map( 'wp_unslash', $value ) : stripslashes( (string) $value );
+	}
+}

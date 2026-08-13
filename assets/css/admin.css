@@ -1,6 +1,57 @@
+/* === Scalyn Mail Relay — Admin Styles === */
+
+/* ---- Base layout ---- */
 .scalyn-mail-relay { max-width: 1200px; }
-.scalyn-mail-relay .scalyn-lead { font-size: 15px; color: #50575e; }
+.scalyn-mail-relay .scalyn-lead { font-size: 15px; color: #50575e; margin-bottom: 0; }
 .scalyn-mail-relay .scalyn-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(280px,1fr)); gap: 16px; margin-top: 20px; }
+
+/* ---- Cards ---- */
 .scalyn-mail-relay .scalyn-card { background: #fff; border: 1px solid #dcdcde; border-radius: 10px; padding: 20px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
 .scalyn-mail-relay .scalyn-card h2 { margin-top: 0; }
+.scalyn-mail-relay .scalyn-card__note { margin-top: 8px; color: #50575e; font-size: 13px; }
+
+/* ---- Health score ---- */
 .scalyn-mail-relay .scalyn-score { display: block; font-size: 42px; line-height: 1; margin: 12px 0; }
+
+/* ---- Status badges ---- */
+.scalyn-badge { display: inline-block; padding: 3px 10px; border-radius: 3px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin: 8px 0; }
+.scalyn-badge--unknown { background: #f0f0f1; color: #50575e; }
+.scalyn-badge--healthy { background: #edfaef; color: #00a32a; border: 1px solid #b8e6bf; }
+.scalyn-badge--warning { background: #fef8ee; color: #996800; border: 1px solid #f0c33c; }
+.scalyn-badge--critical { background: #fce8e8; color: #b32d2e; border: 1px solid #f0a6a7; }
+.scalyn-badge--connected { background: #edfaef; color: #00a32a; }
+.scalyn-badge--disconnected { background: #f0f0f1; color: #50575e; }
+.scalyn-badge--verified { background: #edfaef; color: #00a32a; }
+.scalyn-badge--unverified { background: #fef8ee; color: #996800; }
+
+/* ---- Empty state ---- */
+.scalyn-empty-state { padding: 20px 16px; text-align: center; color: #50575e; background: #f9f9f9; border-radius: 6px; border: 1px dashed #dcdcde; margin: 8px 0; }
+.scalyn-empty-state .scalyn-empty-state__message { margin: 0 0 12px; }
+.scalyn-empty-state .scalyn-empty-state__message:last-child { margin-bottom: 0; }
+
+/* ---- Setup step indicator ---- */
+.scalyn-setup-steps { margin: 0; padding: 0; list-style: none; }
+.scalyn-step { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f0f0f1; font-size: 13px; }
+.scalyn-step:last-child { border-bottom: none; }
+.scalyn-step__number { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+.scalyn-step--pending .scalyn-step__number { background: #f0f0f1; color: #50575e; }
+.scalyn-step--active .scalyn-step__number { background: #2271b1; color: #fff; }
+.scalyn-step--complete .scalyn-step__number { background: #00a32a; color: #fff; }
+.scalyn-step--complete .scalyn-step__label { color: #50575e; }
+
+/* ---- Quick actions ---- */
+.scalyn-actions-card { margin-top: 20px; }
+.scalyn-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.scalyn-actions__note { margin: 0; }
+.scalyn-action-btn[disabled] { opacity: .6; cursor: not-allowed; pointer-events: none; }
+
+/* ---- Setup Wizard ---- */
+.scalyn-wizard-nav { margin: 20px 0 16px; overflow-x: auto; }
+.scalyn-wizard-steps { display: flex; list-style: none; margin: 0; padding: 0; gap: 4px; min-width: max-content; }
+.scalyn-wizard-step { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; min-width: 80px; padding: 10px 8px; background: #f0f0f1; border-radius: 6px; font-size: 11px; text-align: center; color: #50575e; }
+.scalyn-wizard-step--active { background: #2271b1; color: #fff; }
+.scalyn-wizard-step--complete { background: #edfaef; color: #00a32a; }
+.scalyn-wizard-step__number { font-size: 15px; font-weight: 700; line-height: 1; }
+.scalyn-wizard-body { margin-bottom: 16px; }
+.scalyn-wizard-body h2 { margin-top: 0; }
+.scalyn-wizard-footer { display: flex; gap: 8px; justify-content: flex-end; }
