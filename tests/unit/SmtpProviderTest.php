@@ -1,0 +1,674 @@
+<?php
+
+use PHPUnit\Framework\TestCase;
+use PHPMailer\PHPMailer\PHPMailer as StubPHPMailer;
+use PHPMailer\PHPMailer\Exception as PHPMailerException;
+use Scalyn\MailRelay\Core\ProviderRegistry;
+use Scalyn\MailRelay\Mail\MailMessage;
+use Scalyn\MailRelay\Mail\SendResult;
+use Scalyn\MailRelay\Providers\ConnectionResult;
+use Scalyn\MailRelay\Providers\Smtp\PhpMailerLoader;
+use Scalyn\MailRelay\Providers\Smtp\SmtpProvider;
+use Scalyn\MailRelay\Providers\ValidationResult;
+
+/**
+ * Concrete SmtpProvider subclass that injects a stub PHPMailer instance.
+ *
+ * Overriding create_mailer() avoids any real network calls and prevents
+ * PhpMailerLoader from needing WordPress-bundled files during tests.
+ */
+final class TestSmtpProvider extends SmtpProvider {
+
+	private StubPHPMailer $stub_mailer;
+
+	public function __construct( StubPHPMailer $stub_mailer ) {
+		$this->stub_mailer = $stub_mailer;
+	}
+
+	protected function create_mailer(): StubPHPMailer {
+		return $this->stub_mailer;
+	}
+}
+
+final class SmtpProviderTest extends TestCase {
+
+	// -------------------------------------------------------------------------
+	// Helpers
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Returns a valid SMTP configuration array.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function valid_config(): array {
+		return array(
+			'host'       => 'mail.example.com',
+			'port'       => 587,
+			'encryption' => 'tls',
+			'username'   => 'user@example.com',
+			'password'   => 'correct-horse-battery-staple',
+			'from_name'  => 'Test Sender',
+			'from_email' => 'from@example.com',
+		);
+	}
+
+	/**
+	 * Returns a valid SMTP configuration with no authentication.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function valid_config_no_auth(): array {
+		return array(
+			'host'       => 'relay.internal.example.com',
+			'port'       => 25,
+			'encryption' => 'none',
+			'username'   => '',
+			'password'   => '',
+			'from_name'  => '',
+			'from_email' => 'from@example.com',
+		);
+	}
+
+	/**
+	 * Returns a minimal MailMessage for send() tests.
+	 *
+	 * @return MailMessage
+	 */
+	private function make_message(): MailMessage {
+		return new MailMessage(
+			uuid: 'test-uuid-001',
+			from: 'from@example.com',
+			to: array( 'to@example.com' ),
+			subject: 'Test Subject',
+			body: '<p>Test body</p>'
+		);
+	}
+
+	/**
+	 * Returns a TestSmtpProvider wrapping the given stub mailer.
+	 *
+	 * @param StubPHPMailer|null $mailer Stub to inject; creates a fresh stub if null.
+	 * @return TestSmtpProvider
+	 */
+	private function make_provider( ?StubPHPMailer $mailer = null ): TestSmtpProvider {
+		return new TestSmtpProvider( $mailer ?? new StubPHPMailer() );
+	}
+
+	// -------------------------------------------------------------------------
+	// Provider identity
+	// -------------------------------------------------------------------------
+
+	public function test_get_id_returns_smtp(): void {
+		$this->assertSame( 'smtp', ( new SmtpProvider() )->get_id() );
+	}
+
+	public function test_get_label_returns_descriptive_string(): void {
+		$label = ( new SmtpProvider() )->get_label();
+		$this->assertNotEmpty( $label );
+		$this->assertStringContainsStringIgnoringCase( 'smtp', $label );
+	}
+
+	public function test_get_capabilities_includes_html_and_attachments(): void {
+		$caps = ( new SmtpProvider() )->get_capabilities();
+		$this->assertContains( 'html', $caps );
+		$this->assertContains( 'attachments', $caps );
+	}
+
+	// -------------------------------------------------------------------------
+	// validate_config — valid cases
+	// -------------------------------------------------------------------------
+
+	public function test_validate_config_accepts_full_authenticated_config(): void {
+		$result = ( new SmtpProvider() )->validate_config( $this->valid_config() );
+		$this->assertTrue( $result->valid );
+		$this->assertEmpty( $result->errors );
+	}
+
+	public function test_validate_config_accepts_no_auth_config(): void {
+		$result = ( new SmtpProvider() )->validate_config( $this->valid_config_no_auth() );
+		$this->assertTrue( $result->valid );
+		$this->assertEmpty( $result->errors );
+	}
+
+	public function test_validate_config_accepts_ssl_encryption(): void {
+		$config               = $this->valid_config();
+		$config['encryption'] = 'ssl';
+		$config['port']       = 465;
+		$result               = ( new SmtpProvider() )->validate_config( $config );
+		$this->assertTrue( $result->valid );
+	}
+
+	// -------------------------------------------------------------------------
+	// validate_config — host validation
+	// -------------------------------------------------------------------------
+
+	public function test_validate_config_rejects_empty_host(): void {
+		$config         = $this->valid_config();
+		$config['host'] = '';
+		$result         = ( new SmtpProvider() )->validate_config( $config );
+		$this->assertFalse( $result->valid );
+		$this->assertArrayHasKey( 'host', $result->errors );
+	}
+
+	public function test_validate_config_rejects_host_with_http_scheme(): void {
+		$config         = $this->valid_config();
+		$config['host'] = 'http://mail.example.com';
+		$result         = ( new SmtpProvider() )->validate_config( $config );
+		$this->assertFalse( $result->valid );
+		$this->assertArrayHasKey( 'host', $result->errors );
+	}
+
+	public function test_validate_config_rejects_host_with_smtp_scheme(): void {
+		$config         = $this->valid_config();
+		$config['host'] = 'smtp://mail.example.com';
+		$result         = ( new SmtpProvider() )->validate_config( $config );
+		$this->assertFalse( $result->valid );
+		$this->assertArrayHasKey( 'host', $result->errors );
+	}
+
+	public function test_validate_config_rejects_host_with_control_character(): void {
+		$config         = $this->valid_config();
+		$config['host'] = "mail.example.com\x00";
+		$result         = ( new SmtpProvider() )->validate_config( $config );
+		$this->assertFalse( $result->valid );
+		$this->assertArrayHasKey( 'host', $result->errors );
+	}
+
+	public function test_validate_config_rejects_host_with_newline_injection(): void {
+		$config         = $this->valid_config();
+		$config['host'] = "mail.example.com\r\nX-Injected: header";
+		$result         = ( new SmtpProvider() )->validate_config( $config );
+		$this->assertFalse( $result->valid );
+		$this->assertArrayHasKey( 'host', $result->errors );
+	}
+
+	public function test_validate_config_rejects_host_with_embedded_space(): void {
+		$config         = $this->valid_config();
+		$config['host'] = 'mail example.com';
+		$result         = ( new SmtpProvider() )->validate_config( $config );
+		$this->assertFalse( $result->valid );
+		$this->assertArrayHasKey( 'host', $result->errors );
+	}
+
+	public function test_validate_config_accepts_ipv4_host(): void {
+		$config         = $this->valid_config();
+		$config['host'] = '192.168.1.100';
+		$result         = ( new SmtpProvider() )->validate_config( $config );
+		$this->assertTrue( $result->valid );
+	}
+
+	// -------------------------------------------------------------------------
+	// validate_config — port validation
+	// -------------------------------------------------------------------------
+
+	public function test_validate_config_rejects_port_zero(): void {
+		$config         = $this->valid_config();
+		$config['port'] = 0;
+		$result         = ( new SmtpProvider() )->validate_config( $config );
+		$this->assertFalse( $result->valid );
+		$this->assertArrayHasKey( 'port', $result->errors );
+	}
+
+	public function test_validate_config_rejects_port_above_65535(): void {
+		$config         = $this->valid_config();
+		$config['port'] = 65536;
+		$result         = ( new SmtpProvider() )->validate_config( $config );
+		$this->assertFalse( $result->valid );
+		$this->assertArrayHasKey( 'port', $result->errors );
+	}
+
+	public function test_validate_config_accepts_port_1(): void {
+		$config         = $this->valid_config();
+		$config['port'] = 1;
+		$result         = ( new SmtpProvider() )->validate_config( $config );
+		$this->assertTrue( $result->valid );
+	}
+
+	public function test_validate_config_accepts_port_65535(): void {
+		$config         = $this->valid_config();
+		$config['port'] = 65535;
+		$result         = ( new SmtpProvider() )->validate_config( $config );
+		$this->assertTrue( $result->valid );
+	}
+
+	// -------------------------------------------------------------------------
+	// validate_config — from_email validation
+	// -------------------------------------------------------------------------
+
+	public function test_validate_config_rejects_empty_from_email(): void {
+		$config               = $this->valid_config();
+		$config['from_email'] = '';
+		$result               = ( new SmtpProvider() )->validate_config( $config );
+		$this->assertFalse( $result->valid );
+		$this->assertArrayHasKey( 'from_email', $result->errors );
+	}
+
+	public function test_validate_config_rejects_invalid_from_email(): void {
+		$config               = $this->valid_config();
+		$config['from_email'] = 'not-an-email';
+		$result               = ( new SmtpProvider() )->validate_config( $config );
+		$this->assertFalse( $result->valid );
+		$this->assertArrayHasKey( 'from_email', $result->errors );
+	}
+
+	public function test_validate_config_rejects_from_email_missing_at_sign(): void {
+		$config               = $this->valid_config();
+		$config['from_email'] = 'userexample.com';
+		$result               = ( new SmtpProvider() )->validate_config( $config );
+		$this->assertFalse( $result->valid );
+		$this->assertArrayHasKey( 'from_email', $result->errors );
+	}
+
+	// -------------------------------------------------------------------------
+	// validate_config — authentication validation
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Requirement: username present + empty password = invalid (incomplete auth config).
+	 */
+	public function test_validate_config_rejects_username_with_empty_password(): void {
+		$config             = $this->valid_config();
+		$config['password'] = '';
+		$result             = ( new SmtpProvider() )->validate_config( $config );
+		$this->assertFalse( $result->valid );
+		$this->assertArrayHasKey( 'password', $result->errors );
+	}
+
+	public function test_validate_config_accepts_username_with_non_empty_password(): void {
+		$result = ( new SmtpProvider() )->validate_config( $this->valid_config() );
+		$this->assertTrue( $result->valid );
+	}
+
+	public function test_validate_config_accepts_empty_username_and_empty_password(): void {
+		$result = ( new SmtpProvider() )->validate_config( $this->valid_config_no_auth() );
+		$this->assertTrue( $result->valid );
+	}
+
+	// -------------------------------------------------------------------------
+	// send() — success: no fabricated IDs or codes
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Requirement: provider_message_id must be null on generic SMTP success.
+	 * PHPMailer's RFC Message-ID is not a provider-assigned transaction ID.
+	 */
+	public function test_send_success_provider_message_id_is_null(): void {
+		$result = $this->make_provider()->send( $this->make_message(), $this->valid_config() );
+		$this->assertTrue( $result->success );
+		$this->assertNull( $result->provider_message_id );
+	}
+
+	/**
+	 * Requirement: response_code must not be fabricated as '250' on success.
+	 */
+	public function test_send_success_response_code_is_null(): void {
+		$result = $this->make_provider()->send( $this->make_message(), $this->valid_config() );
+		$this->assertTrue( $result->success );
+		$this->assertNull( $result->response_code );
+		$this->assertNotSame( '250', $result->response_code );
+	}
+
+	/**
+	 * Requirement: success message must not say "Delivered".
+	 */
+	public function test_send_success_message_does_not_contain_delivered(): void {
+		$result = $this->make_provider()->send( $this->make_message(), $this->valid_config() );
+		$this->assertTrue( $result->success );
+		$this->assertNotNull( $result->response_message );
+		$this->assertStringNotContainsStringIgnoringCase( 'delivered', (string) $result->response_message );
+	}
+
+	public function test_send_success_provider_id_is_smtp(): void {
+		$result = $this->make_provider()->send( $this->make_message(), $this->valid_config() );
+		$this->assertSame( 'smtp', $result->provider );
+	}
+
+	// -------------------------------------------------------------------------
+	// send() — failure normalisation
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Requirement: raw PHPMailer exception messages must not be exposed in results.
+	 */
+	public function test_send_failure_does_not_expose_raw_phpmailer_exception(): void {
+		$stub                  = new StubPHPMailer();
+		$stub->send_exception  = new PHPMailerException( 'SMTP server said: 550 5.1.1 User unknown' );
+		$result                = $this->make_provider( $stub )->send( $this->make_message(), $this->valid_config() );
+
+		$this->assertFalse( $result->success );
+		// Raw server response must not appear in the normalised message.
+		$this->assertStringNotContainsString( '550 5.1.1', (string) $result->response_message );
+		$this->assertStringNotContainsString( 'User unknown', (string) $result->response_message );
+	}
+
+	/**
+	 * Requirement: passwords must not appear in result messages or metadata.
+	 */
+	public function test_send_failure_does_not_expose_password_in_result(): void {
+		$stub                 = new StubPHPMailer();
+		$stub->send_exception = new PHPMailerException( 'authenticate: password incorrect-horse-battery-staple' );
+
+		$config = $this->valid_config();
+		$result = $this->make_provider( $stub )->send( $this->make_message(), $config );
+
+		$this->assertFalse( $result->success );
+		$this->assertStringNotContainsString( $config['password'], (string) $result->response_message );
+		// Metadata must also be free of the password.
+		$this->assertStringNotContainsString( $config['password'], implode( ' ', array_map( 'strval', $result->metadata ) ) );
+	}
+
+	public function test_send_normalises_connection_exception_to_safe_message(): void {
+		$stub                 = new StubPHPMailer();
+		$stub->send_exception = new PHPMailerException( 'SMTP connect() failed.' );
+		$result               = $this->make_provider( $stub )->send( $this->make_message(), $this->valid_config() );
+
+		$this->assertFalse( $result->success );
+		$this->assertSame( 'network', $result->failure_category );
+		$this->assertStringContainsStringIgnoringCase( 'connect', (string) $result->response_message );
+	}
+
+	public function test_send_normalises_auth_exception_to_safe_message(): void {
+		$stub                 = new StubPHPMailer();
+		$stub->send_exception = new PHPMailerException( 'SMTP authenticate: failed.' );
+		$result               = $this->make_provider( $stub )->send( $this->make_message(), $this->valid_config() );
+
+		$this->assertFalse( $result->success );
+		$this->assertSame( 'auth', $result->failure_category );
+		$this->assertStringContainsStringIgnoringCase( 'authentication', (string) $result->response_message );
+	}
+
+	public function test_send_normalises_tls_exception_to_safe_message(): void {
+		$stub                 = new StubPHPMailer();
+		$stub->send_exception = new PHPMailerException( 'Could not connect: TLS negotiation failed.' );
+		$result               = $this->make_provider( $stub )->send( $this->make_message(), $this->valid_config() );
+
+		$this->assertFalse( $result->success );
+		$this->assertSame( 'network', $result->failure_category );
+		$this->assertStringContainsStringIgnoringCase( 'secure', (string) $result->response_message );
+	}
+
+	// -------------------------------------------------------------------------
+	// send() — encryption = none must not enable STARTTLS opportunistically
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Requirement: PHPMailer's SMTPAutoTLS must be false when encryption is 'none'.
+	 * If left at its default (true), PHPMailer upgrades opportunistically even
+	 * when the user explicitly selected no encryption.
+	 */
+	public function test_send_encryption_none_sets_smtp_auto_tls_false(): void {
+		$stub   = new StubPHPMailer();
+		$config = $this->valid_config_no_auth();
+
+		$this->make_provider( $stub )->send( $this->make_message(), $config );
+
+		$this->assertFalse( $stub->SMTPAutoTLS, 'SMTPAutoTLS must be false when encryption is none.' );
+		$this->assertSame( '', $stub->SMTPSecure, 'SMTPSecure must be empty string when encryption is none.' );
+	}
+
+	public function test_send_encryption_tls_uses_starttls_constant(): void {
+		$stub   = new StubPHPMailer();
+		$config = $this->valid_config();
+
+		$this->make_provider( $stub )->send( $this->make_message(), $config );
+
+		$this->assertSame( StubPHPMailer::ENCRYPTION_STARTTLS, $stub->SMTPSecure );
+	}
+
+	public function test_send_encryption_ssl_uses_smtps_constant(): void {
+		$stub                 = new StubPHPMailer();
+		$config               = $this->valid_config();
+		$config['encryption'] = 'ssl';
+
+		$this->make_provider( $stub )->send( $this->make_message(), $config );
+
+		$this->assertSame( StubPHPMailer::ENCRYPTION_SMTPS, $stub->SMTPSecure );
+	}
+
+	// -------------------------------------------------------------------------
+	// send() — address validation
+	// -------------------------------------------------------------------------
+
+	public function test_send_returns_config_failure_for_invalid_sender_address(): void {
+		$message = new MailMessage(
+			uuid: 'bad-from-001',
+			from: 'not-an-email',
+			to: array( 'to@example.com' ),
+			subject: 'Test',
+			body: 'body'
+		);
+
+		$result = $this->make_provider()->send( $message, $this->valid_config() );
+		$this->assertFalse( $result->success );
+		$this->assertSame( 'config', $result->failure_category );
+	}
+
+	public function test_send_returns_config_failure_for_invalid_recipient_address(): void {
+		$message = new MailMessage(
+			uuid: 'bad-to-001',
+			from: 'from@example.com',
+			to: array( 'not-an-email' ),
+			subject: 'Test',
+			body: 'body'
+		);
+
+		$result = $this->make_provider()->send( $message, $this->valid_config() );
+		$this->assertFalse( $result->success );
+		$this->assertSame( 'config', $result->failure_category );
+	}
+
+	public function test_send_returns_config_failure_when_to_is_empty(): void {
+		$message = new MailMessage(
+			uuid: 'no-to-001',
+			from: 'from@example.com',
+			to: array(),
+			subject: 'Test',
+			body: 'body'
+		);
+
+		$result = $this->make_provider()->send( $message, $this->valid_config() );
+		$this->assertFalse( $result->success );
+		$this->assertSame( 'config', $result->failure_category );
+	}
+
+	public function test_send_parses_display_name_address_format(): void {
+		$stub    = new StubPHPMailer();
+		$message = new MailMessage(
+			uuid: 'display-name-001',
+			from: 'Test Sender <from@example.com>',
+			to: array( 'Recipient Name <to@example.com>' ),
+			subject: 'Test',
+			body: 'body'
+		);
+
+		$result = $this->make_provider( $stub )->send( $message, $this->valid_config() );
+
+		$this->assertTrue( $result->success );
+		$this->assertSame( 'from@example.com', $stub->From );
+		$this->assertSame( 'Test Sender', $stub->FromName );
+		$this->assertCount( 1, $stub->recipients );
+		$this->assertSame( 'to@example.com', $stub->recipients[0]['address'] );
+		$this->assertSame( 'Recipient Name', $stub->recipients[0]['name'] );
+	}
+
+	// -------------------------------------------------------------------------
+	// send() — header handling
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Structural headers managed by PHPMailer must not be passed via addCustomHeader().
+	 */
+	public function test_send_skips_from_header(): void {
+		$stub    = new StubPHPMailer();
+		$message = new MailMessage(
+			uuid: 'header-from-001',
+			from: 'from@example.com',
+			to: array( 'to@example.com' ),
+			subject: 'Test',
+			body: 'body',
+			headers: array( 'From: override@evil.com' )
+		);
+
+		$this->make_provider( $stub )->send( $message, $this->valid_config() );
+
+		$header_names = array_map( 'strtolower', array_column( $stub->custom_headers, 'name' ) );
+		$this->assertNotContains( 'from', $header_names, 'From header must not be passed to addCustomHeader().' );
+	}
+
+	public function test_send_skips_subject_header(): void {
+		$stub    = new StubPHPMailer();
+		$message = new MailMessage(
+			uuid: 'header-subject-001',
+			from: 'from@example.com',
+			to: array( 'to@example.com' ),
+			subject: 'Test',
+			body: 'body',
+			headers: array( 'Subject: Injected Subject' )
+		);
+
+		$this->make_provider( $stub )->send( $message, $this->valid_config() );
+
+		$header_names = array_map( 'strtolower', array_column( $stub->custom_headers, 'name' ) );
+		$this->assertNotContains( 'subject', $header_names, 'Subject header must not be passed to addCustomHeader().' );
+	}
+
+	public function test_send_discards_header_containing_newline(): void {
+		$stub    = new StubPHPMailer();
+		$message = new MailMessage(
+			uuid: 'header-inject-001',
+			from: 'from@example.com',
+			to: array( 'to@example.com' ),
+			subject: 'Test',
+			body: 'body',
+			headers: array( "X-Custom: value\r\nBcc: attacker@evil.com" )
+		);
+
+		$this->make_provider( $stub )->send( $message, $this->valid_config() );
+
+		// The entire header must be discarded because it contains CR+LF.
+		$this->assertEmpty( $stub->custom_headers, 'Headers containing newlines must be silently discarded.' );
+	}
+
+	public function test_send_passes_safe_x_custom_header(): void {
+		$stub    = new StubPHPMailer();
+		$message = new MailMessage(
+			uuid: 'header-safe-001',
+			from: 'from@example.com',
+			to: array( 'to@example.com' ),
+			subject: 'Test',
+			body: 'body',
+			headers: array( 'X-Campaign-ID: abc123' )
+		);
+
+		$this->make_provider( $stub )->send( $message, $this->valid_config() );
+
+		$found = false;
+		foreach ( $stub->custom_headers as $header ) {
+			if ( 'X-Campaign-ID' === $header['name'] && 'abc123' === $header['value'] ) {
+				$found = true;
+				break;
+			}
+		}
+		$this->assertTrue( $found, 'Safe custom header must be passed to PHPMailer.' );
+	}
+
+	// -------------------------------------------------------------------------
+	// test_connection() — connection lifecycle
+	// -------------------------------------------------------------------------
+
+	public function test_connection_success_returns_true_result(): void {
+		$result = $this->make_provider()->test_connection( $this->valid_config() );
+		$this->assertTrue( $result->success );
+	}
+
+	public function test_connection_calls_smtp_close_on_success(): void {
+		$stub   = new StubPHPMailer();
+		$result = $this->make_provider( $stub )->test_connection( $this->valid_config() );
+
+		$this->assertTrue( $result->success );
+		$this->assertTrue( $stub->smtpClose_was_called, 'smtpClose() must be called on successful connection.' );
+	}
+
+	public function test_connection_calls_smtp_close_when_auth_fails_after_connect(): void {
+		// smtpConnect() in PHPMailer exceptions-mode throws (never returns false)
+		// when authentication fails. It also calls quit() internally before throwing.
+		// Our smtpClose() in the catch block is still called (idempotent on disconnect).
+		$stub = new StubPHPMailer();
+		$stub->smtpConnect_exception = new PHPMailerException( 'SMTP Error: Could not authenticate.' );
+
+		$result = $this->make_provider( $stub )->test_connection( $this->valid_config() );
+
+		$this->assertFalse( $result->success );
+		$this->assertSame( 'SMTP authentication failed.', $result->message );
+		$this->assertTrue( $stub->smtpClose_was_called, 'smtpClose() must be called in catch block even after smtpConnect() throws.' );
+	}
+
+	public function test_connection_calls_smtp_close_when_exception_is_thrown(): void {
+		$stub                       = new StubPHPMailer();
+		$stub->smtpConnect_exception = new PHPMailerException( 'TLS negotiation failed.' );
+
+		$result = $this->make_provider( $stub )->test_connection( $this->valid_config() );
+
+		$this->assertFalse( $result->success );
+		$this->assertTrue( $stub->smtpClose_was_called, 'smtpClose() must be called when smtpConnect() throws.' );
+	}
+
+	public function test_connection_returns_failure_when_smtp_connect_returns_false(): void {
+		$stub                     = new StubPHPMailer();
+		$stub->smtpConnect_result = false;
+
+		$result = $this->make_provider( $stub )->test_connection( $this->valid_config() );
+
+		$this->assertFalse( $result->success );
+	}
+
+	public function test_connection_with_no_credentials_succeeds_and_closes(): void {
+		$stub = new StubPHPMailer();
+
+		$result = $this->make_provider( $stub )->test_connection( $this->valid_config_no_auth() );
+
+		$this->assertTrue( $result->success );
+		$this->assertTrue( $stub->smtpClose_was_called, 'smtpClose() must be called on success with no-auth config.' );
+	}
+
+	// -------------------------------------------------------------------------
+	// PHPMailer loader
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Requirement: PHPMailer classes are pre-loaded via stubs in the test bootstrap.
+	 * PhpMailerLoader::load() must be a no-op when classes already exist.
+	 */
+	public function test_phpmailer_loader_is_no_op_when_classes_already_loaded(): void {
+		$this->assertTrue(
+			class_exists( 'PHPMailer\\PHPMailer\\PHPMailer', false ),
+			'PHPMailer stubs must be loaded before this test runs.'
+		);
+
+		// Must not throw or require any filesystem access.
+		PhpMailerLoader::load();
+
+		$this->assertTrue( class_exists( 'PHPMailer\\PHPMailer\\PHPMailer', false ) );
+	}
+
+	// -------------------------------------------------------------------------
+	// Provider registration
+	// -------------------------------------------------------------------------
+
+	public function test_provider_can_be_registered_in_provider_registry(): void {
+		$registry = new ProviderRegistry();
+		$registry->register( new SmtpProvider() );
+
+		$this->assertTrue( $registry->has( 'smtp' ) );
+		$this->assertInstanceOf( SmtpProvider::class, $registry->get( 'smtp' ) );
+	}
+
+	public function test_provider_registration_replaces_existing_registration(): void {
+		$registry = new ProviderRegistry();
+		$registry->register( new SmtpProvider() );
+		$registry->register( new SmtpProvider() ); // second registration must not throw.
+
+		$this->assertTrue( $registry->has( 'smtp' ) );
+	}
+}
