@@ -12,5 +12,10 @@ define( 'SCALYN_MAIL_RELAY_FILE', SCALYN_MAIL_RELAY_PATH . 'scalyn-mail-relay.ph
 
 require_once __DIR__ . '/fixtures/wordpress/wp-stubs.php';
 
+// Load PHPMailer stub classes before any provider code runs.
+// PhpMailerLoader::load() checks class_exists() first and skips the
+// WordPress-bundled file require when the classes are already in memory.
+require_once __DIR__ . '/fixtures/phpmailer/phpmailer-stubs.php';
+
 require_once SCALYN_MAIL_RELAY_PATH . 'includes/Core/Autoloader.php';
 \Scalyn\MailRelay\Core\Autoloader::register();

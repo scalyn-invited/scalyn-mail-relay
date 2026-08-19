@@ -42,3 +42,15 @@ add_action(
 		\Scalyn\MailRelay\Core\Plugin::instance()->boot();
 	}
 );
+
+// Register the built-in SMTP provider once Core services are ready.
+// The scalyn_mail_relay_booted action fires after ProviderRegistry is
+// registered in the container and before any mail dispatch occurs.
+// No network call is made during registration.
+add_action(
+	'scalyn_mail_relay_booted',
+	static function ( \Scalyn\MailRelay\Core\Container $container ): void {
+		$container->get( \Scalyn\MailRelay\Core\ProviderRegistry::class )
+			->register( new \Scalyn\MailRelay\Providers\Smtp\SmtpProvider() );
+	}
+);
