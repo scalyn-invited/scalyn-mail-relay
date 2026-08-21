@@ -69,6 +69,7 @@ final class WizardControllerTest extends TestCase {
 		// Reset all test globals.
 		$GLOBALS['_test_wp_options']       = array();
 		$GLOBALS['_test_wp_actions']       = array();
+		$GLOBALS['_test_wp_added_actions'] = array();
 		$GLOBALS['_test_wp_transients']    = array();
 		$GLOBALS['_test_current_user_id']  = 1;
 		$GLOBALS['_test_wp_nonce_valid']   = true; // Default: nonce is valid.

@@ -11,8 +11,9 @@ use Scalyn\MailRelay\Mail\MailDispatcher;
 final class PluginTest extends TestCase {
 
 	protected function setUp(): void {
-		$GLOBALS['_test_wp_options'] = array();
-		$GLOBALS['_test_wp_actions'] = array();
+		$GLOBALS['_test_wp_options']       = array();
+		$GLOBALS['_test_wp_actions']       = array();
+		$GLOBALS['_test_wp_added_actions'] = array();
 		$this->reset_plugin_singleton();
 	}
 

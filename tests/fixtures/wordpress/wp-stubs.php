@@ -15,12 +15,14 @@
  * tests to verify that specific hooks were fired by the dispatcher.
  */
 
-$GLOBALS['_test_wp_options']     = array();
-$GLOBALS['_test_wp_actions']     = array();
-$GLOBALS['_test_wp_transients']  = array();
-$GLOBALS['_test_current_user_id'] = 1;
-$GLOBALS['_test_wp_nonce_valid'] = false;
-$GLOBALS['_test_wp_redirect']    = null;
+$GLOBALS['_test_wp_options']       = array();
+$GLOBALS['_test_wp_actions']       = array();
+$GLOBALS['_test_wp_added_actions'] = array();
+$GLOBALS['_test_wp_transients']    = array();
+$GLOBALS['_test_current_user_id']  = 1;
+$GLOBALS['_test_wp_nonce_valid']   = false;
+$GLOBALS['_test_wp_redirect']      = null;
+$GLOBALS['_test_current_time']     = null; // null = use real time; string = fixed time for tests.
 
 if ( ! function_exists( 'get_option' ) ) {
 	/**
@@ -47,12 +49,20 @@ if ( ! function_exists( 'update_option' ) ) {
 
 if ( ! function_exists( 'do_action' ) ) {
 	/**
-	 * Fires the callback registered in $GLOBALS['_test_wp_actions'] for the hook.
-	 * Only one callback per hook name is supported in the test context.
+	 * Fires registered callbacks for the hook.
+	 *
+	 * Two registration paths are supported:
+	 *   _test_wp_actions   — direct-assign path used by MailDispatcherTest and PluginTest.
+	 *                        Only one callback per hook; called with all args as-is.
+	 *   _test_wp_added_actions — populated by add_action(); supports multiple callbacks
+	 *                            per hook and respects accepted_args.
 	 */
 	function do_action( string $hook_name, mixed ...$args ): void {
 		if ( isset( $GLOBALS['_test_wp_actions'][ $hook_name ] ) ) {
 			( $GLOBALS['_test_wp_actions'][ $hook_name ] )( ...$args );
+		}
+		foreach ( $GLOBALS['_test_wp_added_actions'][ $hook_name ] ?? array() as $entry ) {
+			( $entry['callback'] )( ...array_slice( $args, 0, $entry['accepted_args'] ) );
 		}
 	}
 }
@@ -326,5 +336,211 @@ if ( ! function_exists( 'esc_url' ) ) {
 	 */
 	function esc_url( string $url, array $protocols = array() ): string {
 		return $url;
+	}
+}
+
+if ( ! function_exists( 'add_action' ) ) {
+	/**
+	 * Registers a WordPress action callback.
+	 *
+	 * Recorded in $GLOBALS['_test_wp_added_actions'] so tests can assert
+	 * that register() wired the correct hooks. Does not integrate with do_action().
+	 *
+	 * @param string          $tag             Hook name.
+	 * @param callable|array  $function_to_add Callback to register.
+	 * @param int             $priority        Execution priority (default 10).
+	 * @param int             $accepted_args   Number of arguments the callback accepts.
+	 */
+	function add_action( string $tag, $function_to_add, int $priority = 10, int $accepted_args = 1 ): bool {
+		$GLOBALS['_test_wp_added_actions'][ $tag ][] = array(
+			'callback'      => $function_to_add,
+			'priority'      => $priority,
+			'accepted_args' => $accepted_args,
+		);
+		return true;
+	}
+}
+
+if ( ! function_exists( 'current_time' ) ) {
+	/**
+	 * Returns the current time in MySQL datetime format.
+	 *
+	 * Returns $GLOBALS['_test_current_time'] when set (non-null string) so that
+	 * tests can pin the timestamp to a deterministic value.
+	 *
+	 * @param string $type Ignored in the stub (always returns MySQL datetime format).
+	 * @param bool   $gmt  Ignored in the stub.
+	 */
+	function current_time( string $type, bool $gmt = false ): string {
+		if ( null !== $GLOBALS['_test_current_time'] ) {
+			return (string) $GLOBALS['_test_current_time'];
+		}
+		return gmdate( 'Y-m-d H:i:s' );
+	}
+}
+
+if ( ! function_exists( 'wp_json_encode' ) ) {
+	/**
+	 * Encodes a value to JSON. Mirrors WordPress's wp_json_encode().
+	 *
+	 * @param mixed $data    The value to encode.
+	 * @param int   $options JSON encode options (default 0).
+	 * @param int   $depth   Maximum depth (default 512).
+	 * @return string|false JSON string on success; false on failure.
+	 */
+	function wp_json_encode( mixed $data, int $options = 0, int $depth = 512 ): string|false {
+		return json_encode( $data, $options, $depth );
+	}
+}
+
+/**
+ * Minimal $wpdb stub for unit tests.
+ *
+ * Tracks INSERT/UPDATE calls and configures return values for SELECT queries.
+ * Each test should set $GLOBALS['wpdb'] = new WpdbStub() in setUp() to ensure
+ * a clean slate between tests.
+ *
+ * Using a concrete class (not an interface) mirrors how WordPress code accesses
+ * $wpdb as a global — tests configure the global, repositories consume it.
+ */
+class WpdbStub {
+
+	/** Table name prefix. */
+	public string $prefix = 'wp_';
+
+	/** Recorded INSERT calls: [ ['table' => string, 'data' => array], ... ] */
+	public array $inserts = array();
+
+	/** Recorded UPDATE calls: [ ['table' => string, 'data' => array, 'where' => array], ... ] */
+	public array $updates = array();
+
+	/** Recorded prepare() calls: [ ['query' => string, 'args' => array], ... ] */
+	public array $prepare_calls = array();
+
+	/** Value returned by get_var(). Set per-test to simulate existing/absent rows. */
+	public mixed $get_var_return = null;
+
+	/** Row returned by get_row(). Null simulates "not found". */
+	public ?array $get_row_return = null;
+
+	/** Rows returned by get_results(). Empty array = no rows. */
+	public array $get_results_return = array();
+
+	/**
+	 * When true, insert() throws a RuntimeException to simulate a DB-layer exception.
+	 * Tests the subscriber's catch boundary for unexpected $wpdb exceptions.
+	 */
+	public bool $throw_on_insert = false;
+
+	/**
+	 * When true, insert() returns false to simulate a failed DB write.
+	 * Tests the repository's false-return detection and safe exception throwing.
+	 */
+	public bool $return_false_on_insert = false;
+
+	/**
+	 * When true, update() returns false to simulate a failed DB update.
+	 * Tests the repository's false-return detection and safe exception throwing.
+	 */
+	public bool $return_false_on_update = false;
+
+	/**
+	 * Prepares a SQL query. In the stub, arguments are recorded but the raw query
+	 * template is returned unchanged. get_var/get_row/get_results ignore the query.
+	 *
+	 * @param string $query SQL template with %s/%d placeholders.
+	 * @param mixed  ...$args Substitution values (recorded for assertion).
+	 * @return string The unmodified query template.
+	 */
+	public function prepare( string $query, mixed ...$args ): string {
+		$this->prepare_calls[] = array(
+			'query' => $query,
+			'args'  => $args,
+		);
+		return $query;
+	}
+
+	/**
+	 * Records an INSERT and returns 1 (rows affected) or throws when throw_on_insert.
+	 *
+	 * @param string $table  Target table name.
+	 * @param array  $data   Column => value pairs to insert.
+	 * @param mixed  $format Optional format specifiers (unused in stub).
+	 * @return int|false     1 on simulated success.
+	 * @throws \RuntimeException When $this->throw_on_insert is true.
+	 */
+	public function insert( string $table, array $data, mixed $format = null ): int|false {
+		if ( $this->throw_on_insert ) {
+			throw new \RuntimeException( 'Simulated DB failure in insert()' );
+		}
+		if ( $this->return_false_on_insert ) {
+			return false;
+		}
+		$this->inserts[] = array(
+			'table' => $table,
+			'data'  => $data,
+		);
+		return 1;
+	}
+
+	/**
+	 * Records an UPDATE and returns 1 (rows affected).
+	 *
+	 * @param string $table        Target table name.
+	 * @param array  $data         Column => value pairs to update.
+	 * @param array  $where        Column => value pairs for the WHERE clause.
+	 * @param mixed  $format       Optional format specifiers (unused in stub).
+	 * @param mixed  $where_format Optional WHERE format specifiers (unused in stub).
+	 * @return int|false           1 on simulated success.
+	 */
+	public function update( string $table, array $data, array $where, mixed $format = null, mixed $where_format = null ): int|false {
+		if ( $this->return_false_on_update ) {
+			return false;
+		}
+		$this->updates[] = array(
+			'table' => $table,
+			'data'  => $data,
+			'where' => $where,
+		);
+		return 1;
+	}
+
+	/**
+	 * Returns the configured get_var_return value regardless of the query.
+	 *
+	 * @param string $query Ignored in the stub.
+	 * @return mixed The value set via $this->get_var_return.
+	 */
+	public function get_var( string $query ): mixed {
+		return $this->get_var_return;
+	}
+
+	/**
+	 * Returns the configured get_row_return value regardless of the query.
+	 *
+	 * @param string $query  Ignored in the stub.
+	 * @param string $output Output format constant (OBJECT or ARRAY_A); used to
+	 *                       decide whether to cast the return value to object.
+	 * @return array|object|null
+	 */
+	public function get_row( string $query, string $output = OBJECT ): array|object|null {
+		if ( null === $this->get_row_return ) {
+			return null;
+		}
+		if ( ARRAY_A === $output ) {
+			return $this->get_row_return;
+		}
+		return (object) $this->get_row_return;
+	}
+
+	/**
+	 * Returns the configured get_results_return value regardless of the query.
+	 *
+	 * @param string $query  Ignored in the stub.
+	 * @param string $output Output format constant (unused in stub; always returns arrays).
+	 * @return array
+	 */
+	public function get_results( string $query, string $output = OBJECT ): array {
+		return $this->get_results_return;
 	}
 }
