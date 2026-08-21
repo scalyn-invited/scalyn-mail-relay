@@ -150,7 +150,7 @@ final class SettingsRepository {
 	 */
 	public function save( array $new_settings ): bool {
 		$sanitized  = $this->sanitize( $new_settings );
-		$this->data = array_replace_recursive( self::DEFAULTS, $sanitized );
+		$this->data = array_replace_recursive( $this->data, $sanitized );
 		return update_option( self::OPTION_KEY, $this->data );
 	}
 
@@ -187,7 +187,13 @@ final class SettingsRepository {
 			) ? (string) $smtp['encryption'] : 'tls';
 
 			// @security Stored verbatim — see method docblock.
-			$output['smtp']['password'] = (string) ( $smtp['password'] ?? '' );
+			// A blank submitted password preserves the currently stored value rather
+			// than overwriting it with an empty string. This allows the edit form to
+			// render without exposing the stored password in an HTML value attribute.
+			$submitted_password         = (string) ( $smtp['password'] ?? '' );
+			$output['smtp']['password'] = '' !== $submitted_password
+				? $submitted_password
+				: (string) ( $this->data['smtp']['password'] ?? '' );
 		}
 
 		if ( isset( $input['advanced'] ) && is_array( $input['advanced'] ) ) {

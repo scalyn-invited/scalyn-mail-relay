@@ -12,6 +12,7 @@ use Scalyn\MailRelay\Admin\Pages\DiagnosticsPage;
 use Scalyn\MailRelay\Admin\Pages\LogsPage;
 use Scalyn\MailRelay\Admin\Pages\ProvidersPage;
 use Scalyn\MailRelay\Admin\Pages\WizardPage;
+use Scalyn\MailRelay\Admin\WizardController;
 use Scalyn\MailRelay\Core\Capabilities;
 
 defined( 'ABSPATH' ) || exit;
@@ -59,7 +60,7 @@ final class AdminMenu {
 			array( $this, 'render_dashboard' )
 		);
 
-		add_submenu_page(
+		$wizard_hook = add_submenu_page(
 			'scalyn-mail-relay',
 			__( 'Setup Wizard — Scalyn Mail Relay', 'scalyn-mail-relay' ),
 			__( 'Setup Wizard', 'scalyn-mail-relay' ),
@@ -67,6 +68,13 @@ final class AdminMenu {
 			'scalyn-mail-relay-wizard',
 			array( $this, 'render_wizard' )
 		);
+
+		// Register POST handling before admin-header.php outputs HTML so that
+		// wp_safe_redirect() can still send the Location header. The page
+		// callback fires after output has started and headers are already sent.
+		if ( $wizard_hook ) {
+			add_action( 'load-' . $wizard_hook, array( $this, 'handle_wizard_post' ) );
+		}
 
 		add_submenu_page(
 			'scalyn-mail-relay',
@@ -122,6 +130,25 @@ final class AdminMenu {
 	 */
 	public function render_wizard(): void {
 		( new WizardPage() )->render();
+	}
+
+	/**
+	 * Handles wizard POST requests before any page output is sent.
+	 *
+	 * Registered on the load-{hook} action so it fires before admin-header.php
+	 * outputs HTML, which allows wp_safe_redirect() + exit to send the Location
+	 * header before the response body begins.
+	 *
+	 * On GET (and any non-POST) requests, returns immediately so normal page
+	 * rendering in render_wizard() proceeds unaffected.
+	 */
+	public function handle_wizard_post(): void {
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.ValidatedSanitizedInput.MissingUnslash -- REQUEST_METHOD is a server-controlled value, not user input.
+		if ( 'POST' !== ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) {
+			return;
+		}
+
+		( new WizardController() )->handle();
 	}
 
 	/**
