@@ -8,6 +8,9 @@
 namespace Scalyn\MailRelay\Core;
 
 use Scalyn\MailRelay\Admin\AdminMenu;
+use Scalyn\MailRelay\Logging\MailEventSubscriber;
+use Scalyn\MailRelay\Logging\MailLogRepository;
+use Scalyn\MailRelay\Logging\TimelineRepository;
 use Scalyn\MailRelay\Mail\MailDispatcher;
 
 defined( 'ABSPATH' ) || exit;
@@ -96,6 +99,14 @@ final class Plugin {
 				$c->get( SettingsRepository::class )
 			)
 		);
+
+		$this->container->set(
+			MailEventSubscriber::class,
+			static fn(): MailEventSubscriber => new MailEventSubscriber(
+				new MailLogRepository(),
+				new TimelineRepository()
+			)
+		);
 	}
 
 	/**
@@ -103,6 +114,10 @@ final class Plugin {
 	 */
 	private function register_hooks(): void {
 		load_plugin_textdomain( 'scalyn-mail-relay', false, dirname( plugin_basename( SCALYN_MAIL_RELAY_FILE ) ) . '/languages' );
+
+		// Mail logging hooks run on every request (not only admin) because mail
+		// can be dispatched from frontend, REST, WP-CLI, and cron contexts.
+		$this->container->get( MailEventSubscriber::class )->register();
 
 		if ( is_admin() ) {
 			$this->container->get( AdminMenu::class )->register();

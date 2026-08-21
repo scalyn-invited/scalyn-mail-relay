@@ -9,6 +9,11 @@
 define( 'ABSPATH', __DIR__ . '/fixtures/wordpress/' );
 define( 'SCALYN_MAIL_RELAY_PATH', dirname( __DIR__ ) . '/' );
 define( 'SCALYN_MAIL_RELAY_FILE', SCALYN_MAIL_RELAY_PATH . 'scalyn-mail-relay.php' );
+define( 'SCALYN_MAIL_RELAY_DB_VERSION', '0.1.0' );
+
+// WordPress DB output-format constants used by wpdb::get_row() / get_results().
+define( 'OBJECT', 'OBJECT' );
+define( 'ARRAY_A', 'ARRAY_A' );
 
 require_once __DIR__ . '/fixtures/wordpress/wp-stubs.php';
 
