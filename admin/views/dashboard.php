@@ -61,7 +61,7 @@ $setup_steps = array(
 		<section class="scalyn-card" aria-labelledby="scalyn-provider-heading">
 			<h2 id="scalyn-provider-heading"><?php esc_html_e( 'Mail Provider', 'scalyn-mail-relay' ); ?></h2>
 			<?php if ( $provider_configured ) : ?>
-				<?php StatusBadge::render( 'connected', __( 'Connected', 'scalyn-mail-relay' ) ); ?>
+				<?php StatusBadge::render( 'connected', __( 'Configured', 'scalyn-mail-relay' ) ); ?>
 			<?php else : ?>
 				<?php StatusBadge::render( 'disconnected', __( 'Not configured', 'scalyn-mail-relay' ) ); ?>
 				<p class="scalyn-card__note"><?php esc_html_e( 'No mail provider has been configured. Use the Setup Wizard to get started.', 'scalyn-mail-relay' ); ?></p>

@@ -1,6 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use Scalyn\MailRelay\Admin\AdminMenu;
 use Scalyn\MailRelay\Admin\Pages\DashboardPage;
 use Scalyn\MailRelay\Admin\Pages\DiagnosticsPage;
 use Scalyn\MailRelay\Admin\Pages\LogsPage;
@@ -19,6 +20,12 @@ final class AdminMenuTest extends TestCase {
 
 	protected function setUp(): void {
 		$GLOBALS['_test_current_user_can'] = array();
+		$GLOBALS['_test_wp_redirect']      = null;
+		$_SERVER['REQUEST_METHOD']         = 'GET';
+	}
+
+	protected function tearDown(): void {
+		$_SERVER['REQUEST_METHOD'] = 'GET';
 	}
 
 	// -------------------------------------------------------------------------
@@ -108,5 +115,26 @@ final class AdminMenuTest extends TestCase {
 		$GLOBALS['_test_current_user_can'][ Capabilities::VIEW_DASHBOARD ] = true;
 		$this->expectException( RuntimeException::class );
 		( new DiagnosticsPage() )->render();
+	}
+
+	// -------------------------------------------------------------------------
+	// handle_wizard_post() — load-hook POST gate
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Regression guard: handle_wizard_post() must not redirect or throw on GET.
+	 *
+	 * When WordPress fires the load-{hook} action on a normal GET page load,
+	 * handle_wizard_post() must return silently so render_wizard() can proceed.
+	 */
+	public function test_handle_wizard_post_does_nothing_on_get(): void {
+		$_SERVER['REQUEST_METHOD'] = 'GET';
+
+		( new AdminMenu() )->handle_wizard_post();
+
+		$this->assertNull(
+			$GLOBALS['_test_wp_redirect'],
+			'handle_wizard_post() must not redirect when the request method is GET.'
+		);
 	}
 }
