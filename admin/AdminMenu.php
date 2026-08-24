@@ -14,6 +14,7 @@ use Scalyn\MailRelay\Admin\Pages\ProvidersPage;
 use Scalyn\MailRelay\Admin\Pages\WizardPage;
 use Scalyn\MailRelay\Admin\WizardController;
 use Scalyn\MailRelay\Core\Capabilities;
+use Scalyn\MailRelay\Core\Plugin;
 use Scalyn\MailRelay\Logging\MailLogRepository;
 use Scalyn\MailRelay\Logging\TimelineRepository;
 
@@ -163,12 +164,15 @@ final class AdminMenu {
 	/**
 	 * Renders the email logs page.
 	 *
-	 * MailLogRepository and TimelineRepository are not registered as shared
-	 * container services (they are inlined inside the MailEventSubscriber factory).
-	 * They are instantiated directly here — consistent with the existing pattern.
+	 * MailLogRepository and TimelineRepository are resolved from the shared
+	 * service container, consistent with the established plugin service pattern.
 	 */
 	public function render_logs(): void {
-		( new LogsPage( new MailLogRepository(), new TimelineRepository() ) )->render();
+		$container = Plugin::instance()->container();
+		( new LogsPage(
+			$container->get( MailLogRepository::class ),
+			$container->get( TimelineRepository::class )
+		) )->render();
 	}
 
 	/**
