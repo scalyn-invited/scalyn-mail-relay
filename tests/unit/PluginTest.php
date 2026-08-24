@@ -6,6 +6,9 @@ use Scalyn\MailRelay\Core\Container;
 use Scalyn\MailRelay\Core\Plugin;
 use Scalyn\MailRelay\Core\ProviderRegistry;
 use Scalyn\MailRelay\Core\SettingsRepository;
+use Scalyn\MailRelay\Logging\MailEventSubscriber;
+use Scalyn\MailRelay\Logging\MailLogRepository;
+use Scalyn\MailRelay\Logging\TimelineRepository;
 use Scalyn\MailRelay\Mail\MailDispatcher;
 
 final class PluginTest extends TestCase {
@@ -56,6 +59,14 @@ final class PluginTest extends TestCase {
 		$this->assertTrue( $this->booted_container()->has( AdminMenu::class ) );
 	}
 
+	public function test_mail_log_repository_is_registered_in_container(): void {
+		$this->assertTrue( $this->booted_container()->has( MailLogRepository::class ) );
+	}
+
+	public function test_timeline_repository_is_registered_in_container(): void {
+		$this->assertTrue( $this->booted_container()->has( TimelineRepository::class ) );
+	}
+
 	// -------------------------------------------------------------------------
 	// Dependency wiring
 	// -------------------------------------------------------------------------
@@ -78,6 +89,24 @@ final class PluginTest extends TestCase {
 		$this->assertSame( $settings, $prop->getValue( $dispatcher ) );
 	}
 
+	public function test_mail_event_subscriber_receives_shared_mail_log_repository_instance(): void {
+		$container  = $this->booted_container();
+		$log_repo   = $container->get( MailLogRepository::class );
+		$subscriber = $container->get( MailEventSubscriber::class );
+
+		$prop = new \ReflectionProperty( MailEventSubscriber::class, 'log_repo' );
+		$this->assertSame( $log_repo, $prop->getValue( $subscriber ) );
+	}
+
+	public function test_mail_event_subscriber_receives_shared_timeline_repository_instance(): void {
+		$container      = $this->booted_container();
+		$timeline_repo  = $container->get( TimelineRepository::class );
+		$subscriber     = $container->get( MailEventSubscriber::class );
+
+		$prop = new \ReflectionProperty( MailEventSubscriber::class, 'timeline_repo' );
+		$this->assertSame( $timeline_repo, $prop->getValue( $subscriber ) );
+	}
+
 	// -------------------------------------------------------------------------
 	// Container caching contract
 	// -------------------------------------------------------------------------
@@ -88,6 +117,18 @@ final class PluginTest extends TestCase {
 		$this->assertSame( $container->get( ProviderRegistry::class ), $container->get( ProviderRegistry::class ) );
 		$this->assertSame( $container->get( SettingsRepository::class ), $container->get( SettingsRepository::class ) );
 		$this->assertSame( $container->get( MailDispatcher::class ), $container->get( MailDispatcher::class ) );
+	}
+
+	public function test_repeated_resolution_of_mail_log_repository_returns_same_instance(): void {
+		$container = $this->booted_container();
+
+		$this->assertSame( $container->get( MailLogRepository::class ), $container->get( MailLogRepository::class ) );
+	}
+
+	public function test_repeated_resolution_of_timeline_repository_returns_same_instance(): void {
+		$container = $this->booted_container();
+
+		$this->assertSame( $container->get( TimelineRepository::class ), $container->get( TimelineRepository::class ) );
 	}
 
 	// -------------------------------------------------------------------------

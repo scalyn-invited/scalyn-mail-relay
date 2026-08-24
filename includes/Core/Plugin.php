@@ -100,11 +100,13 @@ final class Plugin {
 			)
 		);
 
+		$this->container->set( MailLogRepository::class, static fn(): MailLogRepository => new MailLogRepository() );
+		$this->container->set( TimelineRepository::class, static fn(): TimelineRepository => new TimelineRepository() );
 		$this->container->set(
 			MailEventSubscriber::class,
-			static fn(): MailEventSubscriber => new MailEventSubscriber(
-				new MailLogRepository(),
-				new TimelineRepository()
+			static fn( Container $c ): MailEventSubscriber => new MailEventSubscriber(
+				$c->get( MailLogRepository::class ),
+				$c->get( TimelineRepository::class )
 			)
 		);
 	}
