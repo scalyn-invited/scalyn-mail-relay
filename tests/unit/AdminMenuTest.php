@@ -8,6 +8,8 @@ use Scalyn\MailRelay\Admin\Pages\LogsPage;
 use Scalyn\MailRelay\Admin\Pages\ProvidersPage;
 use Scalyn\MailRelay\Admin\Pages\WizardPage;
 use Scalyn\MailRelay\Core\Capabilities;
+use Scalyn\MailRelay\Logging\MailLogRepository;
+use Scalyn\MailRelay\Logging\TimelineRepository;
 
 /**
  * Tests for the admin page capability gates.
@@ -22,6 +24,7 @@ final class AdminMenuTest extends TestCase {
 		$GLOBALS['_test_current_user_can'] = array();
 		$GLOBALS['_test_wp_redirect']      = null;
 		$_SERVER['REQUEST_METHOD']         = 'GET';
+		$GLOBALS['wpdb']                   = new WpdbStub();
 	}
 
 	protected function tearDown(): void {
@@ -73,7 +76,7 @@ final class AdminMenuTest extends TestCase {
 
 	public function test_logs_page_rejects_user_without_view_logs(): void {
 		$this->expectException( RuntimeException::class );
-		( new LogsPage() )->render();
+		( new LogsPage( new MailLogRepository(), new TimelineRepository() ) )->render();
 	}
 
 	public function test_diagnostics_page_rejects_user_without_run_diagnostics(): void {
@@ -108,7 +111,7 @@ final class AdminMenuTest extends TestCase {
 	public function test_logs_page_rejects_user_with_only_manage_settings(): void {
 		$GLOBALS['_test_current_user_can'][ Capabilities::MANAGE_SETTINGS ] = true;
 		$this->expectException( RuntimeException::class );
-		( new LogsPage() )->render();
+		( new LogsPage( new MailLogRepository(), new TimelineRepository() ) )->render();
 	}
 
 	public function test_diagnostics_page_rejects_user_with_only_view_dashboard(): void {
