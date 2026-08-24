@@ -339,6 +339,46 @@ if ( ! function_exists( 'esc_url' ) ) {
 	}
 }
 
+if ( ! function_exists( 'esc_html_e' ) ) {
+	/**
+	 * Outputs an HTML-escaped translated string.
+	 *
+	 * @param string $text   Text to translate and escape.
+	 * @param string $domain Text domain (unused in stub).
+	 */
+	function esc_html_e( string $text, string $domain = 'default' ): void {
+		echo esc_html( $text ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- esc_html() is called.
+	}
+}
+
+if ( ! function_exists( 'esc_attr_e' ) ) {
+	/**
+	 * Outputs an attribute-escaped translated string.
+	 *
+	 * @param string $text   Text to translate and escape.
+	 * @param string $domain Text domain (unused in stub).
+	 */
+	function esc_attr_e( string $text, string $domain = 'default' ): void {
+		echo esc_attr( $text ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- esc_attr() is called.
+	}
+}
+
+if ( ! function_exists( 'sanitize_html_class' ) ) {
+	/**
+	 * Sanitizes a string to be used as a CSS class name.
+	 *
+	 * Strips any character that is not a word character or a hyphen.
+	 *
+	 * @param string $class    CSS class name candidate.
+	 * @param string $fallback Value returned when $class is empty after sanitization.
+	 * @return string Sanitized class name.
+	 */
+	function sanitize_html_class( string $class, string $fallback = '' ): string {
+		$sanitized = preg_replace( '/[^a-zA-Z0-9_-]/', '', $class );
+		return '' !== $sanitized ? $sanitized : $fallback;
+	}
+}
+
 if ( ! function_exists( 'add_action' ) ) {
 	/**
 	 * Registers a WordPress action callback.
