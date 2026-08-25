@@ -11,15 +11,16 @@ use Scalyn\MailRelay\Core\Capabilities;
 use Scalyn\MailRelay\Core\Plugin;
 use Scalyn\MailRelay\Core\ProviderRegistry;
 use Scalyn\MailRelay\Core\SettingsRepository;
+use Scalyn\MailRelay\Logging\MailLogRepository;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Prepares dashboard data and renders the dashboard view.
  *
- * Data boundary: reads only from Core services (SettingsRepository,
- * ProviderRegistry). Must not query database tables directly, construct
- * transports, access Saturn/Yaj internals, or calculate health scores.
+ * Data boundary: reads from Core services (SettingsRepository, ProviderRegistry)
+ * and the shared MailLogRepository. Must not query database tables directly,
+ * construct transports, access Saturn/Yaj internals, or calculate health scores.
  *
  * Health score, activity stats, and diagnostic results remain as explicit
  * empty state until Yaj's logging and diagnostics REST contracts are available.
@@ -38,6 +39,21 @@ final class DashboardPage {
 
 		$provider_configured = $this->is_provider_configured();
 
+		$log_repo   = Plugin::instance()->container()->get( MailLogRepository::class );
+		$rows       = $log_repo->find_recent( 1, 0 );
+		$latest_log = $rows[0] ?? null;
+
+		$timeline_url = '';
+		if ( null !== $latest_log ) {
+			$uuid = (string) ( $latest_log['message_uuid'] ?? '' );
+			if ( null !== $this->validate_uuid( $uuid ) ) {
+				$timeline_url = add_query_arg(
+					array( 'message_uuid' => $uuid ),
+					admin_url( 'admin.php?page=scalyn-mail-relay-logs' )
+				);
+			}
+		}
+
 		require SCALYN_MAIL_RELAY_PATH . 'admin/views/dashboard.php';
 	}
 
@@ -55,5 +71,24 @@ final class DashboardPage {
 		$id        = $settings->get_active_provider_id();
 
 		return '' !== $id && $registry->has( $id );
+	}
+
+	/**
+	 * Validates a UUID string against the standard 8-4-4-4-12 hexadecimal format.
+	 *
+	 * Returns the UUID unchanged if valid, or null if the format does not match.
+	 * Case-insensitive to accommodate both upper- and lower-case hex.
+	 *
+	 * Note: The same validation pattern exists in LogsPage::validate_uuid().
+	 * A future consolidation may extract a shared UUID helper.
+	 *
+	 * @param string $uuid The UUID string to validate.
+	 * @return string|null The UUID if valid; null if the format is invalid.
+	 */
+	private function validate_uuid( string $uuid ): ?string {
+		if ( 1 === preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $uuid ) ) {
+			return $uuid;
+		}
+		return null;
 	}
 }
