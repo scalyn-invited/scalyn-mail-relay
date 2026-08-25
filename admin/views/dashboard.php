@@ -3,11 +3,17 @@
  * Dashboard view.
  *
  * Variables injected by DashboardPage::render():
- *   bool $provider_configured  Whether a provider is configured and registered.
+ *   bool       $provider_configured  Whether a provider is configured and registered.
+ *   array|null $latest_log           Most recent mail log row, or null when no records exist.
+ *   string     $timeline_url         Validated timeline URL, or '' when no valid UUID exists.
  *
- * Health score, activity statistics, and diagnostics results are not yet
- * available. Those sections use explicit empty state until Yaj's logging
- * and diagnostics REST contracts are implemented. Do not invent data.
+ * Health score and diagnostic results are not yet available. Those sections use
+ * explicit empty state until diagnostics REST contracts are implemented. Do not
+ * invent data.
+ *
+ * Privacy: Do not render response_message, event_data, recipient, subject, body,
+ * credentials, raw SMTP transcripts, or unrestricted provider error metadata.
+ * Accepted status is not delivery evidence and must not be presented as delivered.
  *
  * @package ScalynMailRelay
  */
@@ -19,8 +25,12 @@ use Scalyn\MailRelay\Admin\Components\StatusBadge;
 
 defined( 'ABSPATH' ) || exit;
 
-$wizard_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
-$logs_url   = admin_url( 'admin.php?page=scalyn-mail-relay-logs' );
+$wizard_url    = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
+$logs_url      = admin_url( 'admin.php?page=scalyn-mail-relay-logs' );
+$status_labels = array(
+	'accepted' => __( 'Accepted', 'scalyn-mail-relay' ),
+	'failed'   => __( 'Failed', 'scalyn-mail-relay' ),
+);
 
 $setup_steps = array(
 	array(
@@ -71,12 +81,60 @@ $setup_steps = array(
 
 		<section class="scalyn-card" aria-labelledby="scalyn-activity-heading">
 			<h2 id="scalyn-activity-heading"><?php esc_html_e( 'Recent Email Activity', 'scalyn-mail-relay' ); ?></h2>
-			<?php
-			// Activity data awaits Yaj's logging module (includes/Logging/) and REST contracts.
-			EmptyState::render(
-				__( 'No email activity data is available yet. Send a test email after configuring a provider.', 'scalyn-mail-relay' )
-			);
-			?>
+			<?php if ( null === $latest_log ) : ?>
+				<?php
+				EmptyState::render(
+					__( 'No email activity has been recorded yet. Send a test email after configuring a provider.', 'scalyn-mail-relay' ),
+					__( 'View Email Logs', 'scalyn-mail-relay' ),
+					$logs_url
+				);
+				?>
+			<?php else : ?>
+				<?php
+				$log_status   = (string) ( $latest_log['status'] ?? '' );
+				$log_label    = $status_labels[ $log_status ] ?? ucfirst( $log_status );
+				$log_provider = (string) ( $latest_log['provider'] ?? '' );
+				$log_src_type = (string) ( $latest_log['source_type'] ?? '' );
+				$log_src_name = (string) ( $latest_log['source_name'] ?? '' );
+				$log_created  = (string) ( $latest_log['created_at'] ?? '' );
+
+				$source_display = '' !== $log_src_type ? $log_src_type : '';
+				if ( '' !== $log_src_name ) {
+					$source_display = '' !== $source_display ? $source_display . ' / ' . $log_src_name : $log_src_name;
+				}
+				?>
+				<dl class="scalyn-log-summary">
+					<dt><?php esc_html_e( 'Status', 'scalyn-mail-relay' ); ?></dt>
+					<dd><?php StatusBadge::render( $log_status, $log_label ); ?></dd>
+					<?php if ( '' !== $log_provider ) : ?>
+						<dt><?php esc_html_e( 'Provider', 'scalyn-mail-relay' ); ?></dt>
+						<dd><?php echo esc_html( $log_provider ); ?></dd>
+					<?php endif; ?>
+					<?php if ( '' !== $source_display ) : ?>
+						<dt><?php esc_html_e( 'Source', 'scalyn-mail-relay' ); ?></dt>
+						<dd><?php echo esc_html( $source_display ); ?></dd>
+					<?php endif; ?>
+					<?php if ( '' !== $log_created ) : ?>
+						<dt><?php esc_html_e( 'Date', 'scalyn-mail-relay' ); ?></dt>
+						<dd><time datetime="<?php echo esc_attr( $log_created ); ?>"><?php echo esc_html( $log_created ); ?></time></dd>
+					<?php endif; ?>
+				</dl>
+				<?php if ( 'accepted' === $log_status ) : ?>
+					<p class="description scalyn-log-note">
+						<?php esc_html_e( 'Accepted means the configured provider acknowledged the message. Accepted does not guarantee inbox delivery.', 'scalyn-mail-relay' ); ?>
+					</p>
+				<?php endif; ?>
+				<div class="scalyn-activity-links">
+					<?php if ( '' !== $timeline_url ) : ?>
+						<a href="<?php echo esc_url( $timeline_url ); ?>" class="button button-small">
+							<?php esc_html_e( 'View Timeline', 'scalyn-mail-relay' ); ?>
+						</a>
+					<?php endif; ?>
+					<a href="<?php echo esc_url( $logs_url ); ?>" class="button button-small">
+						<?php esc_html_e( 'View All Logs', 'scalyn-mail-relay' ); ?>
+					</a>
+				</div>
+			<?php endif; ?>
 		</section>
 
 		<section class="scalyn-card" aria-labelledby="scalyn-progress-heading">
