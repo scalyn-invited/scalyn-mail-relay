@@ -633,4 +633,71 @@ final class LogsPageTest extends TestCase {
 		// Source column should show em-dash placeholder when both are empty.
 		$this->assertStringContainsString( '—', $output );
 	}
+
+	// =========================================================================
+	// ACCEPTED DISCLAIMER — conditional on log status
+	// =========================================================================
+
+	public function test_accepted_disclaimer_is_present_for_accepted_timeline(): void {
+		$this->grant_view_logs();
+		$uuid                 = '550e8400-e29b-41d4-a716-446655440000';
+		$_GET['message_uuid'] = $uuid;
+
+		$this->wpdb->get_row_return     = $this->make_log_row( array( 'message_uuid' => $uuid, 'status' => 'accepted' ) );
+		$this->wpdb->get_results_return = array( $this->make_timeline_event( array( 'message_uuid' => $uuid ) ) );
+
+		$output = $this->render_and_capture();
+
+		$this->assertStringContainsString( 'does not guarantee inbox delivery', $output );
+	}
+
+	public function test_accepted_disclaimer_is_absent_for_failed_timeline(): void {
+		$this->grant_view_logs();
+		$uuid                 = '550e8400-e29b-41d4-a716-446655440000';
+		$_GET['message_uuid'] = $uuid;
+
+		$this->wpdb->get_row_return     = $this->make_log_row(
+			array(
+				'message_uuid' => $uuid,
+				'status'       => 'failed',
+				'sent_at'      => null,
+				'failed_at'    => '2026-08-24 10:00:00',
+			)
+		);
+		$this->wpdb->get_results_return = array(
+			$this->make_timeline_event(
+				array(
+					'message_uuid' => $uuid,
+					'event_type'   => 'mail_failed',
+					'event_status' => 'failed',
+					'event_label'  => 'Message failed',
+				)
+			),
+		);
+
+		$output = $this->render_and_capture();
+
+		$this->assertStringNotContainsString( 'does not guarantee inbox delivery', $output );
+	}
+
+	public function test_accepted_disclaimer_is_absent_when_log_not_found(): void {
+		$this->grant_view_logs();
+		$_GET['message_uuid'] = '550e8400-e29b-41d4-a716-446655440000';
+
+		$this->wpdb->get_row_return     = null;
+		$this->wpdb->get_results_return = array();
+
+		$output = $this->render_and_capture();
+
+		$this->assertStringNotContainsString( 'does not guarantee inbox delivery', $output );
+	}
+
+	public function test_accepted_disclaimer_is_absent_for_invalid_uuid(): void {
+		$this->grant_view_logs();
+		$_GET['message_uuid'] = 'not-a-valid-uuid';
+
+		$output = $this->render_and_capture();
+
+		$this->assertStringNotContainsString( 'does not guarantee inbox delivery', $output );
+	}
 }
