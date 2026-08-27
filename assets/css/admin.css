@@ -81,3 +81,9 @@
 .scalyn-wizard-body { margin-bottom: 16px; }
 .scalyn-wizard-body h2 { margin-top: 0; }
 .scalyn-wizard-footer { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* ---- Diagnostic results ---- */
+.scalyn-diagnostics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 20px; }
+.scalyn-diagnostic-card { /* Inherits .scalyn-card base styles */ }
+.scalyn-diagnostic-card__status { margin-top: 8px; }
+.scalyn-diagnostic-card__content { margin-top: 12px; }
