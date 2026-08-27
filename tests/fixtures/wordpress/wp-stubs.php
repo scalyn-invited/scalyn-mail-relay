@@ -363,6 +363,18 @@ if ( ! function_exists( 'esc_attr_e' ) ) {
 	}
 }
 
+if ( ! function_exists( 'esc_attr__' ) ) {
+	/**
+	 * Returns an attribute-escaped translated string.
+	 *
+	 * @param string $text   Text to translate and escape.
+	 * @param string $domain Text domain (unused).
+	 */
+	function esc_attr__( string $text, string $domain = 'default' ): string {
+		return esc_attr( $text );
+	}
+}
+
 if ( ! function_exists( 'sanitize_html_class' ) ) {
 	/**
 	 * Sanitizes a string to be used as a CSS class name.
