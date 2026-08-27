@@ -6,6 +6,8 @@ use Scalyn\MailRelay\Core\Container;
 use Scalyn\MailRelay\Core\Plugin;
 use Scalyn\MailRelay\Core\ProviderRegistry;
 use Scalyn\MailRelay\Core\SettingsRepository;
+use Scalyn\MailRelay\Database\DiagnosticRepository;
+use Scalyn\MailRelay\Diagnostics\DiagnosticRunner;
 use Scalyn\MailRelay\Logging\MailEventSubscriber;
 use Scalyn\MailRelay\Logging\MailLogRepository;
 use Scalyn\MailRelay\Logging\TimelineRepository;
@@ -65,6 +67,14 @@ final class PluginTest extends TestCase {
 
 	public function test_timeline_repository_is_registered_in_container(): void {
 		$this->assertTrue( $this->booted_container()->has( TimelineRepository::class ) );
+	}
+
+	public function test_diagnostic_runner_is_registered_in_container(): void {
+		$this->assertTrue( $this->booted_container()->has( DiagnosticRunner::class ) );
+	}
+
+	public function test_diagnostic_repository_is_registered_in_container(): void {
+		$this->assertTrue( $this->booted_container()->has( DiagnosticRepository::class ) );
 	}
 
 	// -------------------------------------------------------------------------
@@ -129,6 +139,18 @@ final class PluginTest extends TestCase {
 		$container = $this->booted_container();
 
 		$this->assertSame( $container->get( TimelineRepository::class ), $container->get( TimelineRepository::class ) );
+	}
+
+	public function test_repeated_resolution_of_diagnostic_runner_returns_same_instance(): void {
+		$container = $this->booted_container();
+
+		$this->assertSame( $container->get( DiagnosticRunner::class ), $container->get( DiagnosticRunner::class ) );
+	}
+
+	public function test_repeated_resolution_of_diagnostic_repository_returns_same_instance(): void {
+		$container = $this->booted_container();
+
+		$this->assertSame( $container->get( DiagnosticRepository::class ), $container->get( DiagnosticRepository::class ) );
 	}
 
 	// -------------------------------------------------------------------------

@@ -8,6 +8,8 @@
 namespace Scalyn\MailRelay\Core;
 
 use Scalyn\MailRelay\Admin\AdminMenu;
+use Scalyn\MailRelay\Database\DiagnosticRepository;
+use Scalyn\MailRelay\Diagnostics\DiagnosticRunner;
 use Scalyn\MailRelay\Logging\MailEventSubscriber;
 use Scalyn\MailRelay\Logging\MailLogRepository;
 use Scalyn\MailRelay\Logging\TimelineRepository;
@@ -109,6 +111,9 @@ final class Plugin {
 				$c->get( TimelineRepository::class )
 			)
 		);
+
+		$this->container->set( DiagnosticRunner::class, static fn(): DiagnosticRunner => new DiagnosticRunner() );
+		$this->container->set( DiagnosticRepository::class, static fn(): DiagnosticRepository => new DiagnosticRepository() );
 	}
 
 	/**
