@@ -261,4 +261,80 @@ final class DiagnosticRepositoryTest extends TestCase {
 		$last_prepare = end( $this->wpdb->prepare_calls );
 		$this->assertSame( 0, $last_prepare['args'][1] );
 	}
+
+	// -------------------------------------------------------------------------
+	// find_latest_run()
+	// -------------------------------------------------------------------------
+
+	public function test_find_latest_run_returns_empty_results_and_null_score_when_no_diagnostics_exist(): void {
+		$this->wpdb->get_var_return = null;
+
+		$run = $this->make_repo()->find_latest_run();
+
+		$this->assertSame( array(), $run['results'] );
+		$this->assertNull( $run['health_score'] );
+	}
+
+	public function test_find_latest_run_fetches_rows_for_the_latest_uuid(): void {
+		$this->wpdb->get_var_return     = 'run-uuid-latest';
+		$this->wpdb->get_results_return = array(
+			array( 'id' => '1', 'diagnostic_uuid' => 'run-uuid-latest', 'score' => '80' ),
+		);
+
+		$run = $this->make_repo()->find_latest_run();
+
+		$this->assertSame( $this->wpdb->get_results_return, $run['results'] );
+
+		$last_prepare = end( $this->wpdb->prepare_calls );
+		$this->assertContains( 'run-uuid-latest', $last_prepare['args'] );
+	}
+
+	public function test_find_latest_run_averages_scores_in_the_run(): void {
+		$this->wpdb->get_var_return     = 'run-uuid-001';
+		$this->wpdb->get_results_return = array(
+			array( 'score' => '90' ),
+			array( 'score' => '70' ),
+		);
+
+		$run = $this->make_repo()->find_latest_run();
+
+		$this->assertSame( 80, $run['health_score'] );
+	}
+
+	public function test_find_latest_run_ignores_null_scores_in_the_average(): void {
+		$this->wpdb->get_var_return     = 'run-uuid-001';
+		$this->wpdb->get_results_return = array(
+			array( 'score' => '100' ),
+			array( 'score' => null ),
+		);
+
+		$run = $this->make_repo()->find_latest_run();
+
+		$this->assertSame( 100, $run['health_score'] );
+	}
+
+	public function test_find_latest_run_returns_null_score_when_no_row_has_a_score(): void {
+		$this->wpdb->get_var_return     = 'run-uuid-001';
+		$this->wpdb->get_results_return = array(
+			array( 'score' => null ),
+			array( 'score' => null ),
+		);
+
+		$run = $this->make_repo()->find_latest_run();
+
+		$this->assertNull( $run['health_score'] );
+	}
+
+	public function test_find_latest_run_truncates_average_rather_than_rounding(): void {
+		$this->wpdb->get_var_return     = 'run-uuid-001';
+		$this->wpdb->get_results_return = array(
+			array( 'score' => '51' ),
+			array( 'score' => '50' ),
+		);
+
+		$run = $this->make_repo()->find_latest_run();
+
+		// (51 + 50) / 2 = 50.5 -> intval truncates to 50, never rounds up.
+		$this->assertSame( 50, $run['health_score'] );
+	}
 }
