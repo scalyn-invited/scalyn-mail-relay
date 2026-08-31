@@ -9,7 +9,10 @@ namespace Scalyn\MailRelay\Core;
 
 use Scalyn\MailRelay\Admin\AdminMenu;
 use Scalyn\MailRelay\Database\DiagnosticRepository;
+use Scalyn\MailRelay\Diagnostics\DiagnosticCheckRegistry;
 use Scalyn\MailRelay\Diagnostics\DiagnosticRunner;
+use Scalyn\MailRelay\Diagnostics\Checks\MxCheck;
+use Scalyn\MailRelay\Diagnostics\Checks\SpfCheck;
 use Scalyn\MailRelay\Logging\MailEventSubscriber;
 use Scalyn\MailRelay\Logging\MailLogRepository;
 use Scalyn\MailRelay\Logging\TimelineRepository;
@@ -74,6 +77,7 @@ final class Plugin {
 		}
 
 		$this->register_services();
+		$this->populate_diagnostic_checks();
 		$this->register_hooks();
 		$this->booted = true;
 
@@ -112,8 +116,23 @@ final class Plugin {
 			)
 		);
 
+		$this->container->set( DiagnosticCheckRegistry::class, static fn(): DiagnosticCheckRegistry => new DiagnosticCheckRegistry() );
 		$this->container->set( DiagnosticRunner::class, static fn(): DiagnosticRunner => new DiagnosticRunner() );
 		$this->container->set( DiagnosticRepository::class, static fn(): DiagnosticRepository => new DiagnosticRepository() );
+
+		// Register core diagnostic checks.
+		$this->container->set( SpfCheck::class, static fn(): SpfCheck => new SpfCheck() );
+		$this->container->set( MxCheck::class, static fn(): MxCheck => new MxCheck() );
+	}
+
+	/**
+	 * Populates the diagnostic check registry with registered checks.
+	 * Called during boot after all services are registered but before hooks.
+	 */
+	private function populate_diagnostic_checks(): void {
+		$registry = $this->container->get( DiagnosticCheckRegistry::class );
+		$registry->register( $this->container->get( SpfCheck::class ) );
+		$registry->register( $this->container->get( MxCheck::class ) );
 	}
 
 	/**
