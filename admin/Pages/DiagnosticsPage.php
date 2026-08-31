@@ -11,6 +11,7 @@ use Scalyn\MailRelay\Core\Capabilities;
 use Scalyn\MailRelay\Core\Plugin;
 use Scalyn\MailRelay\Core\ProviderRegistry;
 use Scalyn\MailRelay\Core\SettingsRepository;
+use Scalyn\MailRelay\Database\DiagnosticRepository;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -18,11 +19,12 @@ defined( 'ABSPATH' ) || exit;
  * Prepares diagnostics page data and renders the diagnostics view.
  *
  * Data boundary: reads from Core services (SettingsRepository, ProviderRegistry)
- * only. Must not query database tables directly, construct transports, access
- * Yaj/Saturn internals, or calculate health scores.
+ * and DiagnosticRepository only. Must not query database tables directly,
+ * construct transports, or access Yaj/Saturn internals.
  *
- * Diagnostic results, findings, and health scoring remain empty state until
- * Yaj's diagnostics runner and REST contracts are available.
+ * Retrieves diagnostic results and pre-calculated health score from Y1's
+ * DiagnosticRepository, organizes by check type (SPF/DKIM/DMARC), and maps
+ * to UI status vocabulary. Shows empty state when no results exist yet.
  *
  * Ownership: Bernie / Admin.
  */
@@ -39,9 +41,20 @@ final class DiagnosticsPage {
 		$provider_configured = $this->is_provider_configured();
 		$wizard_url          = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 
-		// Diagnostics runner endpoint URL will be set here once Yaj's REST endpoint is available.
+		// Diagnostics runner endpoint URL will be set here once Kim's REST endpoint is available.
 		// For now, keep empty to disable the "Run Diagnostics" button.
 		$diagnostics_run_url = '';
+
+		// Fetch and organize diagnostic results from Y1's repository.
+		$diagnostic_repo = Plugin::instance()->container()->get( DiagnosticRepository::class );
+		$run_data        = $diagnostic_repo->find_latest_run();
+		$diagnostics     = $this->organize_diagnostics( $run_data['results'] );
+		$health_score    = $run_data['health_score'];
+
+		// Pre-calculate UI status values for each diagnostic check.
+		$spf_ui_status   = $diagnostics['spf'] ? $this->get_ui_status( $diagnostics['spf']['status'] ) : 'unknown';
+		$dkim_ui_status  = $diagnostics['dkim'] ? $this->get_ui_status( $diagnostics['dkim']['status'] ) : 'unknown';
+		$dmarc_ui_status = $diagnostics['dmarc'] ? $this->get_ui_status( $diagnostics['dmarc']['status'] ) : 'unknown';
 
 		require SCALYN_MAIL_RELAY_PATH . 'admin/views/diagnostics.php';
 	}
@@ -60,5 +73,52 @@ final class DiagnosticsPage {
 		$id        = $settings->get_active_provider_id();
 
 		return '' !== $id && $registry->has( $id );
+	}
+
+	/**
+	 * Organizes raw diagnostic results by check type for easier UI consumption.
+	 *
+	 * Maps check_name (e.g., 'spf_record') to display keys (e.g., 'spf').
+	 * Returns an associative array keyed by diagnostic type, or null for missing checks.
+	 *
+	 * @param array<int, array<string, mixed>> $raw_results Rows from DiagnosticRepository.
+	 * @return array<string, array<string, mixed>|null> Organized by check type.
+	 */
+	private function organize_diagnostics( array $raw_results ): array {
+		$organized = array(
+			'spf'   => null,
+			'dkim'  => null,
+			'dmarc' => null,
+		);
+
+		foreach ( $raw_results as $result ) {
+			$check_name = $result['check_name'] ?? '';
+
+			if ( 'spf_record' === $check_name ) {
+				$organized['spf'] = $result;
+			} elseif ( 'dkim_record' === $check_name ) {
+				$organized['dkim'] = $result;
+			} elseif ( 'dmarc_policy' === $check_name ) {
+				$organized['dmarc'] = $result;
+			}
+		}
+
+		return $organized;
+	}
+
+	/**
+	 * Maps a diagnostic check status to the UI status vocabulary.
+	 *
+	 * @param string $check_status Status from DiagnosticResult: 'pass', 'warn', 'fail', 'error'.
+	 * @return string UI status: 'healthy', 'warning', 'critical', 'unknown'.
+	 */
+	private function get_ui_status( string $check_status ): string {
+		return match ( $check_status ) {
+			'pass'  => 'healthy',
+			'warn'  => 'warning',
+			'fail'  => 'critical',
+			'error' => 'warning',
+			default => 'unknown',
+		};
 	}
 }
