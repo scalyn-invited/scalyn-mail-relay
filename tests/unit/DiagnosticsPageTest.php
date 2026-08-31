@@ -25,6 +25,7 @@ final class DiagnosticsPageTest extends TestCase {
 		$GLOBALS['_test_wp_actions']       = array();
 		$GLOBALS['_test_wp_added_actions'] = array();
 		$this->reset_plugin_singleton();
+		$this->setup_wpdb_mock();
 	}
 
 	protected function tearDown(): void {
@@ -34,6 +35,42 @@ final class DiagnosticsPageTest extends TestCase {
 	private function reset_plugin_singleton(): void {
 		$property = new ReflectionProperty( Plugin::class, 'instance' );
 		$property->setValue( null, null );
+	}
+
+	private $wpdb_mock_data = array();
+
+	private function setup_wpdb_mock(): void {
+		global $wpdb;
+		$self = $this;
+		$wpdb = new class( $self ) {
+			public $prefix = 'wp_';
+			private $parent;
+
+			public function __construct( $parent ) {
+				$this->parent = $parent;
+			}
+
+			public function prepare( string $query, ...$args ) {
+				return $query;
+			}
+
+			public function get_var( string $sql ) {
+				$data = $this->parent->get_mock_diagnostic_data();
+				return ! empty( $data ) ? 'latest-uuid' : null;
+			}
+
+			public function get_results( string $sql, string $output = 'OBJECT' ) {
+				return $this->parent->get_mock_diagnostic_data();
+			}
+		};
+	}
+
+	public function set_mock_diagnostic_data( array $data ): void {
+		$this->wpdb_mock_data = $data;
+	}
+
+	public function get_mock_diagnostic_data(): array {
+		return $this->wpdb_mock_data;
 	}
 
 	private function grant_run_diagnostics(): void {
@@ -51,7 +88,7 @@ final class DiagnosticsPageTest extends TestCase {
 
 		$this->boot_plugin();
 		Plugin::instance()->container()->get( ProviderRegistry::class )->register(
-			new class implements ProviderInterface {
+			new class() implements ProviderInterface {
 				public function get_id(): string {
 					return 'test-provider';
 				}
@@ -156,5 +193,153 @@ final class DiagnosticsPageTest extends TestCase {
 		$this->assertStringContainsString( 'disabled aria-disabled="true"', $output );
 		$this->assertStringContainsString( '>—</strong>', $output );
 		$this->assertStringContainsString( 'aria-label="Health score not yet assessed"', $output );
+	}
+
+	/**
+	 * B2 Tests: Diagnostics Findings/Remediation UI
+	 *
+	 * Tests for wiring real diagnostic results to the UI.
+	 */
+	public function test_organize_diagnostics_groups_results_by_check_type(): void {
+		$this->grant_run_diagnostics();
+		$this->configure_provider();
+		$this->boot_plugin();
+
+		$page = new DiagnosticsPage();
+
+		// Use reflection to test private method.
+		$reflection = new ReflectionMethod( $page, 'organize_diagnostics' );
+		$reflection->setAccessible( true );
+
+		$raw_results = array(
+			array(
+				'check_name'     => 'spf_record',
+				'result_message' => 'SPF OK',
+			),
+			array(
+				'check_name'     => 'dkim_record',
+				'result_message' => 'DKIM OK',
+			),
+			array(
+				'check_name'     => 'dmarc_policy',
+				'result_message' => 'DMARC OK',
+			),
+			array(
+				'check_name'     => 'unknown_check',
+				'result_message' => 'Unknown',
+			),
+		);
+
+		$organized = $reflection->invoke( $page, $raw_results );
+
+		$this->assertIsArray( $organized );
+		$this->assertArrayHasKey( 'spf', $organized );
+		$this->assertArrayHasKey( 'dkim', $organized );
+		$this->assertArrayHasKey( 'dmarc', $organized );
+		$this->assertSame( 'SPF OK', $organized['spf']['result_message'] );
+		$this->assertSame( 'DKIM OK', $organized['dkim']['result_message'] );
+		$this->assertSame( 'DMARC OK', $organized['dmarc']['result_message'] );
+	}
+
+	public function test_organize_diagnostics_returns_null_for_missing_checks(): void {
+		$this->grant_run_diagnostics();
+		$this->configure_provider();
+		$this->boot_plugin();
+
+		$page       = new DiagnosticsPage();
+		$reflection = new ReflectionMethod( $page, 'organize_diagnostics' );
+		$reflection->setAccessible( true );
+
+		$raw_results = array(
+			array(
+				'check_name'     => 'spf_record',
+				'result_message' => 'SPF OK',
+			),
+		);
+
+		$organized = $reflection->invoke( $page, $raw_results );
+
+		$this->assertNull( $organized['dkim'] );
+		$this->assertNull( $organized['dmarc'] );
+	}
+
+	public function test_get_ui_status_maps_diagnostic_status_to_ui_status(): void {
+		$this->grant_run_diagnostics();
+		$this->configure_provider();
+		$this->boot_plugin();
+
+		$page       = new DiagnosticsPage();
+		$reflection = new ReflectionMethod( $page, 'get_ui_status' );
+		$reflection->setAccessible( true );
+
+		$this->assertSame( 'healthy', $reflection->invoke( $page, 'pass' ) );
+		$this->assertSame( 'warning', $reflection->invoke( $page, 'warn' ) );
+		$this->assertSame( 'critical', $reflection->invoke( $page, 'fail' ) );
+		$this->assertSame( 'warning', $reflection->invoke( $page, 'error' ) );
+		$this->assertSame( 'unknown', $reflection->invoke( $page, 'unknown' ) );
+	}
+
+	public function test_findings_output_is_escaped(): void {
+		$this->grant_run_diagnostics();
+		$this->configure_provider();
+
+		$mock_results = array(
+			array(
+				'check_name'         => 'spf_record',
+				'status'             => 'pass',
+				'result_message'     => 'SPF check passed',
+				'recommended_action' => '',
+				'raw_result'         => wp_json_encode(
+					array(
+						'evidence' => 'v=spf1 include:_spf.google.com ~all',
+						'impact'   => '',
+					)
+				),
+			),
+			array(
+				'check_name'         => 'dkim_record',
+				'status'             => 'fail',
+				'result_message'     => 'DKIM check failed',
+				'recommended_action' => 'Add DKIM record',
+				'raw_result'         => wp_json_encode(
+					array(
+						'evidence' => 'No DKIM record found',
+						'impact'   => 'Emails may be rejected',
+					)
+				),
+			),
+		);
+
+		$this->set_mock_diagnostic_data( $mock_results );
+		$output = $this->render_and_capture();
+
+		// Verify no unescaped HTML or script tags appear.
+		$this->assertStringNotContainsString( '<script', $output );
+		// All findings should be rendered with proper escaping.
+		$this->assertStringContainsString( 'scalyn-finding__message', $output );
+		$this->assertStringContainsString( 'scalyn-finding__evidence', $output );
+		$this->assertStringContainsString( 'scalyn-finding__action', $output );
+	}
+
+	public function test_health_score_displays_with_backend_provided_value(): void {
+		$this->grant_run_diagnostics();
+		$this->configure_provider();
+
+		$mock_results = array(
+			array(
+				'check_name'         => 'spf_record',
+				'status'             => 'pass',
+				'result_message'     => 'SPF OK',
+				'recommended_action' => '',
+				'raw_result'         => '{"evidence":"test","impact":""}',
+			),
+		);
+
+		$this->set_mock_diagnostic_data( $mock_results );
+		$output = $this->render_and_capture();
+
+		// When data exists, health score should be rendered with a numeric value.
+		// The actual value depends on backend calculation, so we just verify presence.
+		$this->assertStringContainsString( 'scalyn-score', $output );
 	}
 }

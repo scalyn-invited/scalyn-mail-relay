@@ -87,3 +87,12 @@
 .scalyn-diagnostic-card { /* Inherits .scalyn-card base styles */ }
 .scalyn-diagnostic-card__status { margin-top: 8px; }
 .scalyn-diagnostic-card__content { margin-top: 12px; }
+
+/* ---- Diagnostic findings display ---- */
+.scalyn-finding__message { margin: 8px 0; font-weight: 500; line-height: 1.5; }
+.scalyn-finding__details { margin-top: 12px; }
+.scalyn-finding__details summary { cursor: pointer; font-weight: 500; user-select: none; color: #2271b1; }
+.scalyn-finding__details summary:hover { text-decoration: underline; }
+.scalyn-finding__evidence { background: #f9f9f9; padding: 12px; border-radius: 3px; overflow-x: auto; font-size: 12px; font-family: monospace; line-height: 1.4; white-space: pre-wrap; word-wrap: break-word; }
+.scalyn-finding__impact { margin-top: 12px; padding: 12px; background: #fef8ee; border-left: 4px solid #f0c33c; color: #996800; font-size: 13px; line-height: 1.5; }
+.scalyn-finding__action { margin-top: 12px; padding: 12px; background: #f0f0f1; border-left: 4px solid #50575e; font-size: 13px; line-height: 1.5; }
