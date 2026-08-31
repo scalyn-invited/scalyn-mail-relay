@@ -7,7 +7,10 @@ use Scalyn\MailRelay\Core\Plugin;
 use Scalyn\MailRelay\Core\ProviderRegistry;
 use Scalyn\MailRelay\Core\SettingsRepository;
 use Scalyn\MailRelay\Database\DiagnosticRepository;
+use Scalyn\MailRelay\Diagnostics\DiagnosticCheckRegistry;
 use Scalyn\MailRelay\Diagnostics\DiagnosticRunner;
+use Scalyn\MailRelay\Diagnostics\Checks\MxCheck;
+use Scalyn\MailRelay\Diagnostics\Checks\SpfCheck;
 use Scalyn\MailRelay\Logging\MailEventSubscriber;
 use Scalyn\MailRelay\Logging\MailLogRepository;
 use Scalyn\MailRelay\Logging\TimelineRepository;
@@ -77,6 +80,26 @@ final class PluginTest extends TestCase {
 		$this->assertTrue( $this->booted_container()->has( DiagnosticRepository::class ) );
 	}
 
+	public function test_diagnostic_check_registry_is_registered_in_container(): void {
+		$this->assertTrue( $this->booted_container()->has( DiagnosticCheckRegistry::class ) );
+	}
+
+	public function test_spf_check_is_registered_in_container(): void {
+		$this->assertTrue( $this->booted_container()->has( SpfCheck::class ) );
+	}
+
+	public function test_mx_check_is_registered_in_container(): void {
+		$this->assertTrue( $this->booted_container()->has( MxCheck::class ) );
+	}
+
+	public function test_core_checks_are_registered_in_check_registry(): void {
+		$container = $this->booted_container();
+		$registry  = $container->get( DiagnosticCheckRegistry::class );
+
+		$this->assertTrue( $registry->has( 'spf_record' ) );
+		$this->assertTrue( $registry->has( 'mx_record' ) );
+	}
+
 	// -------------------------------------------------------------------------
 	// Dependency wiring
 	// -------------------------------------------------------------------------
@@ -109,9 +132,9 @@ final class PluginTest extends TestCase {
 	}
 
 	public function test_mail_event_subscriber_receives_shared_timeline_repository_instance(): void {
-		$container      = $this->booted_container();
-		$timeline_repo  = $container->get( TimelineRepository::class );
-		$subscriber     = $container->get( MailEventSubscriber::class );
+		$container     = $this->booted_container();
+		$timeline_repo = $container->get( TimelineRepository::class );
+		$subscriber    = $container->get( MailEventSubscriber::class );
 
 		$prop = new \ReflectionProperty( MailEventSubscriber::class, 'timeline_repo' );
 		$this->assertSame( $timeline_repo, $prop->getValue( $subscriber ) );
@@ -151,6 +174,24 @@ final class PluginTest extends TestCase {
 		$container = $this->booted_container();
 
 		$this->assertSame( $container->get( DiagnosticRepository::class ), $container->get( DiagnosticRepository::class ) );
+	}
+
+	public function test_repeated_resolution_of_diagnostic_check_registry_returns_same_instance(): void {
+		$container = $this->booted_container();
+
+		$this->assertSame( $container->get( DiagnosticCheckRegistry::class ), $container->get( DiagnosticCheckRegistry::class ) );
+	}
+
+	public function test_repeated_resolution_of_spf_check_returns_same_instance(): void {
+		$container = $this->booted_container();
+
+		$this->assertSame( $container->get( SpfCheck::class ), $container->get( SpfCheck::class ) );
+	}
+
+	public function test_repeated_resolution_of_mx_check_returns_same_instance(): void {
+		$container = $this->booted_container();
+
+		$this->assertSame( $container->get( MxCheck::class ), $container->get( MxCheck::class ) );
 	}
 
 	// -------------------------------------------------------------------------
