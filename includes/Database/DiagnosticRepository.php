@@ -129,4 +129,63 @@ final class DiagnosticRepository {
 
 		return $results ? $results : array();
 	}
+
+	/**
+	 * Returns all results from the most recent diagnostic run, with an interim
+	 * average health score for that run.
+	 *
+	 * "Most recent run" is the diagnostic_uuid attached to the newest row
+	 * (by created_at, then id as a tiebreaker). The returned health_score is a
+	 * plain average of the individual check scores in that run — it is a
+	 * provisional stand-in, not the Engineering Handbook's weighted formula
+	 * (DNS/provider/operational/WordPress/security components), which needs a
+	 * dedicated scoring service that does not exist yet. Rows with a null
+	 * score are excluded from the average.
+	 *
+	 * @return array{results: array<int, array<string, mixed>>, health_score: int|null}
+	 *         health_score is null when the run has no scored rows, or when no
+	 *         diagnostics exist yet at all.
+	 */
+	public function find_latest_run(): array {
+		global $wpdb;
+
+		$table = $wpdb->prefix . 'scalyn_diagnostics';
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $table is derived from $wpdb->prefix, not user input; no bindable values in this query. Diagnostic rows must not be cached.
+		$latest_uuid = $wpdb->get_var( "SELECT diagnostic_uuid FROM {$table} ORDER BY created_at DESC, id DESC LIMIT 1" );
+
+		if ( null === $latest_uuid ) {
+			return array(
+				'results'      => array(),
+				'health_score' => null,
+			);
+		}
+
+		$results = $this->find_by_uuid( (string) $latest_uuid );
+
+		return array(
+			'results'      => $results,
+			'health_score' => self::average_score( $results ),
+		);
+	}
+
+	/**
+	 * Computes a plain average of the numeric score values in a set of rows.
+	 *
+	 * @param array<int, array<string, mixed>> $rows Rows as returned by find_by_uuid().
+	 */
+	private static function average_score( array $rows ): ?int {
+		$total = 0;
+		$count = 0;
+
+		foreach ( $rows as $row ) {
+			$score = $row['score'] ?? null;
+			if ( null !== $score && is_numeric( $score ) ) {
+				$total += (int) $score;
+				++$count;
+			}
+		}
+
+		return $count > 0 ? intval( $total / $count ) : null;
+	}
 }
