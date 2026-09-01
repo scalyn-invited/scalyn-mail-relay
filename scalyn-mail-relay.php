@@ -54,3 +54,15 @@ add_action(
 			->register( new \Scalyn\MailRelay\Providers\Smtp\SmtpProvider() );
 	}
 );
+
+// Register the SMTP/TLS diagnostic check (S1). Registered here rather than
+// in Plugin.php because DiagnosticCheckRegistry is explicitly designed for
+// third-party/module-owned registration via this action, keeping the check
+// implementation inside Providers/Mail (Saturn-owned) with no Core edits.
+add_action(
+	'scalyn_mail_relay_booted',
+	static function ( \Scalyn\MailRelay\Core\Container $container ): void {
+		$container->get( \Scalyn\MailRelay\Diagnostics\DiagnosticCheckRegistry::class )
+			->register( new \Scalyn\MailRelay\Providers\Mail\SmtpTlsCheck() );
+	}
+);
