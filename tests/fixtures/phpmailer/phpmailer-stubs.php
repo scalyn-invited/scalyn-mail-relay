@@ -108,6 +108,9 @@ class PHPMailer {
 	/** @var int SMTP debug output level (0 = disabled). */
 	public int $SMTPDebug = 0;
 
+	/** @var int Connection/read timeout in seconds (real PHPMailer's own default: 300). */
+	public int $Timeout = 300;
+
 	// -------------------------------------------------------------------------
 	// Message fields (written by SmtpProvider::send()).
 	// -------------------------------------------------------------------------

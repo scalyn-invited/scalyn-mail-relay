@@ -74,6 +74,20 @@ class SmtpProvider implements ProviderInterface {
 	);
 
 	/**
+	 * Maximum time, in seconds, PHPMailer may spend establishing and holding
+	 * the SMTP connection for a single send/connection-test attempt.
+	 *
+	 * WordPress admin requests are typically bounded by ~30s max_execution_time;
+	 * this leaves headroom for WP bootstrap and response rendering around the
+	 * SMTP transaction itself, while still tolerating realistic handshake
+	 * latency on slower relays. PHPMailer's own default (300s) is unsuitable
+	 * for a synchronous admin-facing request.
+	 *
+	 * @var int
+	 */
+	private const CONNECTION_TIMEOUT_SECONDS = 15;
+
+	/**
 	 * Returns the unique machine-readable provider identifier.
 	 *
 	 * @return string
@@ -174,6 +188,11 @@ class SmtpProvider implements ProviderInterface {
 	 * @return ConnectionResult
 	 */
 	public function test_connection( array $config ): ConnectionResult {
+		$validation = $this->validate_config( $config );
+		if ( ! $validation->valid ) {
+			return new ConnectionResult( false, $this->config_validation_failure_message( $validation ) );
+		}
+
 		PhpMailerLoader::load();
 
 		$mailer = $this->create_mailer();
@@ -212,6 +231,16 @@ class SmtpProvider implements ProviderInterface {
 	 * @return SendResult
 	 */
 	public function send( MailMessage $message, array $config ): SendResult {
+		$validation = $this->validate_config( $config );
+		if ( ! $validation->valid ) {
+			return new SendResult(
+				success: false,
+				provider: 'smtp',
+				response_message: $this->config_validation_failure_message( $validation ),
+				failure_category: TransportFailureCategory::CONFIG
+			);
+		}
+
 		PhpMailerLoader::load();
 
 		$mailer = $this->create_mailer();
@@ -329,6 +358,7 @@ class SmtpProvider implements ProviderInterface {
 		$mailer->Port      = $port;
 		$mailer->CharSet   = 'UTF-8';
 		$mailer->SMTPDebug = 0; // Disable debug transcript; default is 0, set explicitly for clarity.
+		$mailer->Timeout   = self::CONNECTION_TIMEOUT_SECONDS;
 
 		switch ( $encryption ) {
 			case 'ssl':
@@ -356,6 +386,22 @@ class SmtpProvider implements ProviderInterface {
 			$mailer->FromName = $from_name;
 		}
 		// phpcs:enable WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+	}
+
+	/**
+	 * Returns a safe, human-readable message for a failed configuration validation.
+	 *
+	 * The per-field messages from validate_config() are static strings that
+	 * never echo back the raw invalid value, so surfacing the first one
+	 * directly is safe and more actionable to an administrator than a
+	 * generic message.
+	 *
+	 * @param ValidationResult $result A failed validation result.
+	 * @return string
+	 */
+	private function config_validation_failure_message( ValidationResult $result ): string {
+		$messages = array_values( $result->errors );
+		return $messages[0] ?? 'The SMTP configuration is invalid.';
 	}
 
 	/**

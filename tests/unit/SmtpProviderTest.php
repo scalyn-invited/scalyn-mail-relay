@@ -540,6 +540,249 @@ final class SmtpProviderTest extends TestCase {
 	}
 
 	// -------------------------------------------------------------------------
+	// send() / test_connection() — regression matrix (S3)
+	// -------------------------------------------------------------------------
+
+	/**
+	 * @return array<string, array{0: array<string, mixed>, 1: array<string, mixed>}>
+	 */
+	public static function transportConfigMatrixProvider(): array {
+		$base    = array(
+			'host'       => 'mail.example.com',
+			'from_name'  => '',
+			'from_email' => 'from@example.com',
+		);
+		$auth    = array(
+			'username' => 'user@example.com',
+			'password' => 'correct-horse-battery-staple',
+		);
+		$no_auth = array(
+			'username' => '',
+			'password' => '',
+		);
+
+		return array(
+			'tls-587-auth'    => array(
+				array_merge( $base, $auth, array( 'port' => 587, 'encryption' => 'tls' ) ),
+				array(
+					'SMTPSecure'  => 'tls',
+					'SMTPAutoTLS' => true,
+					'SMTPAuth'    => true,
+					'Port'        => 587,
+				),
+			),
+			'tls-587-no-auth' => array(
+				array_merge( $base, $no_auth, array( 'port' => 587, 'encryption' => 'tls' ) ),
+				array(
+					'SMTPSecure'  => 'tls',
+					'SMTPAutoTLS' => true,
+					'SMTPAuth'    => false,
+					'Port'        => 587,
+				),
+			),
+			'ssl-465-auth'    => array(
+				array_merge( $base, $auth, array( 'port' => 465, 'encryption' => 'ssl' ) ),
+				array(
+					'SMTPSecure'  => 'ssl',
+					'SMTPAutoTLS' => true,
+					'SMTPAuth'    => true,
+					'Port'        => 465,
+				),
+			),
+			'ssl-465-no-auth' => array(
+				array_merge( $base, $no_auth, array( 'port' => 465, 'encryption' => 'ssl' ) ),
+				array(
+					'SMTPSecure'  => 'ssl',
+					'SMTPAutoTLS' => true,
+					'SMTPAuth'    => false,
+					'Port'        => 465,
+				),
+			),
+			'none-25-no-auth' => array(
+				array_merge( $base, $no_auth, array( 'port' => 25, 'encryption' => 'none' ) ),
+				array(
+					'SMTPSecure'  => '',
+					'SMTPAutoTLS' => false,
+					'SMTPAuth'    => false,
+					'Port'        => 25,
+				),
+			),
+			'none-25-auth'    => array(
+				array_merge( $base, $auth, array( 'port' => 25, 'encryption' => 'none' ) ),
+				array(
+					'SMTPSecure'  => '',
+					'SMTPAutoTLS' => false,
+					'SMTPAuth'    => true,
+					'Port'        => 25,
+				),
+			),
+		);
+	}
+
+	/**
+	 * @dataProvider transportConfigMatrixProvider
+	 */
+	public function test_send_regression_matrix_configures_mailer_and_succeeds( array $config, array $expected ): void {
+		$stub = new StubPHPMailer();
+
+		$result = $this->make_provider( $stub )->send( $this->make_message(), $config );
+
+		$this->assertTrue( $result->success, 'send() must succeed for a valid configuration combination.' );
+		$this->assertSame( $expected['SMTPSecure'], $stub->SMTPSecure );
+		$this->assertSame( $expected['SMTPAutoTLS'], $stub->SMTPAutoTLS );
+		$this->assertSame( $expected['SMTPAuth'], $stub->SMTPAuth );
+		$this->assertSame( $expected['Port'], $stub->Port );
+		$this->assertSame( 15, $stub->Timeout );
+	}
+
+	/**
+	 * @dataProvider transportConfigMatrixProvider
+	 */
+	public function test_connection_regression_matrix_configures_mailer_and_succeeds( array $config, array $expected ): void {
+		$stub = new StubPHPMailer();
+
+		$result = $this->make_provider( $stub )->test_connection( $config );
+
+		$this->assertTrue( $result->success, 'test_connection() must succeed for a valid configuration combination.' );
+		$this->assertSame( $expected['SMTPSecure'], $stub->SMTPSecure );
+		$this->assertSame( $expected['SMTPAutoTLS'], $stub->SMTPAutoTLS );
+		$this->assertSame( $expected['SMTPAuth'], $stub->SMTPAuth );
+		$this->assertSame( $expected['Port'], $stub->Port );
+		$this->assertSame( 15, $stub->Timeout );
+		$this->assertTrue( $stub->smtpClose_was_called );
+	}
+
+	/**
+	 * Requirement: failure classification is derived purely from exception text,
+	 * never from configuration state — the same TLS-text failure must classify
+	 * identically no matter which encryption mode was configured at failure time.
+	 *
+	 * @dataProvider encryptionModeProvider
+	 */
+	public function test_send_failure_classification_stable_across_encryption_modes( string $encryption, int $port ): void {
+		$stub                 = new StubPHPMailer();
+		$stub->send_exception = new PHPMailerException( 'Could not connect: TLS negotiation failed.' );
+
+		$config               = $this->valid_config();
+		$config['encryption'] = $encryption;
+		$config['port']       = $port;
+
+		$result = $this->make_provider( $stub )->send( $this->make_message(), $config );
+
+		$this->assertFalse( $result->success );
+		$this->assertSame(
+			TransportFailureCategory::TLS,
+			$result->failure_category,
+			"TLS-text failures must classify as TLS regardless of configured encryption ({$encryption})."
+		);
+	}
+
+	/**
+	 * @return array<string, array{0: string, 1: int}>
+	 */
+	public static function encryptionModeProvider(): array {
+		return array(
+			'tls-587' => array( 'tls', 587 ),
+			'ssl-465' => array( 'ssl', 465 ),
+			'none-25' => array( 'none', 25 ),
+		);
+	}
+
+	// -------------------------------------------------------------------------
+	// send() / test_connection() — malformed config guard (S3)
+	// -------------------------------------------------------------------------
+
+	public function test_send_returns_config_failure_for_malformed_host(): void {
+		$config         = $this->valid_config();
+		$config['host'] = "mail.example.com\r\nX-Injected: header";
+
+		$result = $this->make_provider()->send( $this->make_message(), $config );
+
+		$this->assertFalse( $result->success );
+		$this->assertSame( TransportFailureCategory::CONFIG, $result->failure_category );
+		$this->assertSame( 'SMTP host contains invalid characters or an unsupported format.', $result->response_message );
+	}
+
+	/**
+	 * Requirement: a malformed config must never echo the raw invalid value back
+	 * to the caller — only the static validate_config() error text is surfaced.
+	 */
+	public function test_send_config_failure_message_never_contains_raw_malformed_host(): void {
+		$config         = $this->valid_config();
+		$config['host'] = "mail.example.com\r\nX-Injected: header";
+
+		$result = $this->make_provider()->send( $this->make_message(), $config );
+
+		$this->assertFalse( $result->success );
+		$this->assertStringNotContainsString( 'X-Injected', (string) $result->response_message );
+		$this->assertStringNotContainsString( "\r\n", (string) $result->response_message );
+	}
+
+	public function test_send_returns_config_failure_for_url_scheme_host(): void {
+		$config         = $this->valid_config();
+		$config['host'] = 'http://mail.example.com';
+
+		$result = $this->make_provider()->send( $this->make_message(), $config );
+
+		$this->assertFalse( $result->success );
+		$this->assertSame( TransportFailureCategory::CONFIG, $result->failure_category );
+		$this->assertStringNotContainsString( 'http://mail.example.com', (string) $result->response_message );
+	}
+
+	public function test_send_returns_config_failure_for_out_of_range_port(): void {
+		$config         = $this->valid_config();
+		$config['port'] = 99999;
+
+		$result = $this->make_provider()->send( $this->make_message(), $config );
+
+		$this->assertFalse( $result->success );
+		$this->assertSame( TransportFailureCategory::CONFIG, $result->failure_category );
+		$this->assertSame( 'SMTP port must be between 1 and 65535.', $result->response_message );
+	}
+
+	public function test_send_returns_config_failure_for_username_without_password(): void {
+		$config              = $this->valid_config();
+		$config['password'] = '';
+
+		$result = $this->make_provider()->send( $this->make_message(), $config );
+
+		$this->assertFalse( $result->success );
+		$this->assertSame( TransportFailureCategory::CONFIG, $result->failure_category );
+		$this->assertSame( 'SMTP password is required when a username is provided.', $result->response_message );
+	}
+
+	public function test_send_config_guard_short_circuits_before_touching_mailer(): void {
+		$stub           = new StubPHPMailer();
+		$config         = $this->valid_config();
+		$config['host'] = "mail.example.com\r\nX-Injected: header";
+
+		$this->make_provider( $stub )->send( $this->make_message(), $config );
+
+		$this->assertSame( '', $stub->Host, 'PHPMailer must not be configured when config validation fails.' );
+	}
+
+	public function test_connection_returns_safe_message_for_malformed_host(): void {
+		$config         = $this->valid_config();
+		$config['host'] = "mail.example.com\r\nX-Injected: header";
+
+		$result = $this->make_provider()->test_connection( $config );
+
+		$this->assertFalse( $result->success );
+		$this->assertSame( 'SMTP host contains invalid characters or an unsupported format.', $result->message );
+		$this->assertStringNotContainsString( 'X-Injected', $result->message );
+	}
+
+	public function test_connection_config_guard_short_circuits_before_touching_mailer(): void {
+		$stub           = new StubPHPMailer();
+		$config         = $this->valid_config();
+		$config['port'] = 0;
+
+		$this->make_provider( $stub )->test_connection( $config );
+
+		$this->assertFalse( $stub->smtpClose_was_called, 'smtpConnect()/smtpClose() must never run when config validation fails.' );
+	}
+
+	// -------------------------------------------------------------------------
 	// send() — address validation
 	// -------------------------------------------------------------------------
 
