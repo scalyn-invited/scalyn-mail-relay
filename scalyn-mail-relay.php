@@ -66,3 +66,15 @@ add_action(
 			->register( new \Scalyn\MailRelay\Providers\Mail\SmtpTlsCheck() );
 	}
 );
+
+// Register the DKIM and DMARC diagnostic checks (Y3). Registered here rather
+// than in Plugin.php for the same reason as SmtpTlsCheck above: the checks
+// stay inside Diagnostics/Checks (Yaj-owned) with no Core edits.
+add_action(
+	'scalyn_mail_relay_booted',
+	static function ( \Scalyn\MailRelay\Core\Container $container ): void {
+		$registry = $container->get( \Scalyn\MailRelay\Diagnostics\DiagnosticCheckRegistry::class );
+		$registry->register( new \Scalyn\MailRelay\Diagnostics\Checks\DkimCheck() );
+		$registry->register( new \Scalyn\MailRelay\Diagnostics\Checks\DmarcCheck() );
+	}
+);
