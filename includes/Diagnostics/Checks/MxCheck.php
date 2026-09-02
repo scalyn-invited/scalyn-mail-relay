@@ -102,8 +102,7 @@ final class MxCheck implements DiagnosticCheckInterface {
 				severity: 'medium',
 				message: sprintf( 'No MX records found for "%s".', $domain ),
 				impact: 'This domain cannot receive incoming mail. This does not affect the ability to send mail through your configured provider.',
-				recommended_action: 'Add MX records if this domain is expected to receive mail, such as replies or DMARC aggregate reports.',
-				score: 15
+				recommended_action: 'Add MX records if this domain is expected to receive mail, such as replies or DMARC aggregate reports.'
 			);
 		}
 
@@ -112,7 +111,6 @@ final class MxCheck implements DiagnosticCheckInterface {
 			severity: 'low',
 			message: sprintf( '%d MX record(s) found for "%s".', count( $hosts ), $domain ),
 			evidence: implode( "\n", $hosts ),
-			score: 25,
 			raw: array( 'records' => $hosts )
 		);
 	}
