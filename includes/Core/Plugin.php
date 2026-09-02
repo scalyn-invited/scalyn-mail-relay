@@ -9,8 +9,10 @@ namespace Scalyn\MailRelay\Core;
 
 use Scalyn\MailRelay\Admin\AdminMenu;
 use Scalyn\MailRelay\Database\DiagnosticRepository;
+use Scalyn\MailRelay\Database\HealthScoreRepository;
 use Scalyn\MailRelay\Diagnostics\DiagnosticCheckRegistry;
 use Scalyn\MailRelay\Diagnostics\DiagnosticRunner;
+use Scalyn\MailRelay\Diagnostics\HealthScorer;
 use Scalyn\MailRelay\Diagnostics\Checks\DkimCheck;
 use Scalyn\MailRelay\Diagnostics\Checks\DmarcCheck;
 use Scalyn\MailRelay\Diagnostics\Checks\MxCheck;
@@ -123,6 +125,8 @@ final class Plugin {
 		$this->container->set( DiagnosticCheckRegistry::class, static fn(): DiagnosticCheckRegistry => new DiagnosticCheckRegistry() );
 		$this->container->set( DiagnosticRunner::class, static fn(): DiagnosticRunner => new DiagnosticRunner() );
 		$this->container->set( DiagnosticRepository::class, static fn(): DiagnosticRepository => new DiagnosticRepository() );
+		$this->container->set( HealthScorer::class, static fn(): HealthScorer => new HealthScorer() );
+		$this->container->set( HealthScoreRepository::class, static fn(): HealthScoreRepository => new HealthScoreRepository() );
 		$this->container->set( DiagnosticsRunEndpoint::class, static fn(): DiagnosticsRunEndpoint => new DiagnosticsRunEndpoint() );
 
 		// Register core diagnostic checks.

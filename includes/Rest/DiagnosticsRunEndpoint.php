@@ -10,8 +10,11 @@ namespace Scalyn\MailRelay\Rest;
 use Scalyn\MailRelay\Core\Capabilities;
 use Scalyn\MailRelay\Core\Plugin;
 use Scalyn\MailRelay\Database\DiagnosticRepository;
+use Scalyn\MailRelay\Database\HealthScoreRepository;
 use Scalyn\MailRelay\Diagnostics\DiagnosticCheckRegistry;
 use Scalyn\MailRelay\Diagnostics\DiagnosticRunner;
+use Scalyn\MailRelay\Diagnostics\HealthScorer;
+use Scalyn\MailRelay\Logging\MailLogRepository;
 use WP_REST_Request;
 use WP_REST_Response;
 
@@ -75,6 +78,9 @@ final class DiagnosticsRunEndpoint {
 			$runner         = $container->get( DiagnosticRunner::class );
 			$registry       = $container->get( DiagnosticCheckRegistry::class );
 			$repo           = $container->get( DiagnosticRepository::class );
+			$mail_log_repo  = $container->get( MailLogRepository::class );
+			$scorer         = $container->get( HealthScorer::class );
+			$score_repo     = $container->get( HealthScoreRepository::class );
 
 			// Create a diagnostic context with the WordPress domain and safe settings.
 			$domain  = wp_parse_url( home_url(), PHP_URL_HOST ) ?? 'localhost';
@@ -97,14 +103,21 @@ final class DiagnosticsRunEndpoint {
 				);
 			}
 
-			// Fetch the latest run (just persisted) to include health score.
-			$run_data = $repo->find_latest_run();
+			// Compute health score from diagnostic results and recent mail history.
+			$run_data              = $repo->find_latest_run();
+			$mail_status_counts    = $mail_log_repo->count_recent_by_status();
+			$health_score_result   = $scorer->score( $run_data['results'], $mail_status_counts );
+
+			// Persist health score if computed.
+			if ( null !== $health_score_result ) {
+				$score_repo->persist( $health_score_result );
+			}
 
 			return new WP_REST_Response(
 				array(
 					'success'      => true,
 					'results'      => $run_data['results'],
-					'health_score' => $run_data['health_score'],
+					'health_score' => $health_score_result ? $health_score_result->overall_score : null,
 				),
 				200
 			);
