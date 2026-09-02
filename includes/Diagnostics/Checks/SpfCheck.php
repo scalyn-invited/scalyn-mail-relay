@@ -101,7 +101,8 @@ final class SpfCheck implements DiagnosticCheckInterface {
 				severity: 'high',
 				message: sprintf( 'No SPF record found for "%s".', $domain ),
 				impact: 'Receiving mail servers cannot verify that your provider is authorized to send on behalf of this domain, increasing the risk of messages being marked as spam or rejected.',
-				recommended_action: 'Add a TXT record starting with "v=spf1" authorizing your sending provider.'
+				recommended_action: 'Add a TXT record starting with "v=spf1" authorizing your sending provider.',
+				score: 0
 			);
 		}
 
@@ -113,6 +114,7 @@ final class SpfCheck implements DiagnosticCheckInterface {
 				evidence: implode( "\n", $spf_values ),
 				impact: 'RFC 7208 treats multiple SPF records as a permanent error, which can cause receiving servers to fail SPF evaluation entirely.',
 				recommended_action: 'Combine all authorized senders into a single SPF TXT record.',
+				score: 0,
 				raw: array( 'records' => $spf_values )
 			);
 		}
@@ -127,6 +129,7 @@ final class SpfCheck implements DiagnosticCheckInterface {
 				evidence: $spf,
 				impact: 'Without an "all" mechanism or a "redirect", SPF evaluation may not behave as intended for senders not explicitly listed.',
 				recommended_action: 'End the SPF record with "~all", "-all" or a "redirect=" modifier.',
+				score: 15,
 				raw: array( 'record' => $spf )
 			);
 		}
@@ -136,6 +139,7 @@ final class SpfCheck implements DiagnosticCheckInterface {
 			severity: 'low',
 			message: sprintf( 'A valid SPF record was found for "%s".', $domain ),
 			evidence: $spf,
+			score: 25,
 			raw: array( 'record' => $spf )
 		);
 	}

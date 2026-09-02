@@ -102,7 +102,8 @@ final class DmarcCheck implements DiagnosticCheckInterface {
 				severity: 'high',
 				message: sprintf( 'No DMARC record found for "%s".', $domain ),
 				impact: 'Without a DMARC policy, receiving servers have no domain-level instruction on how to handle mail that fails SPF/DKIM checks, and you receive no visibility into spoofing attempts.',
-				recommended_action: 'Publish a TXT record at "_dmarc.' . $domain . '" starting with "v=DMARC1".'
+				recommended_action: 'Publish a TXT record at "_dmarc.' . $domain . '" starting with "v=DMARC1".',
+				score: 0
 			);
 		}
 
@@ -114,6 +115,7 @@ final class DmarcCheck implements DiagnosticCheckInterface {
 				evidence: implode( "\n", $dmarc_values ),
 				impact: 'RFC 7489 requires exactly one DMARC record; receiving servers may ignore DMARC evaluation entirely when multiple records are present.',
 				recommended_action: 'Remove the extra "_dmarc" TXT records, leaving exactly one.',
+				score: 0,
 				raw: array( 'records' => $dmarc_values )
 			);
 		}
@@ -129,6 +131,7 @@ final class DmarcCheck implements DiagnosticCheckInterface {
 				evidence: $dmarc,
 				impact: 'A DMARC record without a recognized policy tag may be ignored by receiving servers.',
 				recommended_action: 'Add a "p=" tag with a value of "none", "quarantine" or "reject".',
+				score: 15,
 				raw: array( 'record' => $dmarc )
 			);
 		}
@@ -141,6 +144,7 @@ final class DmarcCheck implements DiagnosticCheckInterface {
 				evidence: $dmarc,
 				impact: 'Monitor-only mode provides reporting visibility but does not instruct receivers to quarantine or reject spoofed mail.',
 				recommended_action: 'Once SPF/DKIM alignment is confirmed via DMARC reports, consider moving to "p=quarantine" or "p=reject".',
+				score: 15,
 				raw: array( 'record' => $dmarc )
 			);
 		}
@@ -150,6 +154,7 @@ final class DmarcCheck implements DiagnosticCheckInterface {
 			severity: 'low',
 			message: sprintf( 'A valid, enforcing DMARC record ("p=%s") was found for "%s".', $policy, $domain ),
 			evidence: $dmarc,
+			score: 25,
 			raw: array( 'record' => $dmarc )
 		);
 	}

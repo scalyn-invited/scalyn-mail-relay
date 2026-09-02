@@ -110,7 +110,8 @@ final class DkimCheck implements DiagnosticCheckInterface {
 				severity: 'high',
 				message: sprintf( 'No DKIM record found for selector "%s" on "%s".', $selector, $domain ),
 				impact: 'Without a published DKIM key for this selector, receiving servers cannot verify that messages signed with it genuinely originated from an authorized sender.',
-				recommended_action: sprintf( 'Publish a TXT record at "%s" containing your DKIM public key.', $selector_domain )
+				recommended_action: sprintf( 'Publish a TXT record at "%s" containing your DKIM public key.', $selector_domain ),
+				score: 0
 			);
 		}
 
@@ -120,7 +121,8 @@ final class DkimCheck implements DiagnosticCheckInterface {
 				severity: 'high',
 				message: sprintf( 'Multiple DKIM records found for selector "%s" on "%s".', $selector, $domain ),
 				impact: 'DKIM verifiers treat multiple TXT records at the same selector name as undefined behavior, which can cause valid signatures to fail verification.',
-				recommended_action: 'Remove the extra TXT records for this selector, leaving exactly one.'
+				recommended_action: 'Remove the extra TXT records for this selector, leaving exactly one.',
+				score: 0
 			);
 		}
 
@@ -135,6 +137,7 @@ final class DkimCheck implements DiagnosticCheckInterface {
 				evidence: $dkim,
 				impact: 'A DKIM record without a recognized public key tag will not be usable for signature verification.',
 				recommended_action: 'Ensure the record includes a "p=" tag with your DKIM public key.',
+				score: 15,
 				raw: array( 'record' => $dkim )
 			);
 		}
@@ -147,6 +150,7 @@ final class DkimCheck implements DiagnosticCheckInterface {
 				evidence: $dkim,
 				impact: 'An empty "p=" tag is the standard mechanism for revoking a DKIM key; mail signed with this selector will fail verification.',
 				recommended_action: 'Publish a valid public key, or configure your provider to sign with a different, active selector.',
+				score: 0,
 				raw: array( 'record' => $dkim )
 			);
 		}
@@ -156,6 +160,7 @@ final class DkimCheck implements DiagnosticCheckInterface {
 			severity: 'low',
 			message: sprintf( 'A valid DKIM record was found for selector "%s" on "%s".', $selector, $domain ),
 			evidence: $dkim,
+			score: 25,
 			raw: array( 'record' => $dkim )
 		);
 	}
