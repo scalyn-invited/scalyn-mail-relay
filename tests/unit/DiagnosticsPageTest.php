@@ -62,6 +62,10 @@ final class DiagnosticsPageTest extends TestCase {
 			public function get_results( string $sql, string $output = 'OBJECT' ) {
 				return $this->parent->get_mock_diagnostic_data();
 			}
+
+			public function get_row( string $sql, string $output = 'OBJECT' ) {
+				return null; // No health score yet in test
+			}
 		};
 	}
 
@@ -183,14 +187,16 @@ final class DiagnosticsPageTest extends TestCase {
 		}
 	}
 
-	public function test_configured_state_keeps_unavailable_diagnostics_action_disabled(): void {
+	public function test_configured_state_enables_diagnostics_action_when_endpoint_available(): void {
 		$this->grant_run_diagnostics();
 		$this->configure_provider();
 
 		$output = $this->render_and_capture();
 
 		$this->assertStringContainsString( 'Run Diagnostics Now', $output );
-		$this->assertStringContainsString( 'disabled aria-disabled="true"', $output );
+		// Button should now be enabled with the REST endpoint URL.
+		$this->assertStringContainsString( 'href="http://example.com/wp-json/scalyn-mail-relay/v1/diagnostics/run"', $output );
+		$this->assertStringContainsString( 'button button-primary', $output );
 		$this->assertStringContainsString( '>—</strong>', $output );
 		$this->assertStringContainsString( 'aria-label="Health score not yet assessed"', $output );
 	}

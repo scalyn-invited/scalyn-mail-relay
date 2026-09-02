@@ -9,14 +9,20 @@ namespace Scalyn\MailRelay\Core;
 
 use Scalyn\MailRelay\Admin\AdminMenu;
 use Scalyn\MailRelay\Database\DiagnosticRepository;
+use Scalyn\MailRelay\Database\HealthScoreRepository;
 use Scalyn\MailRelay\Diagnostics\DiagnosticCheckRegistry;
 use Scalyn\MailRelay\Diagnostics\DiagnosticRunner;
+use Scalyn\MailRelay\Diagnostics\HealthScorer;
+use Scalyn\MailRelay\Diagnostics\Checks\DkimCheck;
+use Scalyn\MailRelay\Diagnostics\Checks\DmarcCheck;
 use Scalyn\MailRelay\Diagnostics\Checks\MxCheck;
 use Scalyn\MailRelay\Diagnostics\Checks\SpfCheck;
+use Scalyn\MailRelay\Providers\Mail\SmtpTlsCheck;
 use Scalyn\MailRelay\Logging\MailEventSubscriber;
 use Scalyn\MailRelay\Logging\MailLogRepository;
 use Scalyn\MailRelay\Logging\TimelineRepository;
 use Scalyn\MailRelay\Mail\MailDispatcher;
+use Scalyn\MailRelay\Rest\DiagnosticsRunEndpoint;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -119,10 +125,16 @@ final class Plugin {
 		$this->container->set( DiagnosticCheckRegistry::class, static fn(): DiagnosticCheckRegistry => new DiagnosticCheckRegistry() );
 		$this->container->set( DiagnosticRunner::class, static fn(): DiagnosticRunner => new DiagnosticRunner() );
 		$this->container->set( DiagnosticRepository::class, static fn(): DiagnosticRepository => new DiagnosticRepository() );
+		$this->container->set( HealthScorer::class, static fn(): HealthScorer => new HealthScorer() );
+		$this->container->set( HealthScoreRepository::class, static fn(): HealthScoreRepository => new HealthScoreRepository() );
+		$this->container->set( DiagnosticsRunEndpoint::class, static fn(): DiagnosticsRunEndpoint => new DiagnosticsRunEndpoint() );
 
 		// Register core diagnostic checks.
 		$this->container->set( SpfCheck::class, static fn(): SpfCheck => new SpfCheck() );
 		$this->container->set( MxCheck::class, static fn(): MxCheck => new MxCheck() );
+		$this->container->set( DkimCheck::class, static fn(): DkimCheck => new DkimCheck() );
+		$this->container->set( DmarcCheck::class, static fn(): DmarcCheck => new DmarcCheck() );
+		$this->container->set( SmtpTlsCheck::class, static fn(): SmtpTlsCheck => new SmtpTlsCheck() );
 	}
 
 	/**
@@ -133,6 +145,9 @@ final class Plugin {
 		$registry = $this->container->get( DiagnosticCheckRegistry::class );
 		$registry->register( $this->container->get( SpfCheck::class ) );
 		$registry->register( $this->container->get( MxCheck::class ) );
+		$registry->register( $this->container->get( DkimCheck::class ) );
+		$registry->register( $this->container->get( DmarcCheck::class ) );
+		$registry->register( $this->container->get( SmtpTlsCheck::class ) );
 	}
 
 	/**
@@ -144,6 +159,9 @@ final class Plugin {
 		// Mail logging hooks run on every request (not only admin) because mail
 		// can be dispatched from frontend, REST, WP-CLI, and cron contexts.
 		$this->container->get( MailEventSubscriber::class )->register();
+
+		// Register REST endpoints.
+		add_action( 'rest_api_init', array( $this->container->get( DiagnosticsRunEndpoint::class ), 'register' ) );
 
 		if ( is_admin() ) {
 			$this->container->get( AdminMenu::class )->register();

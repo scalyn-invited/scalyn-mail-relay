@@ -24,6 +24,11 @@ $GLOBALS['_test_wp_nonce_valid']   = false;
 $GLOBALS['_test_wp_redirect']      = null;
 $GLOBALS['_test_current_time']     = null; // null = use real time; string = fixed time for tests.
 
+// Define plugin constants for tests.
+if ( ! defined( 'SCALYN_MAIL_RELAY_REST_NAMESPACE' ) ) {
+	define( 'SCALYN_MAIL_RELAY_REST_NAMESPACE', 'scalyn-mail-relay/v1' );
+}
+
 if ( ! function_exists( 'get_option' ) ) {
 	/**
 	 * @param string $option
@@ -225,6 +230,83 @@ if ( ! function_exists( 'admin_url' ) ) {
 	 */
 	function admin_url( string $path = '', string $scheme = 'admin' ): string {
 		return 'http://example.com/wp-admin/' . ltrim( $path, '/' );
+	}
+}
+
+if ( ! function_exists( 'rest_url' ) ) {
+	/**
+	 * @param string $path   Path relative to the REST API base.
+	 * @param string $scheme Unused in stub.
+	 */
+	function rest_url( string $path = '', string $scheme = 'rest' ): string {
+		return 'http://example.com/wp-json/' . ltrim( $path, '/' );
+	}
+}
+
+if ( ! function_exists( 'home_url' ) ) {
+	/**
+	 * @param string $path   Path relative to the home URL.
+	 * @param string $scheme Unused in stub.
+	 */
+	function home_url( string $path = '', string $scheme = 'http' ): string {
+		return 'http://example.com' . ( $path ? '/' . ltrim( $path, '/' ) : '' );
+	}
+}
+
+if ( ! function_exists( 'wp_parse_url' ) ) {
+	/**
+	 * A wrapper for PHP's parse_url() function.
+	 *
+	 * @param string   $url URL to parse.
+	 * @param int|null $component Specific component to return.
+	 * @return array|string|int|null
+	 */
+	function wp_parse_url( string $url, ?int $component = -1 ) {
+		$parsed = parse_url( $url );
+		if ( -1 === $component ) {
+			return $parsed;
+		}
+		return $parsed[ $component ] ?? null;
+	}
+}
+
+if ( ! function_exists( 'register_rest_route' ) ) {
+	/**
+	 * Stub for register_rest_route() that records registrations.
+	 * Tests don't actually need to invoke the endpoint, just verify it was registered.
+	 *
+	 * @param string $namespace The namespace for the route.
+	 * @param string $route     The route path.
+	 * @param array  $args      Route arguments (methods, callback, permission_callback).
+	 * @return bool True if registered successfully.
+	 */
+	function register_rest_route( string $namespace, string $route, array $args = array() ): bool {
+		if ( ! isset( $GLOBALS['_test_registered_rest_routes'] ) ) {
+			$GLOBALS['_test_registered_rest_routes'] = array();
+		}
+		$GLOBALS['_test_registered_rest_routes'][] = array(
+			'namespace' => $namespace,
+			'route'     => $route,
+			'args'      => $args,
+		);
+		return true;
+	}
+}
+
+if ( ! class_exists( 'WP_REST_Request' ) ) {
+	/**
+	 * Minimal WP_REST_Request stub for unit tests.
+	 */
+	class WP_REST_Request {
+		private array $params = array();
+
+		public function get_param( string $key ) {
+			return $this->params[ $key ] ?? null;
+		}
+
+		public function set_param( string $key, mixed $value ): void {
+			$this->params[ $key ] = $value;
+		}
 	}
 }
 

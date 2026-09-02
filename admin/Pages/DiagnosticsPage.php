@@ -12,6 +12,7 @@ use Scalyn\MailRelay\Core\Plugin;
 use Scalyn\MailRelay\Core\ProviderRegistry;
 use Scalyn\MailRelay\Core\SettingsRepository;
 use Scalyn\MailRelay\Database\DiagnosticRepository;
+use Scalyn\MailRelay\Database\HealthScoreRepository;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -41,15 +42,19 @@ final class DiagnosticsPage {
 		$provider_configured = $this->is_provider_configured();
 		$wizard_url          = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 
-		// Diagnostics runner endpoint URL will be set here once Kim's REST endpoint is available.
-		// For now, keep empty to disable the "Run Diagnostics" button.
-		$diagnostics_run_url = '';
+		// Wire the "Run Diagnostics" button to the REST endpoint.
+		$diagnostics_run_url = rest_url( 'scalyn-mail-relay/v1/diagnostics/run' );
 
 		// Fetch and organize diagnostic results from Y1's repository.
-		$diagnostic_repo = Plugin::instance()->container()->get( DiagnosticRepository::class );
+		$container       = Plugin::instance()->container();
+		$diagnostic_repo = $container->get( DiagnosticRepository::class );
+		$score_repo      = $container->get( HealthScoreRepository::class );
 		$run_data        = $diagnostic_repo->find_latest_run();
 		$diagnostics     = $this->organize_diagnostics( $run_data['results'] );
-		$health_score    = $run_data['health_score'];
+
+		// Read the computed health score from HealthScoreRepository (wired by Y3's HealthScorer).
+		$latest_score = $score_repo->find_latest();
+		$health_score = $latest_score ? (int) $latest_score['overall_score'] : null;
 
 		// Pre-calculate UI status values for each diagnostic check.
 		$spf_ui_status   = $diagnostics['spf'] ? $this->get_ui_status( $diagnostics['spf']['status'] ) : 'unknown';
