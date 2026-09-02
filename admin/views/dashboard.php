@@ -6,10 +6,9 @@
  *   bool       $provider_configured  Whether a provider is configured and registered.
  *   array|null $latest_log           Most recent mail log row, or null when no records exist.
  *   string     $timeline_url         Validated timeline URL, or '' when no valid UUID exists.
- *
- * Health score and diagnostic results are not yet available. Those sections use
- * explicit empty state until diagnostics REST contracts are implemented. Do not
- * invent data.
+ *   int|null   $health_score         Overall health score (0-100) or null if no results.
+ *   string     $health_ui_status     UI status for health (healthy, warning, critical, unknown).
+ *   string     $health_ui_label      Formatted health label (e.g., "80/100" or "Unknown").
  *
  * Privacy: Do not render response_message, event_data, recipient, subject, body,
  * credentials, raw SMTP transcripts, or unrestricted provider error metadata.
@@ -63,9 +62,16 @@ $setup_steps = array(
 
 		<section class="scalyn-card" aria-labelledby="scalyn-health-heading">
 			<h2 id="scalyn-health-heading"><?php esc_html_e( 'Email Health', 'scalyn-mail-relay' ); ?></h2>
-			<strong class="scalyn-score" aria-label="<?php esc_attr_e( 'Health score not yet assessed', 'scalyn-mail-relay' ); ?>">—</strong>
-			<?php StatusBadge::render( 'unknown', __( 'Unknown', 'scalyn-mail-relay' ) ); ?>
-			<p class="scalyn-card__note"><?php esc_html_e( 'Run the initial diagnostics after configuring a provider to generate your first health score.', 'scalyn-mail-relay' ); ?></p>
+			<?php if ( null === $health_score ) : ?>
+				<strong class="scalyn-score" aria-label="<?php esc_attr_e( 'Health score not yet assessed', 'scalyn-mail-relay' ); ?>">—</strong>
+				<?php StatusBadge::render( 'unknown', $health_ui_label ); ?>
+				<p class="scalyn-card__note"><?php esc_html_e( 'Run the initial diagnostics after configuring a provider to generate your first health score.', 'scalyn-mail-relay' ); ?></p>
+			<?php else : ?>
+				<?php /* translators: %d is the numeric health score out of 100 */ ?>
+				<strong class="scalyn-score" aria-label="<?php esc_attr( sprintf( __( 'Health score: %d out of 100', 'scalyn-mail-relay' ), $health_score ) ); ?>"><?php echo esc_html( $health_score ); ?></strong>
+				<?php StatusBadge::render( $health_ui_status, $health_ui_label ); ?>
+				<p class="scalyn-card__note"><?php esc_html_e( 'Your email health is based on SPF, DKIM, DMARC configuration and delivery performance.', 'scalyn-mail-relay' ); ?></p>
+			<?php endif; ?>
 		</section>
 
 		<section class="scalyn-card" aria-labelledby="scalyn-provider-heading">

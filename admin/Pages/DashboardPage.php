@@ -11,6 +11,7 @@ use Scalyn\MailRelay\Core\Capabilities;
 use Scalyn\MailRelay\Core\Plugin;
 use Scalyn\MailRelay\Core\ProviderRegistry;
 use Scalyn\MailRelay\Core\SettingsRepository;
+use Scalyn\MailRelay\Database\DiagnosticRepository;
 use Scalyn\MailRelay\Logging\MailLogRepository;
 
 defined( 'ABSPATH' ) || exit;
@@ -53,6 +54,14 @@ final class DashboardPage {
 				);
 			}
 		}
+
+		// Fetch health score from latest diagnostic run.
+		$diagnostic_repo  = Plugin::instance()->container()->get( DiagnosticRepository::class );
+		$run_data         = $diagnostic_repo->find_latest_run();
+		$health_score     = $run_data['health_score'];
+		$health_ui_status = null !== $health_score ? ( $health_score >= 80 ? 'healthy' : ( $health_score >= 60 ? 'warning' : 'critical' ) ) : 'unknown';
+		/* translators: %d is the numeric health score out of 100 */
+		$health_ui_label = null !== $health_score ? sprintf( __( '%d/100', 'scalyn-mail-relay' ), $health_score ) : __( 'Unknown', 'scalyn-mail-relay' );
 
 		require SCALYN_MAIL_RELAY_PATH . 'admin/views/dashboard.php';
 	}

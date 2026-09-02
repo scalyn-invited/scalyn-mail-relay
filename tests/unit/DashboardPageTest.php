@@ -7,6 +7,7 @@ use Scalyn\MailRelay\Core\Capabilities;
 use Scalyn\MailRelay\Core\Plugin;
 use Scalyn\MailRelay\Core\ProviderRegistry;
 use Scalyn\MailRelay\Core\SettingsRepository;
+use Scalyn\MailRelay\Database\DiagnosticRepository;
 use Scalyn\MailRelay\Logging\MailLogRepository;
 
 /**
@@ -31,6 +32,8 @@ final class DashboardPageTest extends TestCase {
 
 	private WpdbStub $wpdb;
 
+	private array $mock_diagnostic_data = array();
+
 	protected function setUp(): void {
 		$this->wpdb                        = new WpdbStub();
 		$GLOBALS['wpdb']                   = $this->wpdb;
@@ -39,6 +42,7 @@ final class DashboardPageTest extends TestCase {
 		$GLOBALS['_test_wp_actions']       = array();
 		$GLOBALS['_test_wp_added_actions'] = array();
 		$this->reset_plugin_singleton();
+		$this->setup_wpdb_for_diagnostics();
 	}
 
 	protected function tearDown(): void {
@@ -76,6 +80,71 @@ final class DashboardPageTest extends TestCase {
 		ob_start();
 		$this->make_page()->render();
 		return (string) ob_get_clean();
+	}
+
+	/** Set mock diagnostic data for find_latest_run() to return. */
+	public function set_mock_diagnostic_data( array $data ): void {
+		$this->mock_diagnostic_data = $data;
+	}
+
+	/** Get mock diagnostic data. */
+	public function get_mock_diagnostic_data(): array {
+		return $this->mock_diagnostic_data;
+	}
+
+	/** Setup wpdb mock to handle diagnostic queries with get_var/get_results. */
+	private function setup_wpdb_for_diagnostics(): void {
+		global $wpdb;
+		$self = $this;
+
+		// Create a custom wpdb that wraps WpdbStub but overrides get_var/get_results for diagnostics.
+		$original_wpdb = $this->wpdb;
+		$wpdb          = new class( $self, $original_wpdb ) {
+			public $prefix = 'wp_';
+			private $parent;
+			private $original_wpdb;
+
+			public function __construct( $parent, $original_wpdb ) {
+				$this->parent        = $parent;
+				$this->original_wpdb = $original_wpdb;
+			}
+
+			public function prepare( string $query, ...$args ) {
+				return $this->original_wpdb->prepare( $query, ...$args );
+			}
+
+			public function get_var( string $sql ) {
+				// For diagnostic queries, return a UUID if data exists, null otherwise.
+				$data = $this->parent->get_mock_diagnostic_data();
+				if ( ! empty( $data ) ) {
+					return 'latest-uuid';
+				}
+				// If no diagnostic mock data, delegate to original wpdb.
+				return $this->original_wpdb->get_var( $sql );
+			}
+
+			public function get_results( string $sql, string $output = 'OBJECT' ) {
+				// Check if this is a diagnostic query by checking if diagnostics table is referenced.
+				if ( strpos( $sql, 'scalyn_diagnostics' ) !== false ) {
+					// This is a diagnostic query, use mock data.
+					return $this->parent->get_mock_diagnostic_data();
+				}
+				// For other queries (like mail logs), delegate to original wpdb.
+				return $this->original_wpdb->get_results( $sql, $output );
+			}
+
+			public function get_row( string $sql, string $output = 'OBJECT' ) {
+				return $this->original_wpdb->get_row( $sql, $output );
+			}
+
+			public function insert( string $table, array $data, mixed $format = null ): int|false {
+				return $this->original_wpdb->insert( $table, $data, $format );
+			}
+
+			public function update( string $table, array $data, array $where, mixed $format = null, mixed $where_format = null ): int|false {
+				return $this->original_wpdb->update( $table, $data, $where, $format, $where_format );
+			}
+		};
 	}
 
 	/**
@@ -464,6 +533,126 @@ final class DashboardPageTest extends TestCase {
 		$this->assertStringNotContainsString( 'scalyn-badge--critical', $output );
 	}
 
+	public function test_email_health_displays_healthy_score(): void {
+		$this->grant_view_dashboard();
+
+		// Mock diagnostic data that will average to 85 (healthy).
+		$this->set_mock_diagnostic_data(
+			array(
+				array(
+					'check_name'         => 'spf_record',
+					'status'             => 'pass',
+					'score'              => 100,
+					'result_message'     => 'SPF OK',
+					'recommended_action' => '',
+					'raw_result'         => '{}',
+				),
+				array(
+					'check_name'         => 'dkim_record',
+					'status'             => 'pass',
+					'score'              => 100,
+					'result_message'     => 'DKIM OK',
+					'recommended_action' => '',
+					'raw_result'         => '{}',
+				),
+				array(
+					'check_name'         => 'dmarc_policy',
+					'status'             => 'fail',
+					'score'              => 65,
+					'result_message'     => 'DMARC not configured',
+					'recommended_action' => 'Configure DMARC',
+					'raw_result'         => '{}',
+				),
+			)
+		);
+
+		$output = $this->render_and_capture();
+
+		// Average of 100, 100, 65 = 88.33 -> rounds to 88 or shows 88.
+		$this->assertStringContainsString( 'scalyn-badge--healthy', $output );
+		$this->assertStringContainsString( '/100', $output );
+	}
+
+	public function test_email_health_displays_warning_score(): void {
+		$this->grant_view_dashboard();
+
+		// Mock diagnostic data that will average to 70 (warning).
+		$this->set_mock_diagnostic_data(
+			array(
+				array(
+					'check_name'         => 'spf_record',
+					'status'             => 'warn',
+					'score'              => 75,
+					'result_message'     => 'SPF warning',
+					'recommended_action' => 'Review SPF',
+					'raw_result'         => '{}',
+				),
+				array(
+					'check_name'         => 'dkim_record',
+					'status'             => 'fail',
+					'score'              => 50,
+					'result_message'     => 'DKIM not configured',
+					'recommended_action' => 'Configure DKIM',
+					'raw_result'         => '{}',
+				),
+				array(
+					'check_name'         => 'dmarc_policy',
+					'status'             => 'fail',
+					'score'              => 80,
+					'result_message'     => 'DMARC not configured',
+					'recommended_action' => 'Configure DMARC',
+					'raw_result'         => '{}',
+				),
+			)
+		);
+
+		$output = $this->render_and_capture();
+
+		// Average of 75, 50, 80 = 68.33 -> warning.
+		$this->assertStringContainsString( 'scalyn-badge--warning', $output );
+		$this->assertStringContainsString( '/100', $output );
+	}
+
+	public function test_email_health_displays_critical_score(): void {
+		$this->grant_view_dashboard();
+
+		// Mock diagnostic data that will average to 45 (critical).
+		$this->set_mock_diagnostic_data(
+			array(
+				array(
+					'check_name'         => 'spf_record',
+					'status'             => 'fail',
+					'score'              => 30,
+					'result_message'     => 'SPF not configured',
+					'recommended_action' => 'Configure SPF',
+					'raw_result'         => '{}',
+				),
+				array(
+					'check_name'         => 'dkim_record',
+					'status'             => 'fail',
+					'score'              => 40,
+					'result_message'     => 'DKIM not configured',
+					'recommended_action' => 'Configure DKIM',
+					'raw_result'         => '{}',
+				),
+				array(
+					'check_name'         => 'dmarc_policy',
+					'status'             => 'fail',
+					'score'              => 65,
+					'result_message'     => 'DMARC not configured',
+					'recommended_action' => 'Configure DMARC',
+					'raw_result'         => '{}',
+				),
+			)
+		);
+
+		$output = $this->render_and_capture();
+
+		// Average of 30, 40, 65 = 45 -> critical.
+		$this->assertStringContainsString( 'scalyn-badge--critical', $output );
+		$this->assertStringContainsString( '/100', $output );
+	}
+
 	// =========================================================================
 	// PROVIDER SECTION REGRESSION
 	// =========================================================================
@@ -484,12 +673,12 @@ final class DashboardPageTest extends TestCase {
 		$GLOBALS['_test_wp_options'][ SettingsRepository::OPTION_KEY ] = array(
 			'provider' => array( 'active' => 'test-provider' ),
 		);
-		$this->wpdb->get_results_return = array();
+		$this->wpdb->get_results_return                                = array();
 		$this->boot_plugin();
 
 		// Register a minimal provider so ProviderRegistry::has() returns true.
 		Plugin::instance()->container()->get( ProviderRegistry::class )->register(
-			new class implements ProviderInterface {
+			new class() implements ProviderInterface {
 				public function get_id(): string {
 					return 'test-provider';
 				}
