@@ -228,6 +228,66 @@ if ( ! function_exists( 'admin_url' ) ) {
 	}
 }
 
+if ( ! function_exists( 'rest_url' ) ) {
+	/**
+	 * @param string $path   Path relative to the REST API base.
+	 * @param string $scheme Unused in stub.
+	 */
+	function rest_url( string $path = '', string $scheme = 'rest' ): string {
+		return 'http://example.com/wp-json/' . ltrim( $path, '/' );
+	}
+}
+
+if ( ! function_exists( 'home_url' ) ) {
+	/**
+	 * @param string $path   Path relative to the home URL.
+	 * @param string $scheme Unused in stub.
+	 */
+	function home_url( string $path = '', string $scheme = 'http' ): string {
+		return 'http://example.com' . ( $path ? '/' . ltrim( $path, '/' ) : '' );
+	}
+}
+
+if ( ! function_exists( 'wp_parse_url' ) ) {
+	/**
+	 * A wrapper for PHP's parse_url() function.
+	 *
+	 * @param string   $url URL to parse.
+	 * @param int|null $component Specific component to return.
+	 * @return array|string|int|null
+	 */
+	function wp_parse_url( string $url, ?int $component = -1 ) {
+		$parsed = parse_url( $url );
+		if ( -1 === $component ) {
+			return $parsed;
+		}
+		return $parsed[ $component ] ?? null;
+	}
+}
+
+if ( ! function_exists( 'register_rest_route' ) ) {
+	/**
+	 * Stub for register_rest_route() that records registrations.
+	 * Tests don't actually need to invoke the endpoint, just verify it was registered.
+	 *
+	 * @param string $namespace The namespace for the route.
+	 * @param string $route     The route path.
+	 * @param array  $args      Route arguments (methods, callback, permission_callback).
+	 * @return bool True if registered successfully.
+	 */
+	function register_rest_route( string $namespace, string $route, array $args = array() ): bool {
+		if ( ! isset( $GLOBALS['_test_registered_rest_routes'] ) ) {
+			$GLOBALS['_test_registered_rest_routes'] = array();
+		}
+		$GLOBALS['_test_registered_rest_routes'][] = array(
+			'namespace' => $namespace,
+			'route'     => $route,
+			'args'      => $args,
+		);
+		return true;
+	}
+}
+
 if ( ! class_exists( 'WpRedirectException' ) ) {
 	/**
 	 * Thrown by the wp_safe_redirect stub to simulate the exit; call that

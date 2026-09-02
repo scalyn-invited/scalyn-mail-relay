@@ -41,9 +41,8 @@ final class DiagnosticsPage {
 		$provider_configured = $this->is_provider_configured();
 		$wizard_url          = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 
-		// Diagnostics runner endpoint URL will be set here once Kim's REST endpoint is available.
-		// For now, keep empty to disable the "Run Diagnostics" button.
-		$diagnostics_run_url = '';
+		// Wire the "Run Diagnostics" button to the REST endpoint.
+		$diagnostics_run_url = rest_url( 'scalyn-mail-relay/v1/diagnostics/run' );
 
 		// Fetch and organize diagnostic results from Y1's repository.
 		$diagnostic_repo = Plugin::instance()->container()->get( DiagnosticRepository::class );
