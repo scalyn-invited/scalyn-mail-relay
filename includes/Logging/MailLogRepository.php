@@ -153,4 +153,37 @@ final class MailLogRepository {
 
 		return $results ? $results : array();
 	}
+
+	/**
+	 * Returns mail log row counts grouped by status for the last N days.
+	 *
+	 * Used as the operational-reliability evidence source for health scoring
+	 * (HealthScorer): counts of MailStatus::ACCEPTED vs MailStatus::FAILED in
+	 * the recent window. Statuses with zero rows in the window are omitted
+	 * from the returned array rather than reported as zero.
+	 *
+	 * @param int $days Size of the recent window in days; clamped to a minimum of 1.
+	 * @return array<string, int> Status value => row count.
+	 */
+	public function count_recent_by_status( int $days = 7 ): array {
+		global $wpdb;
+
+		$days  = max( 1, $days );
+		$table = $wpdb->prefix . 'scalyn_mail_logs';
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $table is derived from $wpdb->prefix, not user input.
+		$sql = $wpdb->prepare( "SELECT status, COUNT(*) as row_count FROM {$table} WHERE created_at >= DATE_SUB(%s, INTERVAL %d DAY) GROUP BY status", current_time( 'mysql' ), $days );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- $sql is the output of $wpdb->prepare(); log rows are write-heavy and must not be cached.
+		$rows = $wpdb->get_results( $sql, ARRAY_A );
+
+		$counts = array();
+		foreach ( (array) $rows as $row ) {
+			$status = (string) ( $row['status'] ?? '' );
+			if ( '' !== $status ) {
+				$counts[ $status ] = (int) ( $row['row_count'] ?? 0 );
+			}
+		}
+
+		return $counts;
+	}
 }
