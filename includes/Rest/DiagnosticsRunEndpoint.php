@@ -39,7 +39,7 @@ final class DiagnosticsRunEndpoint {
 	 */
 	public function register(): void {
 		register_rest_route(
-			'scalyn-mail-relay/v1',
+			SCALYN_MAIL_RELAY_REST_NAMESPACE,
 			'/diagnostics/run',
 			array(
 				'methods'             => 'POST',
