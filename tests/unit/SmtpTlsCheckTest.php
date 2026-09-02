@@ -3,6 +3,7 @@
 use PHPUnit\Framework\TestCase;
 use Scalyn\MailRelay\Providers\Mail\SmtpTlsCheck;
 use Scalyn\MailRelay\Diagnostics\DiagnosticContext;
+use Scalyn\MailRelay\Mail\TransportFailureCategory;
 
 /**
  * Unit tests for SmtpTlsCheck.
@@ -146,6 +147,31 @@ final class SmtpTlsCheckTest extends TestCase {
 		$result = $this->make_check( array( 'reachable' => false, 'error' => 'refused' ) )->run( $this->make_context() );
 
 		$this->assertSame( 'fail', $result->status );
+	}
+
+	/**
+	 * Requirement (S2): connect-failure evidence must additionally carry the
+	 * shared TransportFailureCategory vocabulary alongside the existing legacy
+	 * 'category' value, without changing status/severity for any of the four
+	 * legacy connect-error reasons.
+	 *
+	 * @dataProvider connectFailureCategoryProvider
+	 */
+	public function test_connect_failure_raw_includes_shared_failure_category( string $legacy_error, string $expected_status, string $expected_failure_category ): void {
+		$result = $this->make_check( array( 'reachable' => false, 'error' => $legacy_error ) )->run( $this->make_context() );
+
+		$this->assertSame( $expected_status, $result->status );
+		$this->assertSame( $legacy_error, $result->raw['category'] );
+		$this->assertSame( $expected_failure_category, $result->raw['failure_category'] );
+	}
+
+	public static function connectFailureCategoryProvider(): array {
+		return array(
+			'timeout'    => array( 'timeout', 'unknown', TransportFailureCategory::TIMEOUT ),
+			'dns'        => array( 'dns', 'unknown', TransportFailureCategory::CONNECTIVITY ),
+			'refused'    => array( 'refused', 'fail', TransportFailureCategory::CONNECTIVITY ),
+			'other'      => array( 'other', 'fail', TransportFailureCategory::UNKNOWN ),
+		);
 	}
 
 	// -------------------------------------------------------------------------
