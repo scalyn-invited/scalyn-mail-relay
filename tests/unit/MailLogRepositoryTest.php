@@ -454,4 +454,54 @@ final class MailLogRepositoryTest extends TestCase {
 			$this->assertStringNotContainsString( 'password', $msg );
 		}
 	}
+
+	// -------------------------------------------------------------------------
+	// count_recent_by_status()
+	// -------------------------------------------------------------------------
+
+	public function test_count_recent_by_status_returns_empty_array_when_no_rows(): void {
+		$this->wpdb->get_results_return = array();
+
+		$this->assertSame( array(), $this->make_repo()->count_recent_by_status() );
+	}
+
+	public function test_count_recent_by_status_maps_status_to_row_count(): void {
+		$this->wpdb->get_results_return = array(
+			array( 'status' => MailStatus::ACCEPTED, 'row_count' => '42' ),
+			array( 'status' => MailStatus::FAILED, 'row_count' => '3' ),
+		);
+
+		$counts = $this->make_repo()->count_recent_by_status();
+
+		$this->assertSame( 42, $counts[ MailStatus::ACCEPTED ] );
+		$this->assertSame( 3, $counts[ MailStatus::FAILED ] );
+	}
+
+	public function test_count_recent_by_status_omits_statuses_with_no_rows(): void {
+		$this->wpdb->get_results_return = array(
+			array( 'status' => MailStatus::ACCEPTED, 'row_count' => '5' ),
+		);
+
+		$counts = $this->make_repo()->count_recent_by_status();
+
+		$this->assertArrayNotHasKey( MailStatus::FAILED, $counts );
+	}
+
+	public function test_count_recent_by_status_passes_days_to_prepare(): void {
+		$this->wpdb->get_results_return = array();
+
+		$this->make_repo()->count_recent_by_status( 14 );
+
+		$last_prepare = end( $this->wpdb->prepare_calls );
+		$this->assertContains( 14, $last_prepare['args'] );
+	}
+
+	public function test_count_recent_by_status_clamps_days_below_one(): void {
+		$this->wpdb->get_results_return = array();
+
+		$this->make_repo()->count_recent_by_status( 0 );
+
+		$last_prepare = end( $this->wpdb->prepare_calls );
+		$this->assertContains( 1, $last_prepare['args'] );
+	}
 }
