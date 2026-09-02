@@ -99,13 +99,13 @@ final class DashboardPageTest extends TestCase {
 
 		// Create a custom wpdb that wraps WpdbStub but overrides get_var/get_results for diagnostics.
 		$original_wpdb = $this->wpdb;
-		$wpdb = new class( $self, $original_wpdb ) {
+		$wpdb          = new class( $self, $original_wpdb ) {
 			public $prefix = 'wp_';
 			private $parent;
 			private $original_wpdb;
 
 			public function __construct( $parent, $original_wpdb ) {
-				$this->parent = $parent;
+				$this->parent        = $parent;
 				$this->original_wpdb = $original_wpdb;
 			}
 
@@ -537,11 +537,34 @@ final class DashboardPageTest extends TestCase {
 		$this->grant_view_dashboard();
 
 		// Mock diagnostic data that will average to 85 (healthy).
-		$this->set_mock_diagnostic_data( array(
-			array( 'check_name' => 'spf_record', 'status' => 'pass', 'score' => 100, 'result_message' => 'SPF OK', 'recommended_action' => '', 'raw_result' => '{}' ),
-			array( 'check_name' => 'dkim_record', 'status' => 'pass', 'score' => 100, 'result_message' => 'DKIM OK', 'recommended_action' => '', 'raw_result' => '{}' ),
-			array( 'check_name' => 'dmarc_policy', 'status' => 'fail', 'score' => 65, 'result_message' => 'DMARC not configured', 'recommended_action' => 'Configure DMARC', 'raw_result' => '{}' ),
-		) );
+		$this->set_mock_diagnostic_data(
+			array(
+				array(
+					'check_name'         => 'spf_record',
+					'status'             => 'pass',
+					'score'              => 100,
+					'result_message'     => 'SPF OK',
+					'recommended_action' => '',
+					'raw_result'         => '{}',
+				),
+				array(
+					'check_name'         => 'dkim_record',
+					'status'             => 'pass',
+					'score'              => 100,
+					'result_message'     => 'DKIM OK',
+					'recommended_action' => '',
+					'raw_result'         => '{}',
+				),
+				array(
+					'check_name'         => 'dmarc_policy',
+					'status'             => 'fail',
+					'score'              => 65,
+					'result_message'     => 'DMARC not configured',
+					'recommended_action' => 'Configure DMARC',
+					'raw_result'         => '{}',
+				),
+			)
+		);
 
 		$output = $this->render_and_capture();
 
@@ -554,11 +577,34 @@ final class DashboardPageTest extends TestCase {
 		$this->grant_view_dashboard();
 
 		// Mock diagnostic data that will average to 70 (warning).
-		$this->set_mock_diagnostic_data( array(
-			array( 'check_name' => 'spf_record', 'status' => 'warn', 'score' => 75, 'result_message' => 'SPF warning', 'recommended_action' => 'Review SPF', 'raw_result' => '{}' ),
-			array( 'check_name' => 'dkim_record', 'status' => 'fail', 'score' => 50, 'result_message' => 'DKIM not configured', 'recommended_action' => 'Configure DKIM', 'raw_result' => '{}' ),
-			array( 'check_name' => 'dmarc_policy', 'status' => 'fail', 'score' => 80, 'result_message' => 'DMARC not configured', 'recommended_action' => 'Configure DMARC', 'raw_result' => '{}' ),
-		) );
+		$this->set_mock_diagnostic_data(
+			array(
+				array(
+					'check_name'         => 'spf_record',
+					'status'             => 'warn',
+					'score'              => 75,
+					'result_message'     => 'SPF warning',
+					'recommended_action' => 'Review SPF',
+					'raw_result'         => '{}',
+				),
+				array(
+					'check_name'         => 'dkim_record',
+					'status'             => 'fail',
+					'score'              => 50,
+					'result_message'     => 'DKIM not configured',
+					'recommended_action' => 'Configure DKIM',
+					'raw_result'         => '{}',
+				),
+				array(
+					'check_name'         => 'dmarc_policy',
+					'status'             => 'fail',
+					'score'              => 80,
+					'result_message'     => 'DMARC not configured',
+					'recommended_action' => 'Configure DMARC',
+					'raw_result'         => '{}',
+				),
+			)
+		);
 
 		$output = $this->render_and_capture();
 
@@ -571,11 +617,34 @@ final class DashboardPageTest extends TestCase {
 		$this->grant_view_dashboard();
 
 		// Mock diagnostic data that will average to 45 (critical).
-		$this->set_mock_diagnostic_data( array(
-			array( 'check_name' => 'spf_record', 'status' => 'fail', 'score' => 30, 'result_message' => 'SPF not configured', 'recommended_action' => 'Configure SPF', 'raw_result' => '{}' ),
-			array( 'check_name' => 'dkim_record', 'status' => 'fail', 'score' => 40, 'result_message' => 'DKIM not configured', 'recommended_action' => 'Configure DKIM', 'raw_result' => '{}' ),
-			array( 'check_name' => 'dmarc_policy', 'status' => 'fail', 'score' => 65, 'result_message' => 'DMARC not configured', 'recommended_action' => 'Configure DMARC', 'raw_result' => '{}' ),
-		) );
+		$this->set_mock_diagnostic_data(
+			array(
+				array(
+					'check_name'         => 'spf_record',
+					'status'             => 'fail',
+					'score'              => 30,
+					'result_message'     => 'SPF not configured',
+					'recommended_action' => 'Configure SPF',
+					'raw_result'         => '{}',
+				),
+				array(
+					'check_name'         => 'dkim_record',
+					'status'             => 'fail',
+					'score'              => 40,
+					'result_message'     => 'DKIM not configured',
+					'recommended_action' => 'Configure DKIM',
+					'raw_result'         => '{}',
+				),
+				array(
+					'check_name'         => 'dmarc_policy',
+					'status'             => 'fail',
+					'score'              => 65,
+					'result_message'     => 'DMARC not configured',
+					'recommended_action' => 'Configure DMARC',
+					'raw_result'         => '{}',
+				),
+			)
+		);
 
 		$output = $this->render_and_capture();
 
@@ -604,12 +673,12 @@ final class DashboardPageTest extends TestCase {
 		$GLOBALS['_test_wp_options'][ SettingsRepository::OPTION_KEY ] = array(
 			'provider' => array( 'active' => 'test-provider' ),
 		);
-		$this->wpdb->get_results_return = array();
+		$this->wpdb->get_results_return                                = array();
 		$this->boot_plugin();
 
 		// Register a minimal provider so ProviderRegistry::has() returns true.
 		Plugin::instance()->container()->get( ProviderRegistry::class )->register(
-			new class implements ProviderInterface {
+			new class() implements ProviderInterface {
 				public function get_id(): string {
 					return 'test-provider';
 				}

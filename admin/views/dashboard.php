@@ -67,6 +67,7 @@ $setup_steps = array(
 				<?php StatusBadge::render( 'unknown', $health_ui_label ); ?>
 				<p class="scalyn-card__note"><?php esc_html_e( 'Run the initial diagnostics after configuring a provider to generate your first health score.', 'scalyn-mail-relay' ); ?></p>
 			<?php else : ?>
+				<?php /* translators: %d is the numeric health score out of 100 */ ?>
 				<strong class="scalyn-score" aria-label="<?php esc_attr( sprintf( __( 'Health score: %d out of 100', 'scalyn-mail-relay' ), $health_score ) ); ?>"><?php echo esc_html( $health_score ); ?></strong>
 				<?php StatusBadge::render( $health_ui_status, $health_ui_label ); ?>
 				<p class="scalyn-card__note"><?php esc_html_e( 'Your email health is based on SPF, DKIM, DMARC configuration and delivery performance.', 'scalyn-mail-relay' ); ?></p>
