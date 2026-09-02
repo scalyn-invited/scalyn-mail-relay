@@ -119,6 +119,15 @@ final class AdminMenu {
 
 		wp_enqueue_style( 'scalyn-mail-relay-admin', SCALYN_MAIL_RELAY_URL . 'assets/css/admin.css', array(), SCALYN_MAIL_RELAY_VERSION );
 		wp_enqueue_script( 'scalyn-mail-relay-admin', SCALYN_MAIL_RELAY_URL . 'assets/js/admin.js', array(), SCALYN_MAIL_RELAY_VERSION, true );
+
+		// Pass REST API nonce to script for CSRF protection.
+		wp_localize_script(
+			'scalyn-mail-relay-admin',
+			'scalynMailRelaySettings',
+			array(
+				'restNonce' => wp_create_nonce( 'wp_rest' ),
+			)
+		);
 	}
 
 	/**
