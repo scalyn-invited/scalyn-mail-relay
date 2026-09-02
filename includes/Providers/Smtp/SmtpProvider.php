@@ -12,6 +12,7 @@ use PHPMailer\PHPMailer\PHPMailer;
 use Scalyn\MailRelay\Contracts\ProviderInterface;
 use Scalyn\MailRelay\Mail\MailMessage;
 use Scalyn\MailRelay\Mail\SendResult;
+use Scalyn\MailRelay\Mail\TransportFailureCategory;
 use Scalyn\MailRelay\Providers\ConnectionResult;
 use Scalyn\MailRelay\Providers\ValidationResult;
 
@@ -225,7 +226,7 @@ class SmtpProvider implements ProviderInterface {
 					success: false,
 					provider: 'smtp',
 					response_message: 'The sender address is not valid.',
-					failure_category: 'config'
+					failure_category: TransportFailureCategory::CONFIG
 				);
 			}
 			$mailer->setFrom( $from['email'], $from['name'] );
@@ -236,7 +237,7 @@ class SmtpProvider implements ProviderInterface {
 					success: false,
 					provider: 'smtp',
 					response_message: 'No recipient addresses were provided.',
-					failure_category: 'config'
+					failure_category: TransportFailureCategory::CONFIG
 				);
 			}
 
@@ -247,7 +248,7 @@ class SmtpProvider implements ProviderInterface {
 						success: false,
 						provider: 'smtp',
 						response_message: 'One or more recipient addresses are not valid.',
-						failure_category: 'config'
+						failure_category: TransportFailureCategory::CONFIG
 					);
 				}
 				$mailer->addAddress( $addr['email'], $addr['name'] );
@@ -458,6 +459,63 @@ class SmtpProvider implements ProviderInterface {
 	}
 
 	/**
+	 * Classifies a PHPMailer exception into a stable transport failure category.
+	 *
+	 * Message text is inspected only to select a category; the raw exception
+	 * message is never retained or returned. An unrecognized message is
+	 * classified as UNKNOWN rather than guessed into a specific category —
+	 * an inability to classify is not evidence of a specific problem.
+	 *
+	 * @param PHPMailerException $e The caught exception.
+	 * @return string One of the TransportFailureCategory constants.
+	 */
+	private function classify_transport_exception( PHPMailerException $e ): string {
+		$raw = strtolower( $e->getMessage() );
+
+		// Certificate is checked first: certificate-error text (e.g. "certificate
+		// verify failed", "self-signed certificate") also contains 'ssl'/'tls'.
+		if ( str_contains( $raw, 'certificate' ) || str_contains( $raw, 'x509' ) || str_contains( $raw, 'self-signed' ) || str_contains( $raw, 'self signed' ) ) {
+			return TransportFailureCategory::CERTIFICATE;
+		}
+		// TLS/handshake is checked before timeout/connectivity: a TLS failure
+		// message may also contain 'connect' (e.g. "Could not connect: TLS negotiation failed.").
+		if ( str_contains( $raw, 'tls' ) || str_contains( $raw, 'ssl' ) || str_contains( $raw, 'crypto' ) || str_contains( $raw, 'starttls' ) ) {
+			return TransportFailureCategory::TLS;
+		}
+		if ( str_contains( $raw, 'timed out' ) || str_contains( $raw, 'timeout' ) ) {
+			return TransportFailureCategory::TIMEOUT;
+		}
+		if ( str_contains( $raw, 'connect' ) || str_contains( $raw, 'refused' ) || str_contains( $raw, 'unreachable' ) || str_contains( $raw, 'resolve' ) ) {
+			return TransportFailureCategory::CONNECTIVITY;
+		}
+		if ( str_contains( $raw, 'authenticate' ) || str_contains( $raw, 'auth' ) ) {
+			return TransportFailureCategory::AUTH;
+		}
+		if ( str_contains( $raw, 'recipients' ) || str_contains( $raw, 'rejected' ) || str_contains( $raw, 'relay' ) || str_contains( $raw, 'data not accepted' ) ) {
+			return TransportFailureCategory::PROVIDER_REJECTION;
+		}
+		return TransportFailureCategory::UNKNOWN;
+	}
+
+	/**
+	 * Returns the sanitized message and retryability for a failure category.
+	 *
+	 * @param string $category One of the TransportFailureCategory constants.
+	 * @return array{0: string, 1: bool} Sanitized message and retryable flag.
+	 */
+	private function message_and_retry_for_category( string $category ): array {
+		return match ( $category ) {
+			TransportFailureCategory::CERTIFICATE => array( "The server's TLS certificate could not be verified.", false ),
+			TransportFailureCategory::TLS => array( 'Unable to establish the requested secure connection.', false ),
+			TransportFailureCategory::TIMEOUT => array( 'The connection to the SMTP server timed out.', true ),
+			TransportFailureCategory::CONNECTIVITY => array( 'Unable to connect to the SMTP server.', true ),
+			TransportFailureCategory::AUTH => array( 'SMTP authentication failed.', false ),
+			TransportFailureCategory::PROVIDER_REJECTION => array( 'The SMTP server did not accept the message.', false ),
+			default => array( 'SMTP transport failed.', false ),
+		};
+	}
+
+	/**
 	 * Converts a PHPMailer exception into a sanitized SendResult failure.
 	 *
 	 * Raw exception messages are never exposed to callers. The message text
@@ -469,31 +527,9 @@ class SmtpProvider implements ProviderInterface {
 	 * @return SendResult
 	 */
 	private function normalize_send_failure( PHPMailerException $e ): SendResult {
-		$message  = 'SMTP transport failed.';
-		$category = 'network';
-		$retry    = false;
+		$category = $this->classify_transport_exception( $e );
 
-		$raw = strtolower( $e->getMessage() );
-
-		// TLS/SSL is checked before 'connect' because a TLS failure message
-		// may also contain the word 'connect' (e.g. "connect: TLS failed").
-		if ( str_contains( $raw, 'tls' ) || str_contains( $raw, 'ssl' ) || str_contains( $raw, 'crypto' ) || str_contains( $raw, 'certificate' ) ) {
-			$message  = 'Unable to establish the requested secure connection.';
-			$category = 'network';
-			$retry    = false;
-		} elseif ( str_contains( $raw, 'authenticate' ) || str_contains( $raw, 'auth' ) ) {
-			$message  = 'SMTP authentication failed.';
-			$category = 'auth';
-			$retry    = false;
-		} elseif ( str_contains( $raw, 'connect' ) || str_contains( $raw, 'timed out' ) || str_contains( $raw, 'connection refused' ) ) {
-			$message  = 'Unable to connect to the SMTP server.';
-			$category = 'network';
-			$retry    = true;
-		} elseif ( str_contains( $raw, 'recipients' ) || str_contains( $raw, 'rejected' ) || str_contains( $raw, 'relay' ) ) {
-			$message  = 'The SMTP server did not accept the message.';
-			$category = 'bounce';
-			$retry    = false;
-		}
+		list( $message, $retry ) = $this->message_and_retry_for_category( $category );
 
 		return new SendResult(
 			success: false,
@@ -513,14 +549,10 @@ class SmtpProvider implements ProviderInterface {
 	 * @return string Sanitized human-readable message.
 	 */
 	private function normalize_connection_message( PHPMailerException $e ): string {
-		$raw = strtolower( $e->getMessage() );
+		$category = $this->classify_transport_exception( $e );
 
-		if ( str_contains( $raw, 'authenticate' ) || str_contains( $raw, 'auth' ) ) {
-			return 'SMTP authentication failed.';
-		}
-		if ( str_contains( $raw, 'tls' ) || str_contains( $raw, 'ssl' ) || str_contains( $raw, 'crypto' ) || str_contains( $raw, 'certificate' ) ) {
-			return 'Unable to establish the requested secure connection.';
-		}
-		return 'Unable to connect to the SMTP server.';
+		list( $message ) = $this->message_and_retry_for_category( $category );
+
+		return $message;
 	}
 }

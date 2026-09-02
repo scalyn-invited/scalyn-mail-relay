@@ -10,6 +10,7 @@ namespace Scalyn\MailRelay\Providers\Mail;
 use Scalyn\MailRelay\Contracts\DiagnosticCheckInterface;
 use Scalyn\MailRelay\Diagnostics\DiagnosticContext;
 use Scalyn\MailRelay\Diagnostics\DiagnosticResult;
+use Scalyn\MailRelay\Mail\TransportFailureCategory;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -149,8 +150,9 @@ final class SmtpTlsCheck implements DiagnosticCheckInterface {
 				severity: 'low',
 				message: sprintf( 'Connecting to "%s:%d" did not complete; the failure may be transient.', $host, $port ),
 				raw: array(
-					'stage'    => 'connect',
-					'category' => $category,
+					'stage'            => 'connect',
+					'category'         => $category,
+					'failure_category' => TransportFailureCategory::from_connect_error( $category ),
 				)
 			);
 		}
@@ -162,8 +164,9 @@ final class SmtpTlsCheck implements DiagnosticCheckInterface {
 			impact: 'Mail cannot be sent through this server while it is unreachable.',
 			recommended_action: 'Verify the configured SMTP host and port, and confirm the server allows connections from this network.',
 			raw: array(
-				'stage'    => 'connect',
-				'category' => $category,
+				'stage'            => 'connect',
+				'category'         => $category,
+				'failure_category' => TransportFailureCategory::from_connect_error( $category ),
 			)
 		);
 	}

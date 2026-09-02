@@ -6,6 +6,7 @@ use PHPMailer\PHPMailer\Exception as PHPMailerException;
 use Scalyn\MailRelay\Core\ProviderRegistry;
 use Scalyn\MailRelay\Mail\MailMessage;
 use Scalyn\MailRelay\Mail\SendResult;
+use Scalyn\MailRelay\Mail\TransportFailureCategory;
 use Scalyn\MailRelay\Providers\ConnectionResult;
 use Scalyn\MailRelay\Providers\Smtp\PhpMailerLoader;
 use Scalyn\MailRelay\Providers\Smtp\SmtpProvider;
@@ -364,7 +365,8 @@ final class SmtpProviderTest extends TestCase {
 		$result               = $this->make_provider( $stub )->send( $this->make_message(), $this->valid_config() );
 
 		$this->assertFalse( $result->success );
-		$this->assertSame( 'network', $result->failure_category );
+		$this->assertSame( TransportFailureCategory::CONNECTIVITY, $result->failure_category );
+		$this->assertTrue( $result->retryable );
 		$this->assertStringContainsStringIgnoringCase( 'connect', (string) $result->response_message );
 	}
 
@@ -374,7 +376,7 @@ final class SmtpProviderTest extends TestCase {
 		$result               = $this->make_provider( $stub )->send( $this->make_message(), $this->valid_config() );
 
 		$this->assertFalse( $result->success );
-		$this->assertSame( 'auth', $result->failure_category );
+		$this->assertSame( TransportFailureCategory::AUTH, $result->failure_category );
 		$this->assertStringContainsStringIgnoringCase( 'authentication', (string) $result->response_message );
 	}
 
@@ -384,8 +386,119 @@ final class SmtpProviderTest extends TestCase {
 		$result               = $this->make_provider( $stub )->send( $this->make_message(), $this->valid_config() );
 
 		$this->assertFalse( $result->success );
-		$this->assertSame( 'network', $result->failure_category );
+		$this->assertSame( TransportFailureCategory::TLS, $result->failure_category );
 		$this->assertStringContainsStringIgnoringCase( 'secure', (string) $result->response_message );
+	}
+
+	public function test_send_normalises_certificate_exception_to_safe_message(): void {
+		$stub                 = new StubPHPMailer();
+		$stub->send_exception = new PHPMailerException( 'SSL operation failed: certificate verify failed.' );
+		$result               = $this->make_provider( $stub )->send( $this->make_message(), $this->valid_config() );
+
+		$this->assertFalse( $result->success );
+		$this->assertSame( TransportFailureCategory::CERTIFICATE, $result->failure_category );
+		$this->assertFalse( $result->retryable );
+		$this->assertStringContainsStringIgnoringCase( 'certificate', (string) $result->response_message );
+	}
+
+	public function test_send_normalises_timeout_exception_to_safe_message(): void {
+		$stub                 = new StubPHPMailer();
+		$stub->send_exception = new PHPMailerException( 'Connection timed out.' );
+		$result               = $this->make_provider( $stub )->send( $this->make_message(), $this->valid_config() );
+
+		$this->assertFalse( $result->success );
+		$this->assertSame( TransportFailureCategory::TIMEOUT, $result->failure_category );
+		$this->assertTrue( $result->retryable );
+		$this->assertStringContainsStringIgnoringCase( 'timed out', (string) $result->response_message );
+	}
+
+	public function test_send_normalises_provider_rejection_exception_to_safe_message(): void {
+		$stub                 = new StubPHPMailer();
+		$stub->send_exception = new PHPMailerException( 'SMTP Error: The following recipients failed: to@example.com' );
+		$result               = $this->make_provider( $stub )->send( $this->make_message(), $this->valid_config() );
+
+		$this->assertFalse( $result->success );
+		$this->assertSame( TransportFailureCategory::PROVIDER_REJECTION, $result->failure_category );
+		$this->assertFalse( $result->retryable );
+		$this->assertStringNotContainsString( 'to@example.com', (string) $result->response_message );
+	}
+
+	/**
+	 * Requirement: an unrecognized failure must be classified as UNKNOWN, never
+	 * guessed into a specific category — an inability to classify is not
+	 * evidence of a specific problem.
+	 */
+	public function test_send_normalises_unrecognized_exception_to_unknown_fallback(): void {
+		$stub                 = new StubPHPMailer();
+		$stub->send_exception = new PHPMailerException( 'Something unexpected happened.' );
+		$result               = $this->make_provider( $stub )->send( $this->make_message(), $this->valid_config() );
+
+		$this->assertFalse( $result->success );
+		$this->assertSame( TransportFailureCategory::UNKNOWN, $result->failure_category );
+		$this->assertFalse( $result->retryable );
+		$this->assertSame( 'SMTP transport failed.', $result->response_message );
+	}
+
+	/**
+	 * Requirement: redaction must hold across every failure category — the
+	 * sanitized message is always one of a small fixed set, never derived
+	 * from the raw exception text, and response_code/metadata stay empty.
+	 *
+	 * @dataProvider transportFailureMessageProvider
+	 */
+	public function test_send_failure_redaction_across_all_categories( string $raw_message ): void {
+		$stub                 = new StubPHPMailer();
+		$stub->send_exception = new PHPMailerException( $raw_message );
+		$result               = $this->make_provider( $stub )->send( $this->make_message(), $this->valid_config() );
+
+		$this->assertFalse( $result->success );
+		$this->assertNull( $result->response_code );
+		$this->assertSame( array(), $result->metadata );
+		$this->assertContains(
+			$result->response_message,
+			array(
+				"The server's TLS certificate could not be verified.",
+				'Unable to establish the requested secure connection.',
+				'The connection to the SMTP server timed out.',
+				'Unable to connect to the SMTP server.',
+				'SMTP authentication failed.',
+				'The SMTP server did not accept the message.',
+				'SMTP transport failed.',
+			)
+		);
+	}
+
+	/**
+	 * Requirement: the same underlying failure must map to the same sanitized
+	 * message whether it surfaces through send() or test_connection().
+	 *
+	 * @dataProvider transportFailureMessageProvider
+	 */
+	public function test_connection_message_matches_send_failure_message_for_same_exception( string $raw_message ): void {
+		$send_stub                 = new StubPHPMailer();
+		$send_stub->send_exception = new PHPMailerException( $raw_message );
+		$send_result                = $this->make_provider( $send_stub )->send( $this->make_message(), $this->valid_config() );
+
+		$connect_stub                       = new StubPHPMailer();
+		$connect_stub->smtpConnect_exception = new PHPMailerException( $raw_message );
+		$connection_result                  = $this->make_provider( $connect_stub )->test_connection( $this->valid_config() );
+
+		$this->assertSame( $send_result->response_message, $connection_result->message );
+	}
+
+	/**
+	 * @return array<string, array{0: string}>
+	 */
+	public static function transportFailureMessageProvider(): array {
+		return array(
+			'certificate'        => array( 'SSL operation failed: certificate verify failed.' ),
+			'tls'                => array( 'Could not connect: TLS negotiation failed.' ),
+			'timeout'            => array( 'Connection timed out.' ),
+			'connectivity'       => array( 'SMTP connect() failed.' ),
+			'auth'               => array( 'authenticate: password incorrect-horse-battery-staple' ),
+			'provider-rejection' => array( 'SMTP Error: The following recipients failed: to@example.com' ),
+			'unknown'            => array( 'Something unexpected happened.' ),
+		);
 	}
 
 	// -------------------------------------------------------------------------
