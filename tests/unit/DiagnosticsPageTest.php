@@ -62,6 +62,10 @@ final class DiagnosticsPageTest extends TestCase {
 			public function get_results( string $sql, string $output = 'OBJECT' ) {
 				return $this->parent->get_mock_diagnostic_data();
 			}
+
+			public function get_row( string $sql, string $output = 'OBJECT' ) {
+				return null; // No health score yet in test
+			}
 		};
 	}
 
