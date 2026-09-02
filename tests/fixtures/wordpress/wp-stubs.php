@@ -24,6 +24,11 @@ $GLOBALS['_test_wp_nonce_valid']   = false;
 $GLOBALS['_test_wp_redirect']      = null;
 $GLOBALS['_test_current_time']     = null; // null = use real time; string = fixed time for tests.
 
+// Define plugin constants for tests.
+if ( ! defined( 'SCALYN_MAIL_RELAY_REST_NAMESPACE' ) ) {
+	define( 'SCALYN_MAIL_RELAY_REST_NAMESPACE', 'scalyn-mail-relay/v1' );
+}
+
 if ( ! function_exists( 'get_option' ) ) {
 	/**
 	 * @param string $option
@@ -285,6 +290,23 @@ if ( ! function_exists( 'register_rest_route' ) ) {
 			'args'      => $args,
 		);
 		return true;
+	}
+}
+
+if ( ! class_exists( 'WP_REST_Request' ) ) {
+	/**
+	 * Minimal WP_REST_Request stub for unit tests.
+	 */
+	class WP_REST_Request {
+		private array $params = array();
+
+		public function get_param( string $key ) {
+			return $this->params[ $key ] ?? null;
+		}
+
+		public function set_param( string $key, mixed $value ): void {
+			$this->params[ $key ] = $value;
+		}
 	}
 }
 
