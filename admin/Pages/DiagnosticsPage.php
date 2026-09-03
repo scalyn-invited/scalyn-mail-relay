@@ -194,10 +194,10 @@ final class DiagnosticsPage {
 	 * }> Array of recent failures with classification, or empty if none.
 	 */
 	private function get_recent_failures( MailLogRepository $repo, FailureClassifier $classifier ): array {
-		// Fetch recent failed logs using the repository's public interface.
-		// This uses the standard pagination API to respect boundaries.
+		// Fetch recent logs using the repository's public interface.
+		// find_recent( limit, offset ) returns the most recent $limit rows.
 		try {
-			$recent_logs = $repo->find_recent( 1, 5 );
+			$recent_logs = $repo->find_recent( 5, 0 );
 		} catch ( \Exception $e ) {
 			// If there's an error fetching logs, return empty array gracefully.
 			return array();
