@@ -57,14 +57,14 @@ final class DiagnosticsPage {
 		$health_score = $latest_score ? (int) $latest_score['overall_score'] : null;
 
 		// Pre-calculate UI status and severity values for each diagnostic check.
-		$spf_ui_status   = $diagnostics['spf'] ? $this->get_ui_status( $diagnostics['spf']['status'] ) : 'unknown';
-		$spf_severity    = $diagnostics['spf'] ? $this->get_severity_class( $diagnostics['spf']['severity'] ?? '' ) : '';
+		$spf_ui_status = $diagnostics['spf'] ? $this->get_ui_status( $diagnostics['spf']['status'] ) : 'unknown';
+		$spf_severity  = $diagnostics['spf'] ? $this->get_severity_class( $diagnostics['spf']['severity'] ?? '' ) : '';
 
-		$mx_ui_status    = $diagnostics['mx'] ? $this->get_ui_status( $diagnostics['mx']['status'] ) : 'unknown';
-		$mx_severity     = $diagnostics['mx'] ? $this->get_severity_class( $diagnostics['mx']['severity'] ?? '' ) : '';
+		$mx_ui_status = $diagnostics['mx'] ? $this->get_ui_status( $diagnostics['mx']['status'] ) : 'unknown';
+		$mx_severity  = $diagnostics['mx'] ? $this->get_severity_class( $diagnostics['mx']['severity'] ?? '' ) : '';
 
-		$dkim_ui_status  = $diagnostics['dkim'] ? $this->get_ui_status( $diagnostics['dkim']['status'] ) : 'unknown';
-		$dkim_severity   = $diagnostics['dkim'] ? $this->get_severity_class( $diagnostics['dkim']['severity'] ?? '' ) : '';
+		$dkim_ui_status = $diagnostics['dkim'] ? $this->get_ui_status( $diagnostics['dkim']['status'] ) : 'unknown';
+		$dkim_severity  = $diagnostics['dkim'] ? $this->get_severity_class( $diagnostics['dkim']['severity'] ?? '' ) : '';
 
 		$dmarc_ui_status = $diagnostics['dmarc'] ? $this->get_ui_status( $diagnostics['dmarc']['status'] ) : 'unknown';
 		$dmarc_severity  = $diagnostics['dmarc'] ? $this->get_severity_class( $diagnostics['dmarc']['severity'] ?? '' ) : '';
