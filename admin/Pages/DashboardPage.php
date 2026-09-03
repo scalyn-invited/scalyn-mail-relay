@@ -63,6 +63,9 @@ final class DashboardPage {
 		/* translators: %d is the numeric health score out of 100 */
 		$health_ui_label = null !== $health_score ? sprintf( __( '%d/100', 'scalyn-mail-relay' ), $health_score ) : __( 'Unknown', 'scalyn-mail-relay' );
 
+		// Wire the "Run Diagnostics" button to the REST endpoint.
+		$diagnostics_run_url = rest_url( 'scalyn-mail-relay/v1/diagnostics/run' );
+
 		require SCALYN_MAIL_RELAY_PATH . 'admin/views/dashboard.php';
 	}
 

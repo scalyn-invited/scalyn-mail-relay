@@ -31,7 +31,7 @@ final class WizardPage {
 	/**
 	 * Total number of wizard steps.
 	 */
-	private const TOTAL_STEPS = 7;
+	private const TOTAL_STEPS = 6;
 
 	/**
 	 * Performs a capability check then renders the wizard view.
@@ -110,8 +110,7 @@ final class WizardPage {
 			3 => __( 'Configure Provider', 'scalyn-mail-relay' ),
 			4 => __( 'Verify Connection', 'scalyn-mail-relay' ),
 			5 => __( 'Send Test Email', 'scalyn-mail-relay' ),
-			6 => __( 'Initial Health Check', 'scalyn-mail-relay' ),
-			7 => __( 'Complete', 'scalyn-mail-relay' ),
+			6 => __( 'Complete', 'scalyn-mail-relay' ),
 		);
 	}
 
