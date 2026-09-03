@@ -286,7 +286,9 @@ defined( 'ABSPATH' ) || exit;
 				ActionButton::render(
 					__( 'Run Diagnostics Now', 'scalyn-mail-relay' ),
 					$diagnostics_run_url,
-					false
+					false,
+					'scalyn-run-diagnostics',
+					array( 'scalyn-action' => 'run-diagnostics', 'endpoint' => $diagnostics_run_url )
 				);
 				?>
 			</div>

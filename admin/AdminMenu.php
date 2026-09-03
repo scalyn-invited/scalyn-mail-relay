@@ -118,16 +118,23 @@ final class AdminMenu {
 		}
 
 		wp_enqueue_style( 'scalyn-mail-relay-admin', SCALYN_MAIL_RELAY_URL . 'assets/css/admin.css', array(), SCALYN_MAIL_RELAY_VERSION );
-		wp_enqueue_script( 'scalyn-mail-relay-admin', SCALYN_MAIL_RELAY_URL . 'assets/js/admin.js', array(), SCALYN_MAIL_RELAY_VERSION, true );
 
-		// Pass REST API nonce to script for CSRF protection.
-		wp_localize_script(
-			'scalyn-mail-relay-admin',
-			'scalynMailRelaySettings',
-			array(
-				'restNonce' => wp_create_nonce( 'wp_rest' ),
-			)
-		);
+		// Enqueue diagnostics-specific script only on the Diagnostics page.
+		if ( 'toplevel_page_scalyn-mail-relay-diagnostics' === $hook ) {
+			wp_enqueue_script( 'scalyn-mail-relay-admin', SCALYN_MAIL_RELAY_URL . 'assets/js/admin.js', array(), SCALYN_MAIL_RELAY_VERSION, true );
+
+			// Pass REST API nonce and translatable strings to script.
+			wp_localize_script(
+				'scalyn-mail-relay-admin',
+				'scalynMailRelaySettings',
+				array(
+					'restNonce'   => wp_create_nonce( 'wp_rest' ),
+					'runningLabel' => __( 'Running...', 'scalyn-mail-relay' ),
+					'errorPrefix' => __( 'Error running diagnostics:', 'scalyn-mail-relay' ),
+				)
+			);
+			wp_set_script_translations( 'scalyn-mail-relay-admin', 'scalyn-mail-relay' );
+		}
 	}
 
 	/**
