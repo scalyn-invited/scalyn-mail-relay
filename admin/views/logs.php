@@ -45,7 +45,8 @@ $status_labels = array(
 	<?php else : ?>
 
 		<div class="scalyn-card">
-			<table class="wp-list-table widefat fixed striped scalyn-log-table">
+			<div class="scalyn-log-table-wrapper">
+				<table class="wp-list-table widefat fixed striped scalyn-log-table">
 				<thead>
 					<tr>
 						<th scope="col" class="scalyn-log-col-status"><?php esc_html_e( 'Status', 'scalyn-mail-relay' ); ?></th>
@@ -124,6 +125,7 @@ $status_labels = array(
 					<?php endforeach; ?>
 				</tbody>
 			</table>
+			</div>
 
 			<?php if ( $page > 1 || $has_next_page ) : ?>
 				<div class="scalyn-log-pagination tablenav">

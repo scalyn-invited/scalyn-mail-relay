@@ -50,34 +50,45 @@
 .scalyn-badge--failed { background: #fce8e8; color: #b32d2e; border: 1px solid #f0a6a7; }
 
 /* ---- Email Logs list table ---- */
-.scalyn-log-table { margin-top: 12px; }
+.scalyn-log-table { margin-top: 12px; width: 100%; }
+.scalyn-log-table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .scalyn-log-table .scalyn-log-col-status { width: 110px; }
 .scalyn-log-table .scalyn-log-col-provider { width: 90px; }
 .scalyn-log-table .scalyn-log-col-source { width: auto; }
 .scalyn-log-table .scalyn-log-col-attachments { width: 100px; }
 .scalyn-log-table .scalyn-log-col-timestamp { width: 160px; }
 .scalyn-log-table .scalyn-log-col-action { width: 120px; }
-.scalyn-log-pagination { margin-top: 10px; display: flex; justify-content: flex-end; }
+.scalyn-log-pagination { margin-top: 10px; display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.scalyn-log-pagination .button { padding: 6px 12px; font-size: 13px; }
 .scalyn-log-note { margin-top: 12px; }
 
 /* ---- Responsive design ---- */
 @media (max-width: 768px) {
+	.scalyn-log-table { font-size: 13px; }
 	.scalyn-log-table .scalyn-log-col-source,
 	.scalyn-log-table .scalyn-log-col-attachments { display: none; }
 	.scalyn-log-table .scalyn-log-col-provider { width: 80px; }
 	.scalyn-log-table .scalyn-log-col-timestamp { width: 120px; font-size: 12px; }
+	.scalyn-log-table th, .scalyn-log-table td { padding: 8px 6px; }
+	.scalyn-log-pagination { justify-content: center; }
 	.scalyn-wizard-steps { flex-wrap: wrap; }
 	.scalyn-wizard-step { min-width: 70px; padding: 8px 6px; font-size: 10px; }
 	.scalyn-actions { flex-wrap: wrap; }
 }
 
 @media (max-width: 480px) {
+	.scalyn-log-table { font-size: 12px; }
+	.scalyn-log-table-wrapper { margin: 0 -20px; padding: 0 20px; }
 	.scalyn-log-table .scalyn-log-col-provider { display: none; }
-	.scalyn-log-table .scalyn-log-col-status { width: 80px; font-size: 12px; }
+	.scalyn-log-table .scalyn-log-col-status { width: 70px; font-size: 11px; }
 	.scalyn-log-table .scalyn-log-col-timestamp { display: none; }
-	.scalyn-log-table .scalyn-log-col-action { width: 100px; }
+	.scalyn-log-table .scalyn-log-col-action { width: 90px; }
+	.scalyn-log-table th, .scalyn-log-table td { padding: 6px 4px; }
+	.scalyn-log-table .button { padding: 4px 8px; font-size: 11px; }
+	.scalyn-log-pagination { justify-content: center; margin-left: -8px; margin-right: -8px; }
 	.scalyn-wizard-step__label { display: none; }
 	.scalyn-wizard-step { min-width: 60px; padding: 6px 4px; }
+	.scalyn-card { padding: 16px 12px; }
 }
 
 /* ---- Timeline ---- */
