@@ -17,10 +17,13 @@ final class ContainerTest extends TestCase {
 		$container = new Container();
 		$calls     = 0;
 
-		$container->set( 'counter', static function () use ( &$calls ): object {
-			++$calls;
-			return new \stdClass();
-		} );
+		$container->set(
+			'counter',
+			static function () use ( &$calls ): object {
+				++$calls;
+				return new \stdClass();
+			}
+		);
 
 		$container->get( 'counter' );
 		$container->get( 'counter' );

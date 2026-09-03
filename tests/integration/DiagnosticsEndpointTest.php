@@ -15,10 +15,10 @@ use Scalyn\MailRelay\Diagnostics\DiagnosticCheckRegistry;
 final class DiagnosticsEndpointTest extends TestCase {
 
 	protected function setUp(): void {
-		$GLOBALS['_test_current_user_can'] = array();
-		$GLOBALS['_test_wp_options']       = array();
-		$GLOBALS['_test_wp_actions']       = array();
-		$GLOBALS['_test_wp_added_actions'] = array();
+		$GLOBALS['_test_current_user_can']       = array();
+		$GLOBALS['_test_wp_options']             = array();
+		$GLOBALS['_test_wp_actions']             = array();
+		$GLOBALS['_test_wp_added_actions']       = array();
 		$GLOBALS['_test_registered_rest_routes'] = array();
 		$this->reset_plugin_singleton();
 		$this->setup_wpdb_mock();

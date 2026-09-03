@@ -226,15 +226,26 @@ final class DiagnosticsPage {
 
 			$suggestion = $classifier->classify( $send_result );
 
+			// Format the timestamp using site's date/time settings.
+			$failed_at_raw       = $log['failed_at'] ?? null;
+			$failed_at_formatted = null;
+			if ( $failed_at_raw ) {
+				$timestamp = strtotime( $failed_at_raw );
+				if ( false !== $timestamp ) {
+					$failed_at_formatted = wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $timestamp );
+				}
+			}
+
 			$failures[] = array(
-				'provider'         => $log['provider'] ?? 'unknown',
-				'status'           => $log['status'] ?? 'unknown',
-				'response_code'    => $log['response_code'] ?? null,
-				'response_message' => $log['response_message'] ?? null,
-				'failed_at'        => $log['failed_at'] ?? null,
-				'category'         => $suggestion->category,
-				'remediation'      => $suggestion->suggestion,
-				'evidence'         => $suggestion->evidence,
+				'provider'            => $log['provider'] ?? 'unknown',
+				'status'              => $log['status'] ?? 'unknown',
+				'response_code'       => $log['response_code'] ?? null,
+				'response_message'    => $log['response_message'] ?? null,
+				'failed_at'           => $failed_at_raw,
+				'failed_at_formatted' => $failed_at_formatted,
+				'category'            => $suggestion->category,
+				'remediation'         => $suggestion->suggestion,
+				'evidence'            => $suggestion->evidence,
 			);
 		}
 

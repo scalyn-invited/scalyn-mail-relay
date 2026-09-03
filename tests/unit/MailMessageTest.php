@@ -87,7 +87,10 @@ final class MailMessageTest extends TestCase {
 	}
 
 	public function test_context_metadata_is_stored(): void {
-		$context = array( 'source_type' => 'wp_mail', 'post_id' => 42 );
+		$context = array(
+			'source_type' => 'wp_mail',
+			'post_id'     => 42,
+		);
 		$msg     = new MailMessage(
 			uuid: 'uuid-007',
 			from: 'a@example.com',

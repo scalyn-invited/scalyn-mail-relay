@@ -38,9 +38,12 @@ final class DashboardPage {
 			wp_die( esc_html__( 'You do not have permission to view Scalyn Mail Relay.', 'scalyn-mail-relay' ) );
 		}
 
+		$container           = Plugin::instance()->container();
+		$settings            = $container->get( SettingsRepository::class );
 		$provider_configured = $this->is_provider_configured();
+		$provider_verified   = $provider_configured && $settings->is_provider_verified();
 
-		$log_repo   = Plugin::instance()->container()->get( MailLogRepository::class );
+		$log_repo   = $container->get( MailLogRepository::class );
 		$rows       = $log_repo->find_recent( 1, 0 );
 		$latest_log = $rows[0] ?? null;
 
@@ -56,7 +59,7 @@ final class DashboardPage {
 		}
 
 		// Fetch health score from latest diagnostic run.
-		$diagnostic_repo  = Plugin::instance()->container()->get( DiagnosticRepository::class );
+		$diagnostic_repo  = $container->get( DiagnosticRepository::class );
 		$run_data         = $diagnostic_repo->find_latest_run();
 		$health_score     = $run_data['health_score'];
 		$health_ui_status = null !== $health_score ? ( $health_score >= 80 ? 'healthy' : ( $health_score >= 60 ? 'warning' : 'critical' ) ) : 'unknown';

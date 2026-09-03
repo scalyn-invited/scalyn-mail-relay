@@ -333,9 +333,9 @@ final class SmtpProviderTest extends TestCase {
 	 * Requirement: raw PHPMailer exception messages must not be exposed in results.
 	 */
 	public function test_send_failure_does_not_expose_raw_phpmailer_exception(): void {
-		$stub                  = new StubPHPMailer();
-		$stub->send_exception  = new PHPMailerException( 'SMTP server said: 550 5.1.1 User unknown' );
-		$result                = $this->make_provider( $stub )->send( $this->make_message(), $this->valid_config() );
+		$stub                 = new StubPHPMailer();
+		$stub->send_exception = new PHPMailerException( 'SMTP server said: 550 5.1.1 User unknown' );
+		$result               = $this->make_provider( $stub )->send( $this->make_message(), $this->valid_config() );
 
 		$this->assertFalse( $result->success );
 		// Raw server response must not appear in the normalised message.
@@ -477,11 +477,11 @@ final class SmtpProviderTest extends TestCase {
 	public function test_connection_message_matches_send_failure_message_for_same_exception( string $raw_message ): void {
 		$send_stub                 = new StubPHPMailer();
 		$send_stub->send_exception = new PHPMailerException( $raw_message );
-		$send_result                = $this->make_provider( $send_stub )->send( $this->make_message(), $this->valid_config() );
+		$send_result               = $this->make_provider( $send_stub )->send( $this->make_message(), $this->valid_config() );
 
-		$connect_stub                       = new StubPHPMailer();
+		$connect_stub                        = new StubPHPMailer();
 		$connect_stub->smtpConnect_exception = new PHPMailerException( $raw_message );
-		$connection_result                  = $this->make_provider( $connect_stub )->test_connection( $this->valid_config() );
+		$connection_result                   = $this->make_provider( $connect_stub )->test_connection( $this->valid_config() );
 
 		$this->assertSame( $send_result->response_message, $connection_result->message );
 	}
@@ -563,7 +563,14 @@ final class SmtpProviderTest extends TestCase {
 
 		return array(
 			'tls-587-auth'    => array(
-				array_merge( $base, $auth, array( 'port' => 587, 'encryption' => 'tls' ) ),
+				array_merge(
+					$base,
+					$auth,
+					array(
+						'port'       => 587,
+						'encryption' => 'tls',
+					)
+				),
 				array(
 					'SMTPSecure'  => 'tls',
 					'SMTPAutoTLS' => true,
@@ -572,7 +579,14 @@ final class SmtpProviderTest extends TestCase {
 				),
 			),
 			'tls-587-no-auth' => array(
-				array_merge( $base, $no_auth, array( 'port' => 587, 'encryption' => 'tls' ) ),
+				array_merge(
+					$base,
+					$no_auth,
+					array(
+						'port'       => 587,
+						'encryption' => 'tls',
+					)
+				),
 				array(
 					'SMTPSecure'  => 'tls',
 					'SMTPAutoTLS' => true,
@@ -581,7 +595,14 @@ final class SmtpProviderTest extends TestCase {
 				),
 			),
 			'ssl-465-auth'    => array(
-				array_merge( $base, $auth, array( 'port' => 465, 'encryption' => 'ssl' ) ),
+				array_merge(
+					$base,
+					$auth,
+					array(
+						'port'       => 465,
+						'encryption' => 'ssl',
+					)
+				),
 				array(
 					'SMTPSecure'  => 'ssl',
 					'SMTPAutoTLS' => true,
@@ -590,7 +611,14 @@ final class SmtpProviderTest extends TestCase {
 				),
 			),
 			'ssl-465-no-auth' => array(
-				array_merge( $base, $no_auth, array( 'port' => 465, 'encryption' => 'ssl' ) ),
+				array_merge(
+					$base,
+					$no_auth,
+					array(
+						'port'       => 465,
+						'encryption' => 'ssl',
+					)
+				),
 				array(
 					'SMTPSecure'  => 'ssl',
 					'SMTPAutoTLS' => true,
@@ -599,7 +627,14 @@ final class SmtpProviderTest extends TestCase {
 				),
 			),
 			'none-25-no-auth' => array(
-				array_merge( $base, $no_auth, array( 'port' => 25, 'encryption' => 'none' ) ),
+				array_merge(
+					$base,
+					$no_auth,
+					array(
+						'port'       => 25,
+						'encryption' => 'none',
+					)
+				),
 				array(
 					'SMTPSecure'  => '',
 					'SMTPAutoTLS' => false,
@@ -608,7 +643,14 @@ final class SmtpProviderTest extends TestCase {
 				),
 			),
 			'none-25-auth'    => array(
-				array_merge( $base, $auth, array( 'port' => 25, 'encryption' => 'none' ) ),
+				array_merge(
+					$base,
+					$auth,
+					array(
+						'port'       => 25,
+						'encryption' => 'none',
+					)
+				),
 				array(
 					'SMTPSecure'  => '',
 					'SMTPAutoTLS' => false,
@@ -741,7 +783,7 @@ final class SmtpProviderTest extends TestCase {
 	}
 
 	public function test_send_returns_config_failure_for_username_without_password(): void {
-		$config              = $this->valid_config();
+		$config             = $this->valid_config();
 		$config['password'] = '';
 
 		$result = $this->make_provider()->send( $this->make_message(), $config );
@@ -950,7 +992,7 @@ final class SmtpProviderTest extends TestCase {
 		// smtpConnect() in PHPMailer exceptions-mode throws (never returns false)
 		// when authentication fails. It also calls quit() internally before throwing.
 		// Our smtpClose() in the catch block is still called (idempotent on disconnect).
-		$stub = new StubPHPMailer();
+		$stub                        = new StubPHPMailer();
 		$stub->smtpConnect_exception = new PHPMailerException( 'SMTP Error: Could not authenticate.' );
 
 		$result = $this->make_provider( $stub )->test_connection( $this->valid_config() );
@@ -961,7 +1003,7 @@ final class SmtpProviderTest extends TestCase {
 	}
 
 	public function test_connection_calls_smtp_close_when_exception_is_thrown(): void {
-		$stub                       = new StubPHPMailer();
+		$stub                        = new StubPHPMailer();
 		$stub->smtpConnect_exception = new PHPMailerException( 'TLS negotiation failed.' );
 
 		$result = $this->make_provider( $stub )->test_connection( $this->valid_config() );

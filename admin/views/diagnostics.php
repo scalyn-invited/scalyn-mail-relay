@@ -42,6 +42,49 @@ defined( 'ABSPATH' ) || exit;
 	<h1><?php esc_html_e( 'Diagnostics', 'scalyn-mail-relay' ); ?></h1>
 	<p class="scalyn-lead"><?php esc_html_e( 'Email deliverability health checks and remediation guidance.', 'scalyn-mail-relay' ); ?></p>
 
+	<?php if ( $provider_configured ) : ?>
+		<!-- Run Diagnostics Action (Header) -->
+		<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+			<div>
+				<?php
+				$last_run_time = null;
+				if ( null !== $health_score && ! empty( $diagnostics ) ) {
+					// Get created_at from first diagnostic result.
+					foreach ( $diagnostics as $check_data ) {
+						if ( null !== $check_data && isset( $check_data['created_at'] ) ) {
+							$last_run_time = $check_data['created_at'];
+							break;
+						}
+					}
+				}
+				?>
+				<?php if ( null !== $last_run_time ) : ?>
+					<p style="margin: 0 0 8px 0; font-size: 13px; color: #50575e;">
+						<?php esc_html_e( 'Last run: ', 'scalyn-mail-relay' ); ?>
+						<time datetime="<?php echo esc_attr( wp_date( 'c', strtotime( $last_run_time ) ) ); ?>">
+							<?php echo esc_html( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), strtotime( $last_run_time ) ) ); ?>
+						</time>
+					</p>
+				<?php endif; ?>
+			</div>
+			<div class="scalyn-actions">
+				<?php
+				ActionButton::render(
+					__( 'Run Diagnostics Now', 'scalyn-mail-relay' ),
+					$diagnostics_run_url,
+					false,
+					'scalyn-run-diagnostics',
+					array(
+						'scalyn-action' => 'run-diagnostics',
+						'endpoint'      => $diagnostics_run_url,
+					),
+					true
+				);
+				?>
+			</div>
+		</div>
+	<?php endif; ?>
+
 	<?php if ( ! $provider_configured ) : ?>
 		<div class="scalyn-card">
 			<?php
@@ -78,7 +121,7 @@ defined( 'ABSPATH' ) || exit;
 						}
 
 						echo '<p class="scalyn-finding__message">' . esc_html( $spf['result_message'] ) . '</p>';
-						EvidenceDisplay::render( $spf, 'SPF Record', true );
+						EvidenceDisplay::render( $spf, 'SPF Record', 'pass' !== $spf['status'] );
 
 						if ( $spf['recommended_action'] ) {
 							echo '<p class="scalyn-finding__action">' . esc_html( $spf['recommended_action'] ) . '</p>';
@@ -105,7 +148,7 @@ defined( 'ABSPATH' ) || exit;
 						}
 
 						echo '<p class="scalyn-finding__message">' . esc_html( $mx['result_message'] ) . '</p>';
-						EvidenceDisplay::render( $mx, 'MX Records', true );
+						EvidenceDisplay::render( $mx, 'MX Records', 'pass' !== $mx['status'] );
 
 						if ( $mx['recommended_action'] ) {
 							echo '<p class="scalyn-finding__action">' . esc_html( $mx['recommended_action'] ) . '</p>';
@@ -132,7 +175,7 @@ defined( 'ABSPATH' ) || exit;
 						}
 
 						echo '<p class="scalyn-finding__message">' . esc_html( $dkim['result_message'] ) . '</p>';
-						EvidenceDisplay::render( $dkim, 'DKIM Records', true );
+						EvidenceDisplay::render( $dkim, 'DKIM Records', 'pass' !== $dkim['status'] );
 
 						if ( $dkim['recommended_action'] ) {
 							echo '<p class="scalyn-finding__action">' . esc_html( $dkim['recommended_action'] ) . '</p>';
@@ -159,7 +202,7 @@ defined( 'ABSPATH' ) || exit;
 						}
 
 						echo '<p class="scalyn-finding__message">' . esc_html( $dmarc['result_message'] ) . '</p>';
-						EvidenceDisplay::render( $dmarc, 'DMARC Policy', true );
+						EvidenceDisplay::render( $dmarc, 'DMARC Policy', 'pass' !== $dmarc['status'] );
 
 						if ( $dmarc['recommended_action'] ) {
 							echo '<p class="scalyn-finding__action">' . esc_html( $dmarc['recommended_action'] ) . '</p>';
@@ -196,7 +239,7 @@ defined( 'ABSPATH' ) || exit;
 						}
 
 						echo '<p class="scalyn-finding__message">' . esc_html( $smtp_tls['result_message'] ) . '</p>';
-						EvidenceDisplay::render( $smtp_tls, 'SMTP/TLS Configuration', true );
+						EvidenceDisplay::render( $smtp_tls, 'SMTP/TLS Configuration', 'pass' !== $smtp_tls['status'] );
 
 						if ( $smtp_tls['recommended_action'] ) {
 							echo '<p class="scalyn-finding__action">' . esc_html( $smtp_tls['recommended_action'] ) . '</p>';
@@ -210,8 +253,8 @@ defined( 'ABSPATH' ) || exit;
 		</section>
 
 		<!-- Overall Health Score -->
-		<section class="scalyn-diagnostics-section" aria-labelledby="scalyn-diagnostics-health-heading">
-			<h2 id="scalyn-diagnostics-health-heading" class="scalyn-diagnostics-section__title"><?php esc_html_e( 'Overall Email Health', 'scalyn-mail-relay' ); ?></h2>
+		<section class="scalyn-diagnostics-section" aria-labelledby="scalyn-diagnostics-health-section-heading">
+			<h2 id="scalyn-diagnostics-health-section-heading" class="scalyn-diagnostics-section__title"><?php esc_html_e( 'Overall Email Health', 'scalyn-mail-relay' ); ?></h2>
 
 			<div class="scalyn-diagnostics-grid">
 				<?php
@@ -225,16 +268,13 @@ defined( 'ABSPATH' ) || exit;
 					$health_ui_label,
 					function () use ( $health_score ) {
 						if ( null === $health_score ) {
-							echo '<strong class="scalyn-score" aria-label="' . esc_attr__( 'Health score not yet assessed', 'scalyn-mail-relay' ) . '">—</strong>';
 							echo '<p class="scalyn-card__note">' . esc_html__( 'Run diagnostics to generate your email health score based on SPF, DKIM, DMARC, MX, and SMTP/TLS verification.', 'scalyn-mail-relay' ) . '</p>';
 							return;
 						}
 
-						/* translators: %d is the health score number (0-100) */
-						echo '<strong class="scalyn-score" aria-label="' . esc_attr( sprintf( __( 'Health score: %d out of 100', 'scalyn-mail-relay' ), $health_score ) ) . '">' . esc_html( $health_score ) . '</strong>';
 						echo '<p class="scalyn-card__note">' . esc_html__( 'Your email health score is based on the results of all diagnostic checks (SPF, DKIM, DMARC, MX, and SMTP/TLS).', 'scalyn-mail-relay' ) . '</p>';
 					},
-					'scalyn-diagnostics-health-heading'
+					'scalyn-diagnostics-health-card-heading'
 				);
 				?>
 			</div>
@@ -255,9 +295,9 @@ defined( 'ABSPATH' ) || exit;
 								</span>
 								<span class="scalyn-failure-provider"><?php echo esc_html( $failure['provider'] ); ?></span>
 								<?php if ( $failure['failed_at'] ) : ?>
-									<span class="scalyn-failure-time" title="<?php echo esc_attr( $failure['failed_at'] ); ?>">
-										<?php echo esc_html( $failure['failed_at'] ); ?>
-									</span>
+									<time class="scalyn-failure-time" datetime="<?php echo esc_attr( wp_date( 'c', strtotime( $failure['failed_at'] ) ) ); ?>" title="<?php echo esc_attr( $failure['failed_at'] ); ?>">
+										<?php echo esc_html( $failure['failed_at_formatted'] ?? $failure['failed_at'] ); ?>
+									</time>
 								<?php endif; ?>
 							</div>
 
@@ -276,21 +316,6 @@ defined( 'ABSPATH' ) || exit;
 				</div>
 			</section>
 		<?php endif; ?>
-
-		<!-- Run Diagnostics Action -->
-		<section class="scalyn-card scalyn-actions-card" aria-labelledby="scalyn-diagnostics-actions-heading">
-			<h2 id="scalyn-diagnostics-actions-heading"><?php esc_html_e( 'Run Diagnostics', 'scalyn-mail-relay' ); ?></h2>
-			<p class="scalyn-actions__note"><?php esc_html_e( 'Click the button below to run a complete email deliverability diagnostic check. This includes DNS validation (SPF, DKIM, DMARC, MX) and provider health checks (SMTP/TLS). Results will appear in the sections above.', 'scalyn-mail-relay' ); ?></p>
-			<div class="scalyn-actions">
-				<?php
-				ActionButton::render(
-					__( 'Run Diagnostics Now', 'scalyn-mail-relay' ),
-					$diagnostics_run_url,
-					false
-				);
-				?>
-			</div>
-		</section>
 
 	<?php endif; ?>
 </div>

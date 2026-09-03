@@ -122,7 +122,21 @@ $setup_steps = array(
 					<?php endif; ?>
 					<?php if ( '' !== $log_created ) : ?>
 						<dt><?php esc_html_e( 'Date', 'scalyn-mail-relay' ); ?></dt>
-						<dd><time datetime="<?php echo esc_attr( $log_created ); ?>"><?php echo esc_html( $log_created ); ?></time></dd>
+						<dd>
+							<?php
+							$timestamp = strtotime( $log_created );
+							if ( false !== $timestamp ) {
+								$date_fmt = get_option( 'date_format' );
+								$time_fmt = get_option( 'time_format' );
+								$format   = ( $date_fmt && $time_fmt ) ? $date_fmt . ' ' . $time_fmt : 'Y-m-d H:i:s';
+								echo '<time datetime="' . esc_attr( wp_date( 'c', $timestamp ) ) . '">';
+								echo esc_html( wp_date( $format, $timestamp ) );
+								echo '</time>';
+							} else {
+								echo '<span>—</span>';
+							}
+							?>
+						</dd>
 					<?php endif; ?>
 				</dl>
 				<?php if ( 'accepted' === $log_status ) : ?>
@@ -153,12 +167,14 @@ $setup_steps = array(
 	<section class="scalyn-card scalyn-actions-card" aria-labelledby="scalyn-actions-heading">
 		<h2 id="scalyn-actions-heading"><?php esc_html_e( 'Quick Actions', 'scalyn-mail-relay' ); ?></h2>
 		<div class="scalyn-actions">
-			<?php ActionButton::render( __( 'Configure Mailer', 'scalyn-mail-relay' ), $wizard_url ); ?>
-			<?php ActionButton::render( __( 'Run Diagnostics', 'scalyn-mail-relay' ), $diagnostics_run_url, true ); ?>
-			<?php ActionButton::render( __( 'Send Test Email', 'scalyn-mail-relay' ), '', true ); ?>
-			<?php ActionButton::render( __( 'View Logs', 'scalyn-mail-relay' ), $logs_url ); ?>
+			<?php ActionButton::render( __( 'Configure Mailer', 'scalyn-mail-relay' ), $wizard_url, false, '', array(), true ); ?>
+			<?php ActionButton::render( __( 'Run Diagnostics', 'scalyn-mail-relay' ), $diagnostics_run_url, ! $provider_verified, '', array(), false ); ?>
+			<?php ActionButton::render( __( 'Send Test Email', 'scalyn-mail-relay' ), '', ! $provider_verified, '', array(), false ); ?>
+			<?php ActionButton::render( __( 'View Logs', 'scalyn-mail-relay' ), $logs_url, false, '', array(), false ); ?>
 		</div>
-		<p class="scalyn-actions__note description"><?php esc_html_e( 'Run Diagnostics and Send Test Email will be enabled after a mail provider is configured and verified.', 'scalyn-mail-relay' ); ?></p>
+		<?php if ( ! $provider_verified ) : ?>
+			<p class="scalyn-actions__note description"><?php esc_html_e( 'Run Diagnostics and Send Test Email will be enabled after a mail provider is configured and verified through a successful connection or test email.', 'scalyn-mail-relay' ); ?></p>
+		<?php endif; ?>
 	</section>
 
 </div>

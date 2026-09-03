@@ -197,9 +197,17 @@ final class DiagnosticRepositoryTest extends TestCase {
 	}
 
 	public function test_find_by_uuid_returns_configured_rows(): void {
-		$rows = array(
-			array( 'id' => '1', 'check_name' => 'spf_record', 'status' => 'pass' ),
-			array( 'id' => '2', 'check_name' => 'dkim_record', 'status' => 'warn' ),
+		$rows                           = array(
+			array(
+				'id'         => '1',
+				'check_name' => 'spf_record',
+				'status'     => 'pass',
+			),
+			array(
+				'id'         => '2',
+				'check_name' => 'dkim_record',
+				'status'     => 'warn',
+			),
 		);
 		$this->wpdb->get_results_return = $rows;
 
@@ -219,7 +227,7 @@ final class DiagnosticRepositoryTest extends TestCase {
 	}
 
 	public function test_find_recent_returns_configured_rows(): void {
-		$rows                            = array( array( 'id' => '1' ), array( 'id' => '2' ) );
+		$rows                           = array( array( 'id' => '1' ), array( 'id' => '2' ) );
 		$this->wpdb->get_results_return = $rows;
 
 		$this->assertSame( $rows, $this->make_repo()->find_recent() );
@@ -278,7 +286,11 @@ final class DiagnosticRepositoryTest extends TestCase {
 	public function test_find_latest_run_fetches_rows_for_the_latest_uuid(): void {
 		$this->wpdb->get_var_return     = 'run-uuid-latest';
 		$this->wpdb->get_results_return = array(
-			array( 'id' => '1', 'diagnostic_uuid' => 'run-uuid-latest', 'score' => '80' ),
+			array(
+				'id'              => '1',
+				'diagnostic_uuid' => 'run-uuid-latest',
+				'score'           => '80',
+			),
 		);
 
 		$run = $this->make_repo()->find_latest_run();

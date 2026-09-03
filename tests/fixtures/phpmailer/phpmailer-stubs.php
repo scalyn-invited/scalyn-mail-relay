@@ -193,7 +193,10 @@ class PHPMailer {
 	 * @return bool
 	 */
 	public function addAddress( string $address, string $name = '' ): bool {
-		$this->recipients[] = array( 'address' => $address, 'name' => $name );
+		$this->recipients[] = array(
+			'address' => $address,
+			'name'    => $name,
+		);
 		return true;
 	}
 
@@ -203,7 +206,10 @@ class PHPMailer {
 	 * @return void
 	 */
 	public function addCustomHeader( string $name, string $value = '' ): void {
-		$this->custom_headers[] = array( 'name' => $name, 'value' => $value );
+		$this->custom_headers[] = array(
+			'name'  => $name,
+			'value' => $value,
+		);
 	}
 
 	/**

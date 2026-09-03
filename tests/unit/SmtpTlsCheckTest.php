@@ -132,19 +132,34 @@ final class SmtpTlsCheckTest extends TestCase {
 	// -------------------------------------------------------------------------
 
 	public function test_returns_unknown_for_connection_timeout(): void {
-		$result = $this->make_check( array( 'reachable' => false, 'error' => 'timeout' ) )->run( $this->make_context() );
+		$result = $this->make_check(
+			array(
+				'reachable' => false,
+				'error'     => 'timeout',
+			)
+		)->run( $this->make_context() );
 
 		$this->assertSame( 'unknown', $result->status );
 	}
 
 	public function test_returns_unknown_for_dns_failure(): void {
-		$result = $this->make_check( array( 'reachable' => false, 'error' => 'dns' ) )->run( $this->make_context() );
+		$result = $this->make_check(
+			array(
+				'reachable' => false,
+				'error'     => 'dns',
+			)
+		)->run( $this->make_context() );
 
 		$this->assertSame( 'unknown', $result->status );
 	}
 
 	public function test_returns_fail_for_connection_refused(): void {
-		$result = $this->make_check( array( 'reachable' => false, 'error' => 'refused' ) )->run( $this->make_context() );
+		$result = $this->make_check(
+			array(
+				'reachable' => false,
+				'error'     => 'refused',
+			)
+		)->run( $this->make_context() );
 
 		$this->assertSame( 'fail', $result->status );
 	}
@@ -158,7 +173,12 @@ final class SmtpTlsCheckTest extends TestCase {
 	 * @dataProvider connectFailureCategoryProvider
 	 */
 	public function test_connect_failure_raw_includes_shared_failure_category( string $legacy_error, string $expected_status, string $expected_failure_category ): void {
-		$result = $this->make_check( array( 'reachable' => false, 'error' => $legacy_error ) )->run( $this->make_context() );
+		$result = $this->make_check(
+			array(
+				'reachable' => false,
+				'error'     => $legacy_error,
+			)
+		)->run( $this->make_context() );
 
 		$this->assertSame( $expected_status, $result->status );
 		$this->assertSame( $legacy_error, $result->raw['category'] );
@@ -167,10 +187,10 @@ final class SmtpTlsCheckTest extends TestCase {
 
 	public static function connectFailureCategoryProvider(): array {
 		return array(
-			'timeout'    => array( 'timeout', 'unknown', TransportFailureCategory::TIMEOUT ),
-			'dns'        => array( 'dns', 'unknown', TransportFailureCategory::CONNECTIVITY ),
-			'refused'    => array( 'refused', 'fail', TransportFailureCategory::CONNECTIVITY ),
-			'other'      => array( 'other', 'fail', TransportFailureCategory::UNKNOWN ),
+			'timeout' => array( 'timeout', 'unknown', TransportFailureCategory::TIMEOUT ),
+			'dns'     => array( 'dns', 'unknown', TransportFailureCategory::CONNECTIVITY ),
+			'refused' => array( 'refused', 'fail', TransportFailureCategory::CONNECTIVITY ),
+			'other'   => array( 'other', 'fail', TransportFailureCategory::UNKNOWN ),
 		);
 	}
 
@@ -179,14 +199,26 @@ final class SmtpTlsCheckTest extends TestCase {
 	// -------------------------------------------------------------------------
 
 	public function test_returns_pass_when_none_configured_and_starttls_not_offered(): void {
-		$probe  = $this->reachable( array( 'starttls_offered' => false, 'tls_negotiated' => false, 'cert' => null ) );
+		$probe  = $this->reachable(
+			array(
+				'starttls_offered' => false,
+				'tls_negotiated'   => false,
+				'cert'             => null,
+			)
+		);
 		$result = $this->make_check( $probe )->run( $this->make_context( encryption: 'none' ) );
 
 		$this->assertSame( 'pass', $result->status );
 	}
 
 	public function test_returns_warn_when_none_configured_but_starttls_available(): void {
-		$probe  = $this->reachable( array( 'starttls_offered' => true, 'tls_negotiated' => false, 'cert' => null ) );
+		$probe  = $this->reachable(
+			array(
+				'starttls_offered' => true,
+				'tls_negotiated'   => false,
+				'cert'             => null,
+			)
+		);
 		$result = $this->make_check( $probe )->run( $this->make_context( encryption: 'none' ) );
 
 		$this->assertSame( 'warn', $result->status );
@@ -197,14 +229,25 @@ final class SmtpTlsCheckTest extends TestCase {
 	// -------------------------------------------------------------------------
 
 	public function test_returns_fail_when_tls_configured_but_starttls_not_offered(): void {
-		$probe  = $this->reachable( array( 'starttls_offered' => false, 'tls_negotiated' => false, 'cert' => null ) );
+		$probe  = $this->reachable(
+			array(
+				'starttls_offered' => false,
+				'tls_negotiated'   => false,
+				'cert'             => null,
+			)
+		);
 		$result = $this->make_check( $probe )->run( $this->make_context( encryption: 'tls' ) );
 
 		$this->assertSame( 'fail', $result->status );
 	}
 
 	public function test_returns_fail_when_tls_negotiation_fails(): void {
-		$probe  = $this->reachable( array( 'tls_negotiated' => false, 'cert' => null ) );
+		$probe  = $this->reachable(
+			array(
+				'tls_negotiated' => false,
+				'cert'           => null,
+			)
+		);
 		$result = $this->make_check( $probe )->run( $this->make_context( encryption: 'tls' ) );
 
 		$this->assertSame( 'fail', $result->status );

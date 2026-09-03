@@ -20,7 +20,9 @@ defined( 'ABSPATH' ) || exit;
  *
  *   array(
  *       'provider' => array(
- *           'active' => string,  // Registered provider ID, e.g. 'smtp'.
+ *           'active'      => string,      // Registered provider ID, e.g. 'smtp'.
+ *           'verified'    => bool,        // True if connection/send verified after config.
+ *           'verified_at' => string|null, // ISO 8601 timestamp of last successful verification.
  *       ),
  *       'smtp' => array(
  *           'host'       => string,
@@ -55,7 +57,9 @@ final class SettingsRepository {
 
 	private const DEFAULTS = array(
 		'provider' => array(
-			'active' => '',
+			'active'      => '',
+			'verified'    => false,
+			'verified_at' => null,
 		),
 		'smtp'     => array(
 			'host'       => '',
@@ -95,6 +99,40 @@ final class SettingsRepository {
 	 */
 	public function get_active_provider_id(): string {
 		return (string) ( $this->data['provider']['active'] ?? '' );
+	}
+
+	/**
+	 * Returns whether the currently configured provider has been verified.
+	 *
+	 * Verified means the provider's connection has been tested and succeeded,
+	 * or a test email has been sent successfully, or a real send succeeded.
+	 *
+	 * @return bool True if verified; false if not yet verified or no provider configured.
+	 */
+	public function is_provider_verified(): bool {
+		return (bool) ( $this->data['provider']['verified'] ?? false );
+	}
+
+	/**
+	 * Returns the ISO 8601 timestamp of the last successful provider verification.
+	 *
+	 * @return string|null ISO 8601 timestamp, or null if never verified.
+	 */
+	public function get_provider_verified_at(): ?string {
+		return $this->data['provider']['verified_at'] ?? null;
+	}
+
+	/**
+	 * Marks the provider as verified with a timestamp.
+	 *
+	 * Called after a successful connection test, test email send, or real send.
+	 *
+	 * @return bool True on success; false if the option was not updated.
+	 */
+	public function mark_provider_verified(): bool {
+		$this->data['provider']['verified']    = true;
+		$this->data['provider']['verified_at'] = current_time( 'c' );
+		return update_option( self::OPTION_KEY, $this->data );
 	}
 
 	/**
@@ -169,6 +207,14 @@ final class SettingsRepository {
 
 		if ( isset( $input['provider']['active'] ) ) {
 			$output['provider']['active'] = sanitize_text_field( (string) $input['provider']['active'] );
+		}
+
+		if ( isset( $input['provider']['verified'] ) ) {
+			$output['provider']['verified'] = (bool) $input['provider']['verified'];
+		}
+
+		if ( isset( $input['provider']['verified_at'] ) ) {
+			$output['provider']['verified_at'] = sanitize_text_field( (string) $input['provider']['verified_at'] );
 		}
 
 		if ( isset( $input['smtp'] ) && is_array( $input['smtp'] ) ) {

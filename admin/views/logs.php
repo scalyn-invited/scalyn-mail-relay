@@ -95,9 +95,23 @@ $status_labels = array(
 								<?php echo esc_html( (string) $att_count ); ?>
 							</td>
 							<td class="scalyn-log-col-timestamp">
-								<time datetime="<?php echo esc_attr( $created_at ); ?>">
-									<?php echo esc_html( $created_at ); ?>
-								</time>
+								<?php
+								if ( ! empty( $created_at ) ) {
+									$timestamp = strtotime( $created_at );
+									if ( false !== $timestamp ) {
+										$date_fmt = get_option( 'date_format' );
+										$time_fmt = get_option( 'time_format' );
+										$format   = ( $date_fmt && $time_fmt ) ? $date_fmt . ' ' . $time_fmt : 'Y-m-d H:i:s';
+										echo '<time datetime="' . esc_attr( wp_date( 'c', $timestamp ) ) . '">';
+										echo esc_html( wp_date( $format, $timestamp ) );
+										echo '</time>';
+									} else {
+										echo '<span>—</span>';
+									}
+								} else {
+									echo '<span>—</span>';
+								}
+								?>
 							</td>
 							<td class="scalyn-log-col-action">
 								<?php if ( '' !== $uuid ) : ?>

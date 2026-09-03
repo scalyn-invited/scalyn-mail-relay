@@ -55,13 +55,13 @@ final class SpfCheckTest extends TestCase {
 
 	public static function invalidDomainProvider(): array {
 		return array(
-			'ip literal'      => array( '192.168.1.1' ),
-			'leading hyphen'  => array( '-example.com' ),
-			'no tld'          => array( 'example' ),
-			'space injected'  => array( 'example .com' ),
-			'wildcard'        => array( '*.example.com' ),
-			'control chars'   => array( "example.com\r\nInjected" ),
-			'too long'        => array( str_repeat( 'a', 250 ) . '.com' ),
+			'ip literal'     => array( '192.168.1.1' ),
+			'leading hyphen' => array( '-example.com' ),
+			'no tld'         => array( 'example' ),
+			'space injected' => array( 'example .com' ),
+			'wildcard'       => array( '*.example.com' ),
+			'control chars'  => array( "example.com\r\nInjected" ),
+			'too long'       => array( str_repeat( 'a', 250 ) . '.com' ),
 		);
 	}
 

@@ -58,17 +58,19 @@ final class SettingsRepositoryTest extends TestCase {
 
 	public function test_save_rejects_invalid_encryption_and_defaults_to_tls(): void {
 		$repo = new SettingsRepository();
-		$repo->save( array(
-			'smtp' => array(
-				'host'       => 'smtp.example.com',
-				'port'       => 587,
-				'encryption' => 'ftp',
-				'username'   => 'user',
-				'password'   => 'pass',
-				'from_name'  => 'Test',
-				'from_email' => 'test@example.com',
-			),
-		) );
+		$repo->save(
+			array(
+				'smtp' => array(
+					'host'       => 'smtp.example.com',
+					'port'       => 587,
+					'encryption' => 'ftp',
+					'username'   => 'user',
+					'password'   => 'pass',
+					'from_name'  => 'Test',
+					'from_email' => 'test@example.com',
+				),
+			)
+		);
 
 		$this->assertSame( 'tls', $repo->get_smtp_config()['encryption'] );
 	}
@@ -130,17 +132,19 @@ final class SettingsRepositoryTest extends TestCase {
 		);
 
 		$repo = new SettingsRepository();
-		$repo->save( array(
-			'smtp' => array(
-				'host'       => 'mail.example.com',
-				'port'       => 587,
-				'encryption' => 'tls',
-				'username'   => 'user',
-				'password'   => '',   // Intentionally blank — should preserve existing value.
-				'from_name'  => '',
-				'from_email' => 'from@example.com',
-			),
-		) );
+		$repo->save(
+			array(
+				'smtp' => array(
+					'host'       => 'mail.example.com',
+					'port'       => 587,
+					'encryption' => 'tls',
+					'username'   => 'user',
+					'password'   => '',   // Intentionally blank — should preserve existing value.
+					'from_name'  => '',
+					'from_email' => 'from@example.com',
+				),
+			)
+		);
 
 		$fresh = new SettingsRepository();
 		$this->assertSame( 'existing-secret', $fresh->get_smtp_config()['password'] );
@@ -152,17 +156,19 @@ final class SettingsRepositoryTest extends TestCase {
 		);
 
 		$repo = new SettingsRepository();
-		$repo->save( array(
-			'smtp' => array(
-				'host'       => 'mail.example.com',
-				'port'       => 587,
-				'encryption' => 'tls',
-				'username'   => 'user',
-				'password'   => 'new-password',
-				'from_name'  => '',
-				'from_email' => 'from@example.com',
-			),
-		) );
+		$repo->save(
+			array(
+				'smtp' => array(
+					'host'       => 'mail.example.com',
+					'port'       => 587,
+					'encryption' => 'tls',
+					'username'   => 'user',
+					'password'   => 'new-password',
+					'from_name'  => '',
+					'from_email' => 'from@example.com',
+				),
+			)
+		);
 
 		$fresh = new SettingsRepository();
 		$this->assertSame( 'new-password', $fresh->get_smtp_config()['password'] );
@@ -179,23 +185,29 @@ final class SettingsRepositoryTest extends TestCase {
 
 		// Second save on the same instance: smtp only — mirrors Step 3.
 		// provider.active must survive.
-		$repo->save( array(
-			'smtp' => array(
-				'host'       => 'smtp.example.com',
-				'port'       => 587,
-				'encryption' => 'tls',
-				'username'   => 'user',
-				'password'   => 'pass',
-				'from_name'  => '',
-				'from_email' => 'from@example.com',
-			),
-		) );
+		$repo->save(
+			array(
+				'smtp' => array(
+					'host'       => 'smtp.example.com',
+					'port'       => 587,
+					'encryption' => 'tls',
+					'username'   => 'user',
+					'password'   => 'pass',
+					'from_name'  => '',
+					'from_email' => 'from@example.com',
+				),
+			)
+		);
 
 		$fresh = new SettingsRepository();
-		$this->assertSame( 'smtp', $fresh->get_active_provider_id(),
+		$this->assertSame(
+			'smtp',
+			$fresh->get_active_provider_id(),
 			'provider.active must not be overwritten when only the smtp key is saved.'
 		);
-		$this->assertSame( 'smtp.example.com', $fresh->get_smtp_config()['host'],
+		$this->assertSame(
+			'smtp.example.com',
+			$fresh->get_smtp_config()['host'],
 			'smtp.host must be persisted alongside the preserved provider.active.'
 		);
 	}
@@ -212,7 +224,9 @@ final class SettingsRepositoryTest extends TestCase {
 
 		$fresh = new SettingsRepository();
 		$this->assertSame( 'smtp', $fresh->get_active_provider_id() );
-		$this->assertSame( 'mail.example.com', $fresh->get_smtp_config()['host'],
+		$this->assertSame(
+			'mail.example.com',
+			$fresh->get_smtp_config()['host'],
 			'smtp.host must not be overwritten when only the provider key is saved.'
 		);
 	}

@@ -45,7 +45,11 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 				}
 				?>
 				<li class="<?php echo esc_attr( $step_class ); ?>">
-					<span class="scalyn-wizard-step__number" aria-hidden="true"><?php echo esc_html( (string) $num ); ?></span>
+					<?php if ( $num < $current_step ) : ?>
+						<span class="scalyn-wizard-step__number" aria-hidden="true">✓</span>
+					<?php else : ?>
+						<span class="scalyn-wizard-step__number" aria-hidden="true"><?php echo esc_html( (string) $num ); ?></span>
+					<?php endif; ?>
 					<span class="scalyn-wizard-step__label"><?php echo esc_html( $label ); ?></span>
 					<span class="screen-reader-text"><?php echo esc_html( $aria_status ); ?></span>
 				</li>
@@ -374,7 +378,11 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 				&larr; <?php esc_html_e( 'Back', 'scalyn-mail-relay' ); ?>
 			</a>
 		<?php endif; ?>
-		<?php if ( $current_step < $total_steps ) : ?>
+		<?php
+		// Show Next button only on non-form steps. Steps 2 and 3 have forms with submit buttons.
+		$has_form = ( 2 === $current_step || 3 === $current_step );
+		?>
+		<?php if ( $current_step < $total_steps && ! $has_form ) : ?>
 			<a href="<?php echo esc_url( add_query_arg( 'step', $current_step + 1, $wizard_base_url ) ); ?>" class="button button-primary scalyn-wizard-btn scalyn-wizard-btn--next">
 				<?php esc_html_e( 'Next', 'scalyn-mail-relay' ); ?> &rarr;
 			</a>

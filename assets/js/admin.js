@@ -10,37 +10,42 @@
 	/**
 	 * Handle "Run Diagnostics Now" button click.
 	 * Makes a POST request to the diagnostics endpoint.
+	 *
+	 * Only active on the Diagnostics screen (gated by checking for the dedicated button ID).
+	 * Uses a dedicated id selector to avoid conflicts with other action buttons on the Dashboard.
 	 */
 	function initDiagnosticsButton() {
-		const button = document.querySelector( '.scalyn-actions .scalyn-action-btn' );
-		if ( ! button || ! button.href ) {
+		const button = document.getElementById( 'scalyn-run-diagnostics' );
+		if ( ! button || ! button.dataset.scalynAction || 'run-diagnostics' !== button.dataset.scalynAction ) {
 			return;
 		}
 
-		// Convert link to button with POST handler
-		const link = button.href;
-		button.href = '#';
+		const url = button.dataset.endpoint;
+		if ( ! url ) {
+			return;
+		}
+
+		// Convert link to form submission
 		button.addEventListener( 'click', function( e ) {
 			e.preventDefault();
-			runDiagnostics( link );
+			runDiagnostics( button, url );
 		} );
 	}
 
 	/**
 	 * Make POST request to run diagnostics endpoint.
 	 *
-	 * @param {string} url The diagnostics endpoint URL.
+	 * @param {HTMLElement} button The button element.
+	 * @param {string}      url    The diagnostics endpoint URL.
 	 */
-	function runDiagnostics( url ) {
-		const button = document.querySelector( '.scalyn-actions .scalyn-action-btn' );
-		if ( ! button ) {
-			return;
-		}
+	function runDiagnostics( button, url ) {
+		const originalText = button.textContent;
+		const originalDisabled = button.disabled;
 
 		// Disable button and show loading state
 		button.disabled = true;
-		const originalText = button.textContent;
-		button.textContent = 'Running...';
+		button.setAttribute( 'aria-busy', 'true' );
+		button.textContent = window.scalynMailRelaySettings?.runningLabel || 'Running...';
 
 		// Make POST request to endpoint
 		fetch( url, {
@@ -57,16 +62,64 @@
 				throw new Error( 'Diagnostics run failed: ' + response.statusText );
 			} )
 			.then( ( data ) => {
-				// Success - reload page to show updated results
-				window.location.reload();
+				// Check if the response indicates success
+				if ( data && data.success ) {
+					// Success - reload page to show updated results
+					window.location.reload();
+				} else {
+					// Server returned 200 but payload indicates failure
+					const errorMsg = data && data.data ? data.data.message : 'Diagnostics run failed';
+					throw new Error( errorMsg );
+				}
 			} )
 			.catch( ( error ) => {
-				// Show error message
+				// Show error in notice area instead of alert
 				console.error( error );
-				alert( 'Error running diagnostics: ' + error.message );
-				button.disabled = false;
+				const notice = createErrorNotice( window.scalynMailRelaySettings?.errorPrefix || 'Error running diagnostics: ', error.message );
+				const container = document.querySelector( '.scalyn-diagnostics-section' );
+				if ( container ) {
+					container.parentNode.insertBefore( notice, container );
+				}
+				// Restore button state
+				button.disabled = originalDisabled;
+				button.setAttribute( 'aria-busy', 'false' );
 				button.textContent = originalText;
 			} );
+	}
+
+	/**
+	 * Creates an error notice element.
+	 *
+	 * @param {string} prefix   The error prefix text.
+	 * @param {string} message  The error message.
+	 * @return {HTMLElement} The notice element.
+	 */
+	function createErrorNotice( prefix, message ) {
+		const notice = document.createElement( 'div' );
+		notice.className = 'notice notice-error';
+		notice.setAttribute( 'role', 'status' );
+		notice.setAttribute( 'aria-live', 'polite' );
+		notice.innerHTML = '<p><strong>' + escapeHtml( prefix ) + '</strong> ' + escapeHtml( message ) + '</p>';
+		return notice;
+	}
+
+	/**
+	 * Simple HTML escape helper.
+	 *
+	 * @param {string} text Text to escape.
+	 * @return {string} Escaped text.
+	 */
+	function escapeHtml( text ) {
+		const map = {
+			'&': '&amp;',
+			'<': '&lt;',
+			'>': '&gt;',
+			'"': '&quot;',
+			"'": '&#039;',
+		};
+		return text.replace( /[&<>"']/g, function( char ) {
+			return map[ char ];
+		} );
 	}
 
 	// Initialize when DOM is ready

@@ -200,6 +200,13 @@ if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_date' ) ) {
+	/** Formats a timestamp using PHP's date() function with WordPress timezone. */
+	function wp_date( string $format, int $timestamp ): string {
+		return date( $format, $timestamp );
+	}
+}
+
 if ( ! function_exists( 'add_query_arg' ) ) {
 	/**
 	 * Appends a query parameter to a URL.
@@ -480,10 +487,10 @@ if ( ! function_exists( 'add_action' ) ) {
 	 * Recorded in $GLOBALS['_test_wp_added_actions'] so tests can assert
 	 * that register() wired the correct hooks. Does not integrate with do_action().
 	 *
-	 * @param string          $tag             Hook name.
-	 * @param callable|array  $function_to_add Callback to register.
-	 * @param int             $priority        Execution priority (default 10).
-	 * @param int             $accepted_args   Number of arguments the callback accepts.
+	 * @param string         $tag             Hook name.
+	 * @param callable|array $function_to_add Callback to register.
+	 * @param int            $priority        Execution priority (default 10).
+	 * @param int            $accepted_args   Number of arguments the callback accepts.
 	 */
 	function add_action( string $tag, $function_to_add, int $priority = 10, int $accepted_args = 1 ): bool {
 		$GLOBALS['_test_wp_added_actions'][ $tag ][] = array(

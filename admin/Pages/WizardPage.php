@@ -87,15 +87,66 @@ final class WizardPage {
 	/**
 	 * Returns the current wizard step number, clamped to the valid range 1–TOTAL_STEPS.
 	 *
+	 * Clamps the URL step to the first incomplete step to prevent skipping ahead beyond
+	 * configured state. For example, visiting &step=6 on a fresh install returns 1 because
+	 * no steps have been completed.
+	 *
 	 * Read-only GET navigation — no state is modified; no nonce is required.
 	 *
 	 * @return int Step number between 1 and TOTAL_STEPS inclusive.
 	 */
 	private function get_current_step(): int {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Read-only step navigation; no state is changed by this parameter.
-		$step = isset( $_GET['step'] ) ? absint( wp_unslash( $_GET['step'] ) ) : 1;
+		$requested_step = isset( $_GET['step'] ) ? absint( wp_unslash( $_GET['step'] ) ) : 1;
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
-		return max( 1, min( $step, self::TOTAL_STEPS ) );
+		$requested_step = max( 1, min( $requested_step, self::TOTAL_STEPS ) );
+
+		// Get the first incomplete step; don't allow jumping ahead.
+		$first_incomplete = $this->get_first_incomplete_step();
+		return min( $requested_step, $first_incomplete );
+	}
+
+	/**
+	 * Returns the first incomplete wizard step based on persisted configuration state.
+	 *
+	 * Derives completion from:
+	 * - Step 1: Always complete (intro).
+	 * - Step 2: Complete if a provider is chosen.
+	 * - Step 3: Complete if SMTP credentials are saved (host + port + email).
+	 * - Step 4: Complete if connection has been verified (mark_provider_verified called).
+	 * - Step 5: Complete if provider is verified (test email or real send succeeded).
+	 * - Step 6: Always reachable after step 5.
+	 *
+	 * @return int The first step that is not yet complete.
+	 */
+	private function get_first_incomplete_step(): int {
+		$container = Plugin::instance()->container();
+		$settings  = $container->get( SettingsRepository::class );
+		$registry  = $container->get( ProviderRegistry::class );
+
+		// Step 1 always complete.
+
+		// Step 2: Check if a provider is chosen.
+		$active_provider_id = $settings->get_active_provider_id();
+		if ( '' === $active_provider_id || ! $registry->has( $active_provider_id ) ) {
+			return 2;
+		}
+
+		// Step 3: Check if SMTP credentials are configured.
+		$smtp = $settings->get_smtp_config();
+		if ( '' === trim( $smtp['host'] ?? '' )
+			|| 0 === absint( $smtp['port'] ?? 0 )
+			|| '' === trim( $smtp['from_email'] ?? '' ) ) {
+			return 3;
+		}
+
+		// Step 4: Check if connection has been verified.
+		if ( ! $settings->is_provider_verified() ) {
+			return 4;
+		}
+
+		// Steps 5–6 are reachable once verified.
+		return 7; // Return beyond max step to allow all steps to be accessible.
 	}
 
 	/**

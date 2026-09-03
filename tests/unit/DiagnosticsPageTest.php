@@ -181,13 +181,18 @@ final class DiagnosticsPageTest extends TestCase {
 		$this->configure_provider();
 
 		$output = $this->render_and_capture();
-		$ids    = array( 'spf', 'mx', 'dkim', 'dmarc', 'smtp-tls', 'health' );
+		$ids    = array( 'spf', 'mx', 'dkim', 'dmarc', 'smtp-tls' );
 
 		foreach ( $ids as $id ) {
 			$heading_id = 'scalyn-diagnostics-' . $id . '-heading';
 			$this->assertStringContainsString( 'aria-labelledby="' . $heading_id . '"', $output );
-			$this->assertStringContainsString( '<h2 id="' . $heading_id . '">', $output );
+			// Card headings are now h3 (not h2) for proper heading hierarchy.
+			$this->assertStringContainsString( '<h3 id="' . $heading_id . '">', $output );
 		}
+
+		// Health card uses a separate id to avoid duplicate (section has -section-, card has -card-).
+		$this->assertStringContainsString( 'aria-labelledby="scalyn-diagnostics-health-section-heading"', $output );
+		$this->assertStringContainsString( '<h3 id="scalyn-diagnostics-health-card-heading">', $output );
 	}
 
 	public function test_configured_state_enables_diagnostics_action_when_endpoint_available(): void {
@@ -200,8 +205,9 @@ final class DiagnosticsPageTest extends TestCase {
 		// Button should now be enabled with the REST endpoint URL.
 		$this->assertStringContainsString( 'href="http://example.com/wp-json/scalyn-mail-relay/v1/diagnostics/run"', $output );
 		$this->assertStringContainsString( 'button button-primary', $output );
-		$this->assertStringContainsString( '>—</strong>', $output );
-		$this->assertStringContainsString( 'aria-label="Health score not yet assessed"', $output );
+		// Health score displays as a badge (from StatusBadge), not as duplicate large text.
+		$this->assertStringContainsString( 'Unknown', $output );
+		$this->assertStringContainsString( 'Run diagnostics to generate', $output );
 	}
 
 	/**
@@ -377,8 +383,9 @@ final class DiagnosticsPageTest extends TestCase {
 		$this->set_mock_diagnostic_data( $mock_results );
 		$output = $this->render_and_capture();
 
-		// When data exists, health score should be rendered with a numeric value.
-		// The actual value depends on backend calculation, so we just verify presence.
-		$this->assertStringContainsString( 'scalyn-score', $output );
+		// When data exists, health score is displayed in the StatusBadge (e.g., "81/100").
+		// The duplicate large-text display was removed to avoid redundancy (issue #19).
+		$this->assertStringContainsString( 'Health Score', $output );
+		$this->assertStringContainsString( 'scalyn-badge', $output );
 	}
 }
