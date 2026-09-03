@@ -122,7 +122,21 @@ $setup_steps = array(
 					<?php endif; ?>
 					<?php if ( '' !== $log_created ) : ?>
 						<dt><?php esc_html_e( 'Date', 'scalyn-mail-relay' ); ?></dt>
-						<dd><time datetime="<?php echo esc_attr( $log_created ); ?>"><?php echo esc_html( $log_created ); ?></time></dd>
+						<dd>
+							<?php
+							$timestamp = strtotime( $log_created );
+							if ( false !== $timestamp ) {
+								$date_fmt = get_option( 'date_format' );
+								$time_fmt = get_option( 'time_format' );
+								$format   = ( $date_fmt && $time_fmt ) ? $date_fmt . ' ' . $time_fmt : 'Y-m-d H:i:s';
+								echo '<time datetime="' . esc_attr( wp_date( 'c', $timestamp ) ) . '">';
+								echo esc_html( wp_date( $format, $timestamp ) );
+								echo '</time>';
+							} else {
+								echo '<span>—</span>';
+							}
+							?>
+						</dd>
 					<?php endif; ?>
 				</dl>
 				<?php if ( 'accepted' === $log_status ) : ?>

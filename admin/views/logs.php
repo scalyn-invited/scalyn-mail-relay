@@ -99,8 +99,11 @@ $status_labels = array(
 								if ( ! empty( $created_at ) ) {
 									$timestamp = strtotime( $created_at );
 									if ( false !== $timestamp ) {
+										$date_fmt = get_option( 'date_format' );
+										$time_fmt = get_option( 'time_format' );
+										$format   = ( $date_fmt && $time_fmt ) ? $date_fmt . ' ' . $time_fmt : 'Y-m-d H:i:s';
 										echo '<time datetime="' . esc_attr( wp_date( 'c', $timestamp ) ) . '">';
-										echo esc_html( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $timestamp ) );
+										echo esc_html( wp_date( $format, $timestamp ) );
 										echo '</time>';
 									} else {
 										echo '<span>—</span>';
