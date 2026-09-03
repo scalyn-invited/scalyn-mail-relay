@@ -164,11 +164,14 @@ final class DiagnosticsPageTest extends TestCase {
 
 		$output = $this->render_and_capture();
 
-		$this->assertSame( 4, substr_count( $output, 'class="scalyn-card scalyn-diagnostic-card"' ) );
-		$this->assertSame( 4, substr_count( $output, 'scalyn-badge--unknown' ) );
+		// 6 cards: SPF, MX, DKIM, DMARC, SMTP/TLS, Health Score (all unknown when no data)
+		$this->assertSame( 6, substr_count( $output, 'class="scalyn-card scalyn-diagnostic-card"' ) );
+		$this->assertSame( 6, substr_count( $output, 'scalyn-badge--unknown' ) );
 		$this->assertStringContainsString( 'SPF Record', $output );
+		$this->assertStringContainsString( 'MX Records', $output );
 		$this->assertStringContainsString( 'DKIM Records', $output );
 		$this->assertStringContainsString( 'DMARC Policy', $output );
+		$this->assertStringContainsString( 'SMTP/TLS Configuration', $output );
 		$this->assertStringContainsString( 'Overall Email Health', $output );
 		$this->assertStringNotContainsString( 'Configure a mail provider first', $output );
 	}
@@ -178,7 +181,7 @@ final class DiagnosticsPageTest extends TestCase {
 		$this->configure_provider();
 
 		$output = $this->render_and_capture();
-		$ids    = array( 'spf', 'dkim', 'dmarc', 'health' );
+		$ids    = array( 'spf', 'mx', 'dkim', 'dmarc', 'smtp-tls', 'health' );
 
 		foreach ( $ids as $id ) {
 			$heading_id = 'scalyn-diagnostics-' . $id . '-heading';
@@ -223,12 +226,20 @@ final class DiagnosticsPageTest extends TestCase {
 				'result_message' => 'SPF OK',
 			),
 			array(
+				'check_name'     => 'mx_record',
+				'result_message' => 'MX OK',
+			),
+			array(
 				'check_name'     => 'dkim_record',
 				'result_message' => 'DKIM OK',
 			),
 			array(
 				'check_name'     => 'dmarc_policy',
 				'result_message' => 'DMARC OK',
+			),
+			array(
+				'check_name'     => 'smtp_tls',
+				'result_message' => 'SMTP/TLS OK',
 			),
 			array(
 				'check_name'     => 'unknown_check',
@@ -240,11 +251,15 @@ final class DiagnosticsPageTest extends TestCase {
 
 		$this->assertIsArray( $organized );
 		$this->assertArrayHasKey( 'spf', $organized );
+		$this->assertArrayHasKey( 'mx', $organized );
 		$this->assertArrayHasKey( 'dkim', $organized );
 		$this->assertArrayHasKey( 'dmarc', $organized );
+		$this->assertArrayHasKey( 'smtp_tls', $organized );
 		$this->assertSame( 'SPF OK', $organized['spf']['result_message'] );
+		$this->assertSame( 'MX OK', $organized['mx']['result_message'] );
 		$this->assertSame( 'DKIM OK', $organized['dkim']['result_message'] );
 		$this->assertSame( 'DMARC OK', $organized['dmarc']['result_message'] );
+		$this->assertSame( 'SMTP/TLS OK', $organized['smtp_tls']['result_message'] );
 	}
 
 	public function test_organize_diagnostics_returns_null_for_missing_checks(): void {
@@ -265,8 +280,10 @@ final class DiagnosticsPageTest extends TestCase {
 
 		$organized = $reflection->invoke( $page, $raw_results );
 
+		$this->assertNull( $organized['mx'] );
 		$this->assertNull( $organized['dkim'] );
 		$this->assertNull( $organized['dmarc'] );
+		$this->assertNull( $organized['smtp_tls'] );
 	}
 
 	public function test_get_ui_status_maps_diagnostic_status_to_ui_status(): void {
@@ -283,6 +300,22 @@ final class DiagnosticsPageTest extends TestCase {
 		$this->assertSame( 'critical', $reflection->invoke( $page, 'fail' ) );
 		$this->assertSame( 'warning', $reflection->invoke( $page, 'error' ) );
 		$this->assertSame( 'unknown', $reflection->invoke( $page, 'unknown' ) );
+	}
+
+	public function test_get_severity_class_maps_diagnostic_severity_to_css_class(): void {
+		$this->grant_run_diagnostics();
+		$this->configure_provider();
+		$this->boot_plugin();
+
+		$page       = new DiagnosticsPage();
+		$reflection = new ReflectionMethod( $page, 'get_severity_class' );
+		$reflection->setAccessible( true );
+
+		$this->assertSame( 'scalyn-severity-low', $reflection->invoke( $page, 'low' ) );
+		$this->assertSame( 'scalyn-severity-medium', $reflection->invoke( $page, 'medium' ) );
+		$this->assertSame( 'scalyn-severity-high', $reflection->invoke( $page, 'high' ) );
+		$this->assertSame( 'scalyn-severity-critical', $reflection->invoke( $page, 'critical' ) );
+		$this->assertSame( 'scalyn-severity-unknown', $reflection->invoke( $page, 'unknown' ) );
 	}
 
 	public function test_findings_output_is_escaped(): void {
