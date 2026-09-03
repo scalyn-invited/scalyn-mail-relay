@@ -154,7 +154,7 @@ $setup_steps = array(
 		<h2 id="scalyn-actions-heading"><?php esc_html_e( 'Quick Actions', 'scalyn-mail-relay' ); ?></h2>
 		<div class="scalyn-actions">
 			<?php ActionButton::render( __( 'Configure Mailer', 'scalyn-mail-relay' ), $wizard_url ); ?>
-			<?php ActionButton::render( __( 'Run Diagnostics', 'scalyn-mail-relay' ), '', true ); ?>
+			<?php ActionButton::render( __( 'Run Diagnostics', 'scalyn-mail-relay' ), $diagnostics_run_url, true ); ?>
 			<?php ActionButton::render( __( 'Send Test Email', 'scalyn-mail-relay' ), '', true ); ?>
 			<?php ActionButton::render( __( 'View Logs', 'scalyn-mail-relay' ), $logs_url ); ?>
 		</div>
