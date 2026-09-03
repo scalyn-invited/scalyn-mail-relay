@@ -31,7 +31,7 @@ final class DiagnosticResultCardTest extends TestCase {
 			'<section class="scalyn-card scalyn-diagnostic-card" aria-labelledby="diagnostic-heading">',
 			$output
 		);
-		$this->assertStringContainsString( '<h2 id="diagnostic-heading">SPF Record</h2>', $output );
+		$this->assertStringContainsString( '<h3 id="diagnostic-heading">SPF Record</h3>', $output );
 		$this->assertStringContainsString( '<p>Callback content</p>', $output );
 	}
 
@@ -39,11 +39,11 @@ final class DiagnosticResultCardTest extends TestCase {
 		$output = $this->render_card( '' );
 
 		$this->assertStringContainsString(
-			'<section class="scalyn-card scalyn-diagnostic-card"><h2>SPF Record</h2>',
+			'<section class="scalyn-card scalyn-diagnostic-card"><h3>SPF Record</h3>',
 			$output
 		);
 		$this->assertStringNotContainsString( 'aria-labelledby', $output );
-		$this->assertStringNotContainsString( '<h2 id=', $output );
+		$this->assertStringNotContainsString( '<h3 id=', $output );
 	}
 
 	public function test_heading_id_is_escaped_inside_each_attribute_value(): void {
