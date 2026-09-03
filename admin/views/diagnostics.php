@@ -42,6 +42,46 @@ defined( 'ABSPATH' ) || exit;
 	<h1><?php esc_html_e( 'Diagnostics', 'scalyn-mail-relay' ); ?></h1>
 	<p class="scalyn-lead"><?php esc_html_e( 'Email deliverability health checks and remediation guidance.', 'scalyn-mail-relay' ); ?></p>
 
+	<?php if ( $provider_configured ) : ?>
+		<!-- Run Diagnostics Action (Header) -->
+		<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+			<div>
+				<?php
+				$last_run_time = null;
+				if ( null !== $health_score && ! empty( $diagnostics ) ) {
+					// Get created_at from first diagnostic result.
+					foreach ( $diagnostics as $check_data ) {
+						if ( null !== $check_data && isset( $check_data['created_at'] ) ) {
+							$last_run_time = $check_data['created_at'];
+							break;
+						}
+					}
+				}
+				?>
+				<?php if ( null !== $last_run_time ) : ?>
+					<p style="margin: 0 0 8px 0; font-size: 13px; color: #50575e;">
+						<?php esc_html_e( 'Last run: ', 'scalyn-mail-relay' ); ?>
+						<time datetime="<?php echo esc_attr( wp_date( 'c', strtotime( $last_run_time ) ) ); ?>">
+							<?php echo esc_html( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), strtotime( $last_run_time ) ) ); ?>
+						</time>
+					</p>
+				<?php endif; ?>
+			</div>
+			<div class="scalyn-actions">
+				<?php
+				ActionButton::render(
+					__( 'Run Diagnostics Now', 'scalyn-mail-relay' ),
+					$diagnostics_run_url,
+					false,
+					'scalyn-run-diagnostics',
+					array( 'scalyn-action' => 'run-diagnostics', 'endpoint' => $diagnostics_run_url ),
+					true
+				);
+				?>
+			</div>
+		</div>
+	<?php endif; ?>
+
 	<?php if ( ! $provider_configured ) : ?>
 		<div class="scalyn-card">
 			<?php
@@ -273,23 +313,6 @@ defined( 'ABSPATH' ) || exit;
 				</div>
 			</section>
 		<?php endif; ?>
-
-		<!-- Run Diagnostics Action -->
-		<section class="scalyn-card scalyn-actions-card" aria-labelledby="scalyn-diagnostics-actions-heading">
-			<h2 id="scalyn-diagnostics-actions-heading"><?php esc_html_e( 'Run Diagnostics', 'scalyn-mail-relay' ); ?></h2>
-			<p class="scalyn-actions__note"><?php esc_html_e( 'Click the button below to run a complete email deliverability diagnostic check. This includes DNS validation (SPF, DKIM, DMARC, MX) and provider health checks (SMTP/TLS). Results will appear in the sections above.', 'scalyn-mail-relay' ); ?></p>
-			<div class="scalyn-actions">
-				<?php
-				ActionButton::render(
-					__( 'Run Diagnostics Now', 'scalyn-mail-relay' ),
-					$diagnostics_run_url,
-					false,
-					'scalyn-run-diagnostics',
-					array( 'scalyn-action' => 'run-diagnostics', 'endpoint' => $diagnostics_run_url )
-				);
-				?>
-			</div>
-		</section>
 
 	<?php endif; ?>
 </div>
