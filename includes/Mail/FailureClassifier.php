@@ -38,7 +38,7 @@ final class FailureClassifier {
 
 		// Analyze response codes first.
 		if ( null !== $result->response_code ) {
-			$category = $this->classify_by_response_code( $result->response_code, $result->response_message );
+			$category = $this->classify_by_response_code( $result->response_code );
 			if ( TransportFailureCategory::UNKNOWN !== $category ) {
 				return $this->remediation_for_category( $category, $result );
 			}
@@ -71,11 +71,10 @@ final class FailureClassifier {
 	 * - 4xx/5xx 4: Unspecified transient failure.
 	 * - 4xx/5xx 5: Mail system status, network issues.
 	 *
-	 * @param string      $code    SMTP response code (e.g., "535", "421").
-	 * @param string|null $message Optional response message for additional context.
+	 * @param string $code SMTP response code (e.g., "535", "421").
 	 * @return string One of TransportFailureCategory constants.
 	 */
-	private function classify_by_response_code( string $code, ?string $message ): string {
+	private function classify_by_response_code( string $code ): string {
 		// Normalize to numeric code.
 		$numeric_code = (int) $code;
 

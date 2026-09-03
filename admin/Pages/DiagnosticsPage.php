@@ -180,8 +180,8 @@ final class DiagnosticsPage {
 	 * Returns up to 5 most recent failed sends with their classified failure categories
 	 * and remediation suggestions.
 	 *
-	 * @param MailLogRepository  $repo       The mail log repository.
-	 * @param FailureClassifier  $classifier The failure classifier.
+	 * @param MailLogRepository $repo       The mail log repository.
+	 * @param FailureClassifier $classifier The failure classifier.
 	 * @return array<int, array{
 	 *   'provider': string,
 	 *   'status': string,
@@ -227,14 +227,14 @@ final class DiagnosticsPage {
 			$suggestion = $classifier->classify( $send_result );
 
 			$failures[] = array(
-				'provider'          => $log['provider'] ?? 'unknown',
-				'status'            => $log['status'] ?? 'unknown',
-				'response_code'     => $log['response_code'] ?? null,
-				'response_message'  => $log['response_message'] ?? null,
-				'failed_at'         => $log['failed_at'] ?? null,
-				'category'          => $suggestion->category,
-				'remediation'       => $suggestion->suggestion,
-				'evidence'          => $suggestion->evidence,
+				'provider'         => $log['provider'] ?? 'unknown',
+				'status'           => $log['status'] ?? 'unknown',
+				'response_code'    => $log['response_code'] ?? null,
+				'response_message' => $log['response_message'] ?? null,
+				'failed_at'        => $log['failed_at'] ?? null,
+				'category'         => $suggestion->category,
+				'remediation'      => $suggestion->suggestion,
+				'evidence'         => $suggestion->evidence,
 			);
 		}
 
