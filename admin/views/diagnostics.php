@@ -255,9 +255,9 @@ defined( 'ABSPATH' ) || exit;
 								</span>
 								<span class="scalyn-failure-provider"><?php echo esc_html( $failure['provider'] ); ?></span>
 								<?php if ( $failure['failed_at'] ) : ?>
-									<span class="scalyn-failure-time" title="<?php echo esc_attr( $failure['failed_at'] ); ?>">
-										<?php echo esc_html( $failure['failed_at'] ); ?>
-									</span>
+									<time class="scalyn-failure-time" datetime="<?php echo esc_attr( wp_date( 'c', strtotime( $failure['failed_at'] ) ) ); ?>" title="<?php echo esc_attr( $failure['failed_at'] ); ?>">
+										<?php echo esc_html( $failure['failed_at_formatted'] ?? $failure['failed_at'] ); ?>
+									</time>
 								<?php endif; ?>
 							</div>
 

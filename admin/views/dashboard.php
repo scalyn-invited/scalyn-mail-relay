@@ -154,11 +154,13 @@ $setup_steps = array(
 		<h2 id="scalyn-actions-heading"><?php esc_html_e( 'Quick Actions', 'scalyn-mail-relay' ); ?></h2>
 		<div class="scalyn-actions">
 			<?php ActionButton::render( __( 'Configure Mailer', 'scalyn-mail-relay' ), $wizard_url ); ?>
-			<?php ActionButton::render( __( 'Run Diagnostics', 'scalyn-mail-relay' ), $diagnostics_run_url, true ); ?>
-			<?php ActionButton::render( __( 'Send Test Email', 'scalyn-mail-relay' ), '', true ); ?>
+			<?php ActionButton::render( __( 'Run Diagnostics', 'scalyn-mail-relay' ), $diagnostics_run_url, ! $provider_verified ); ?>
+			<?php ActionButton::render( __( 'Send Test Email', 'scalyn-mail-relay' ), '', ! $provider_verified ); ?>
 			<?php ActionButton::render( __( 'View Logs', 'scalyn-mail-relay' ), $logs_url ); ?>
 		</div>
-		<p class="scalyn-actions__note description"><?php esc_html_e( 'Run Diagnostics and Send Test Email will be enabled after a mail provider is configured and verified.', 'scalyn-mail-relay' ); ?></p>
+		<?php if ( ! $provider_verified ) : ?>
+			<p class="scalyn-actions__note description"><?php esc_html_e( 'Run Diagnostics and Send Test Email will be enabled after a mail provider is configured and verified through a successful connection or test email.', 'scalyn-mail-relay' ); ?></p>
+		<?php endif; ?>
 	</section>
 
 </div>
