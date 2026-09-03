@@ -78,31 +78,31 @@ final class LogsPage {
 	 *   bool  $has_next_page Whether additional rows may exist beyond this page.
 	 */
 	private function render_list(): void {
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Read-only GET navigation; no state change. Value is passed through absint() immediately after.
-		$paged = isset( $_GET['paged'] ) ? wp_unslash( (string) $_GET['paged'] ) : '1';
-		$status_filter = isset( $_GET['status'] ) ? wp_unslash( (string) $_GET['status'] ) : '';
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Read-only GET navigation; no state change. paged validated via absint(). status validated against whitelist.
+		$paged  = isset( $_GET['paged'] ) ? wp_unslash( (string) $_GET['paged'] ) : '1';
+		$status = isset( $_GET['status'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['status'] ) ) : '';
 
-		// Validate status filter to prevent injection.
-		if ( $status_filter && ! in_array( $status_filter, array( 'accepted', 'failed' ), true ) ) {
-			$status_filter = '';
+		// Validate status filter against whitelist.
+		if ( $status && ! in_array( $status, array( 'accepted', 'failed' ), true ) ) {
+			$status = '';
 		}
 
 		$page   = max( 1, absint( $paged ) );
 		$offset = ( $page - 1 ) * self::PER_PAGE;
 
 		// Fetch one extra row to determine if there's a next page.
-		$rows   = $this->log_repo->find_recent( self::PER_PAGE + 1, $offset );
+		$rows          = $this->log_repo->find_recent( self::PER_PAGE + 1, $offset );
 		$has_next_page = count( $rows ) > self::PER_PAGE;
 
 		// Trim to page size.
 		$rows = array_slice( $rows, 0, self::PER_PAGE, true );
 
 		// Filter by status if requested.
-		if ( $status_filter ) {
+		if ( $status ) {
 			$rows = array_filter(
 				$rows,
-				function ( $row ) use ( $status_filter ) {
-					return ( $row['status'] ?? '' ) === $status_filter;
+				function ( $row ) use ( $status ) {
+					return ( $row['status'] ?? '' ) === $status;
 				}
 			);
 		}
