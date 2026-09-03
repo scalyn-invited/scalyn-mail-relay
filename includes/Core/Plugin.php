@@ -21,6 +21,7 @@ use Scalyn\MailRelay\Providers\Mail\SmtpTlsCheck;
 use Scalyn\MailRelay\Logging\MailEventSubscriber;
 use Scalyn\MailRelay\Logging\MailLogRepository;
 use Scalyn\MailRelay\Logging\TimelineRepository;
+use Scalyn\MailRelay\Mail\FailureClassifier;
 use Scalyn\MailRelay\Mail\MailDispatcher;
 use Scalyn\MailRelay\Rest\DiagnosticsRunEndpoint;
 
@@ -114,6 +115,7 @@ final class Plugin {
 
 		$this->container->set( MailLogRepository::class, static fn(): MailLogRepository => new MailLogRepository() );
 		$this->container->set( TimelineRepository::class, static fn(): TimelineRepository => new TimelineRepository() );
+		$this->container->set( FailureClassifier::class, static fn(): FailureClassifier => new FailureClassifier() );
 		$this->container->set(
 			MailEventSubscriber::class,
 			static fn( Container $c ): MailEventSubscriber => new MailEventSubscriber(

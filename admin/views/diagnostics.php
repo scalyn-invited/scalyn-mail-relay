@@ -18,9 +18,11 @@
  *   string                       $dmarc_severity        CSS class for DMARC severity.
  *   string                       $smtp_tls_ui_status    UI status for SMTP/TLS (healthy, warning, critical, unknown).
  *   string                       $smtp_tls_severity     CSS class for SMTP/TLS severity.
+ *   array<int, array>            $recent_failures       Recent failed sends with classified category and remediation.
  *
  * Displays real diagnostic findings organized by category (DNS vs Provider checks).
  * Each finding includes: status, message, evidence, impact, severity, and recommended action.
+ * Also displays recent mail send failures with deterministic failure classification and remediation.
  *
  * Privacy: Do not render credentials, SMTP transcripts, provider metadata,
  * email bodies, or recipient information. Render only sanitized evidence and status.
@@ -237,6 +239,43 @@ defined( 'ABSPATH' ) || exit;
 				?>
 			</div>
 		</section>
+
+		<!-- Recent Failure Classifications -->
+		<?php if ( ! empty( $recent_failures ) ) : ?>
+			<section class="scalyn-diagnostics-section" aria-labelledby="scalyn-diagnostics-failures-heading">
+				<h2 id="scalyn-diagnostics-failures-heading" class="scalyn-diagnostics-section__title"><?php esc_html_e( 'Recent Send Failures', 'scalyn-mail-relay' ); ?></h2>
+				<p class="scalyn-diagnostics-section__description"><?php esc_html_e( 'Recent mail delivery failures classified by type with remediation guidance.', 'scalyn-mail-relay' ); ?></p>
+
+				<div class="scalyn-failures-list">
+					<?php foreach ( $recent_failures as $failure ) : ?>
+						<div class="scalyn-failure-item scalyn-card">
+							<div class="scalyn-failure-header">
+								<span class="scalyn-failure-category scalyn-badge scalyn-badge--<?php echo esc_attr( $failure['category'] ); ?>">
+									<?php echo esc_html( ucfirst( str_replace( '-', ' ', $failure['category'] ) ) ); ?>
+								</span>
+								<span class="scalyn-failure-provider"><?php echo esc_html( $failure['provider'] ); ?></span>
+								<?php if ( $failure['failed_at'] ) : ?>
+									<span class="scalyn-failure-time" title="<?php echo esc_attr( $failure['failed_at'] ); ?>">
+										<?php echo esc_html( $failure['failed_at'] ); ?>
+									</span>
+								<?php endif; ?>
+							</div>
+
+							<div class="scalyn-failure-content">
+								<p class="scalyn-failure-remediation">
+									<strong><?php esc_html_e( 'Remediation:', 'scalyn-mail-relay' ); ?></strong> <?php echo esc_html( $failure['remediation'] ); ?>
+								</p>
+								<?php if ( $failure['evidence'] ) : ?>
+									<p class="scalyn-failure-evidence">
+										<small><?php echo esc_html( $failure['evidence'] ); ?></small>
+									</p>
+								<?php endif; ?>
+							</div>
+						</div>
+					<?php endforeach; ?>
+				</div>
+			</section>
+		<?php endif; ?>
 
 		<!-- Run Diagnostics Action -->
 		<section class="scalyn-card scalyn-actions-card" aria-labelledby="scalyn-diagnostics-actions-heading">
