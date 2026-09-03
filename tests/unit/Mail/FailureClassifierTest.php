@@ -14,17 +14,29 @@ use Scalyn\MailRelay\Mail\SendResult;
 use Scalyn\MailRelay\Mail\TransportFailureCategory;
 
 /**
+ * Unit tests for FailureClassifier.
+ *
  * @coversDefaultClass \Scalyn\MailRelay\Mail\FailureClassifier
  */
 class FailureClassifierTest extends TestCase {
 
+	/**
+	 * The FailureClassifier instance under test.
+	 *
+	 * @var FailureClassifier
+	 */
 	private FailureClassifier $classifier;
 
+	/**
+	 * Set up test fixtures.
+	 */
 	protected function setUp(): void {
 		$this->classifier = new FailureClassifier();
 	}
 
 	/**
+	 * Tests auth failure classification by SMTP code 535.
+	 *
 	 * @test
 	 * @covers ::classify
 	 */
@@ -44,6 +56,8 @@ class FailureClassifierTest extends TestCase {
 	}
 
 	/**
+	 * Tests failure classification.
+	 *
 	 * @test
 	 * @covers ::classify
 	 */
@@ -62,6 +76,8 @@ class FailureClassifierTest extends TestCase {
 	}
 
 	/**
+	 * Tests failure classification.
+	 *
 	 * @test
 	 * @covers ::classify
 	 */
@@ -80,6 +96,8 @@ class FailureClassifierTest extends TestCase {
 	}
 
 	/**
+	 * Tests failure classification.
+	 *
 	 * @test
 	 * @covers ::classify
 	 */
@@ -97,6 +115,8 @@ class FailureClassifierTest extends TestCase {
 	}
 
 	/**
+	 * Tests failure classification.
+	 *
 	 * @test
 	 * @covers ::classify
 	 */
@@ -115,6 +135,8 @@ class FailureClassifierTest extends TestCase {
 	}
 
 	/**
+	 * Tests failure classification.
+	 *
 	 * @test
 	 * @covers ::classify
 	 */
@@ -133,6 +155,8 @@ class FailureClassifierTest extends TestCase {
 	}
 
 	/**
+	 * Tests failure classification.
+	 *
 	 * @test
 	 * @covers ::classify
 	 */
@@ -151,6 +175,8 @@ class FailureClassifierTest extends TestCase {
 	}
 
 	/**
+	 * Tests failure classification.
+	 *
 	 * @test
 	 * @covers ::classify
 	 */
@@ -170,6 +196,8 @@ class FailureClassifierTest extends TestCase {
 	}
 
 	/**
+	 * Tests failure classification.
+	 *
 	 * @test
 	 * @covers ::classify
 	 */
@@ -187,6 +215,8 @@ class FailureClassifierTest extends TestCase {
 	}
 
 	/**
+	 * Tests that explicit failure category is respected.
+	 *
 	 * @test
 	 * @covers ::classify
 	 */
@@ -205,6 +235,8 @@ class FailureClassifierTest extends TestCase {
 	}
 
 	/**
+	 * Tests that evidence is included in suggestion.
+	 *
 	 * @test
 	 * @covers ::classify
 	 */
@@ -224,12 +256,14 @@ class FailureClassifierTest extends TestCase {
 	}
 
 	/**
+	 * Tests that long response messages are truncated in evidence.
+	 *
 	 * @test
 	 * @covers ::classify
 	 */
 	public function truncates_long_response_messages_in_evidence(): void {
 		$long_message = str_repeat( 'x', 150 );
-		$result = new SendResult(
+		$result       = new SendResult(
 			success: false,
 			provider: 'smtp',
 			response_code: '535',
@@ -245,6 +279,8 @@ class FailureClassifierTest extends TestCase {
 	}
 
 	/**
+	 * Tests failure classification.
+	 *
 	 * @test
 	 * @covers ::classify
 	 */
