@@ -53,11 +53,32 @@
 .scalyn-log-table { margin-top: 12px; }
 .scalyn-log-table .scalyn-log-col-status { width: 110px; }
 .scalyn-log-table .scalyn-log-col-provider { width: 90px; }
+.scalyn-log-table .scalyn-log-col-source { width: auto; }
 .scalyn-log-table .scalyn-log-col-attachments { width: 100px; }
 .scalyn-log-table .scalyn-log-col-timestamp { width: 160px; }
 .scalyn-log-table .scalyn-log-col-action { width: 120px; }
 .scalyn-log-pagination { margin-top: 10px; display: flex; justify-content: flex-end; }
 .scalyn-log-note { margin-top: 12px; }
+
+/* ---- Responsive design ---- */
+@media (max-width: 768px) {
+	.scalyn-log-table .scalyn-log-col-source,
+	.scalyn-log-table .scalyn-log-col-attachments { display: none; }
+	.scalyn-log-table .scalyn-log-col-provider { width: 80px; }
+	.scalyn-log-table .scalyn-log-col-timestamp { width: 120px; font-size: 12px; }
+	.scalyn-wizard-steps { flex-wrap: wrap; }
+	.scalyn-wizard-step { min-width: 70px; padding: 8px 6px; font-size: 10px; }
+	.scalyn-actions { flex-wrap: wrap; }
+}
+
+@media (max-width: 480px) {
+	.scalyn-log-table .scalyn-log-col-provider { display: none; }
+	.scalyn-log-table .scalyn-log-col-status { width: 80px; font-size: 12px; }
+	.scalyn-log-table .scalyn-log-col-timestamp { display: none; }
+	.scalyn-log-table .scalyn-log-col-action { width: 100px; }
+	.scalyn-wizard-step__label { display: none; }
+	.scalyn-wizard-step { min-width: 60px; padding: 6px 4px; }
+}
 
 /* ---- Timeline ---- */
 .scalyn-timeline { list-style: none; margin: 0; padding: 0; }

@@ -200,6 +200,13 @@ if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_date' ) ) {
+	/** Formats a timestamp using PHP's date() function with WordPress timezone. */
+	function wp_date( string $format, int $timestamp ): string {
+		return date( $format, $timestamp );
+	}
+}
+
 if ( ! function_exists( 'add_query_arg' ) ) {
 	/**
 	 * Appends a query parameter to a URL.
