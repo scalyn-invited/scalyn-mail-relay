@@ -13,6 +13,8 @@ use Scalyn\MailRelay\Core\ProviderRegistry;
 use Scalyn\MailRelay\Core\SettingsRepository;
 use Scalyn\MailRelay\Database\DiagnosticRepository;
 use Scalyn\MailRelay\Database\HealthScoreRepository;
+use Scalyn\MailRelay\Logging\MailLogRepository;
+use Scalyn\MailRelay\Mail\FailureClassifier;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -49,12 +51,17 @@ final class DiagnosticsPage {
 		$container       = Plugin::instance()->container();
 		$diagnostic_repo = $container->get( DiagnosticRepository::class );
 		$score_repo      = $container->get( HealthScoreRepository::class );
+		$mail_log_repo   = $container->get( MailLogRepository::class );
+		$classifier      = $container->get( FailureClassifier::class );
 		$run_data        = $diagnostic_repo->find_latest_run();
 		$diagnostics     = $this->organize_diagnostics( $run_data['results'] );
 
 		// Read the computed health score from HealthScoreRepository (wired by Y3's HealthScorer).
 		$latest_score = $score_repo->find_latest();
 		$health_score = $latest_score ? (int) $latest_score['overall_score'] : null;
+
+		// Fetch and classify recent mail failures.
+		$recent_failures = $this->get_recent_failures( $mail_log_repo, $classifier );
 
 		// Pre-calculate UI status and severity values for each diagnostic check.
 		$spf_ui_status = $diagnostics['spf'] ? $this->get_ui_status( $diagnostics['spf']['status'] ) : 'unknown';
@@ -165,5 +172,72 @@ final class DiagnosticsPage {
 			'critical' => 'scalyn-severity-critical',
 			default    => 'scalyn-severity-unknown',
 		};
+	}
+
+	/**
+	 * Fetches and classifies recent mail failures.
+	 *
+	 * Returns up to 5 most recent failed sends with their classified failure categories
+	 * and remediation suggestions.
+	 *
+	 * @param MailLogRepository  $repo       The mail log repository.
+	 * @param FailureClassifier  $classifier The failure classifier.
+	 * @return array<int, array{
+	 *   'provider': string,
+	 *   'status': string,
+	 *   'response_code': string|null,
+	 *   'response_message': string|null,
+	 *   'failed_at': string|null,
+	 *   'category': string,
+	 *   'remediation': string,
+	 *   'evidence': string|null
+	 * }> Array of recent failures with classification, or empty if none.
+	 */
+	private function get_recent_failures( MailLogRepository $repo, FailureClassifier $classifier ): array {
+		// Fetch recent failed logs using the repository's public interface.
+		// This uses the standard pagination API to respect boundaries.
+		try {
+			$recent_logs = $repo->find_recent( 1, 5 );
+		} catch ( \Exception $e ) {
+			// If there's an error fetching logs, return empty array gracefully.
+			return array();
+		}
+
+		if ( empty( $recent_logs ) ) {
+			return array();
+		}
+
+		$failures = array();
+
+		foreach ( $recent_logs as $log ) {
+			// Only include failed sends.
+			if ( 'failed' !== $log['status'] ) {
+				continue;
+			}
+
+			// Reconstruct a SendResult-like object to pass to the classifier.
+			$send_result = new \Scalyn\MailRelay\Mail\SendResult(
+				success: false,
+				provider: $log['provider'] ?? '',
+				response_code: $log['response_code'] ?? null,
+				response_message: $log['response_message'] ?? null,
+				failure_category: null
+			);
+
+			$suggestion = $classifier->classify( $send_result );
+
+			$failures[] = array(
+				'provider'          => $log['provider'] ?? 'unknown',
+				'status'            => $log['status'] ?? 'unknown',
+				'response_code'     => $log['response_code'] ?? null,
+				'response_message'  => $log['response_message'] ?? null,
+				'failed_at'         => $log['failed_at'] ?? null,
+				'category'          => $suggestion->category,
+				'remediation'       => $suggestion->suggestion,
+				'evidence'          => $suggestion->evidence,
+			);
+		}
+
+		return $failures;
 	}
 }
