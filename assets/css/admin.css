@@ -49,6 +49,15 @@
 .scalyn-badge--accepted { background: #edfaef; color: #00a32a; border: 1px solid #b8e6bf; }
 .scalyn-badge--failed { background: #fce8e8; color: #b32d2e; border: 1px solid #f0a6a7; }
 
+/* ---- Email Logs filters ---- */
+.scalyn-logs-filters { margin-bottom: 20px; background: #f9f9f9; }
+.scalyn-filter-form { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.scalyn-filter-controls { display: flex; gap: 16px; flex-wrap: wrap; flex: 1; }
+.scalyn-filter-group { display: flex; align-items: center; gap: 8px; }
+.scalyn-filter-label { font-weight: 500; color: #1e1e1e; white-space: nowrap; margin: 0; }
+.scalyn-filter-select { padding: 6px 8px; border: 1px solid #dcdcde; border-radius: 4px; font-size: 13px; min-width: 120px; }
+.scalyn-filter-form .button { margin: 0; }
+
 /* ---- Email Logs list table ---- */
 .scalyn-log-table { margin-top: 12px; width: 100%; }
 .scalyn-log-table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -64,6 +73,10 @@
 
 /* ---- Responsive design ---- */
 @media (max-width: 768px) {
+	.scalyn-filter-form { flex-direction: column; align-items: stretch; }
+	.scalyn-filter-controls { flex-direction: column; }
+	.scalyn-filter-select { width: 100%; }
+	.scalyn-filter-form .button { width: 100%; }
 	.scalyn-log-table { font-size: 13px; }
 	.scalyn-log-table .scalyn-log-col-source,
 	.scalyn-log-table .scalyn-log-col-attachments { display: none; }

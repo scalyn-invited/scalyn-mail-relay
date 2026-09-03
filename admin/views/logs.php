@@ -29,6 +29,36 @@ $status_labels = array(
 	<h1><?php esc_html_e( 'Email Logs', 'scalyn-mail-relay' ); ?></h1>
 	<p class="scalyn-lead"><?php esc_html_e( 'Recent email outcomes recorded by Scalyn Mail Relay.', 'scalyn-mail-relay' ); ?></p>
 
+	<?php if ( ! empty( $rows ) ) : ?>
+		<div class="scalyn-card scalyn-logs-filters">
+			<form method="get" action="<?php echo esc_url( $logs_base_url ); ?>" class="scalyn-filter-form">
+				<fieldset>
+					<legend class="screen-reader-text"><?php esc_html_e( 'Filter email logs', 'scalyn-mail-relay' ); ?></legend>
+					<div class="scalyn-filter-controls">
+						<div class="scalyn-filter-group">
+							<label for="scalyn-filter-status" class="scalyn-filter-label">
+								<?php esc_html_e( 'Status:', 'scalyn-mail-relay' ); ?>
+							</label>
+							<select id="scalyn-filter-status" name="status" class="scalyn-filter-select" aria-label="<?php esc_attr_e( 'Filter by status', 'scalyn-mail-relay' ); ?>">
+								<option value=""><?php esc_html_e( 'All', 'scalyn-mail-relay' ); ?></option>
+								<option value="accepted"><?php esc_html_e( 'Accepted', 'scalyn-mail-relay' ); ?></option>
+								<option value="failed"><?php esc_html_e( 'Failed', 'scalyn-mail-relay' ); ?></option>
+							</select>
+						</div>
+					</div>
+					<button type="submit" class="button" aria-label="<?php esc_attr_e( 'Apply filters', 'scalyn-mail-relay' ); ?>">
+						<?php esc_html_e( 'Filter', 'scalyn-mail-relay' ); ?>
+					</button>
+					<?php if ( isset( $_GET['status'] ) && '' !== $_GET['status'] ) : ?>
+						<a href="<?php echo esc_url( $logs_base_url ); ?>" class="button">
+							<?php esc_html_e( 'Clear', 'scalyn-mail-relay' ); ?>
+						</a>
+					<?php endif; ?>
+				</fieldset>
+			</form>
+		</div>
+	<?php endif; ?>
+
 	<?php if ( empty( $rows ) ) : ?>
 
 		<div class="scalyn-card">

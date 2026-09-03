@@ -80,10 +80,26 @@ final class LogsPage {
 	private function render_list(): void {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Read-only GET navigation; no state change. Value is passed through absint() immediately after.
 		$paged = isset( $_GET['paged'] ) ? wp_unslash( (string) $_GET['paged'] ) : '1';
+		$status_filter = isset( $_GET['status'] ) ? wp_unslash( (string) $_GET['status'] ) : '';
+
+		// Validate status filter to prevent injection.
+		if ( $status_filter && ! in_array( $status_filter, array( 'accepted', 'failed' ), true ) ) {
+			$status_filter = '';
+		}
 
 		$page   = max( 1, absint( $paged ) );
 		$offset = ( $page - 1 ) * self::PER_PAGE;
 		$rows   = $this->log_repo->find_recent( self::PER_PAGE, $offset );
+
+		// Filter by status if requested.
+		if ( $status_filter ) {
+			$rows = array_filter(
+				$rows,
+				function ( $row ) use ( $status_filter ) {
+					return ( $row['status'] ?? '' ) === $status_filter;
+				}
+			);
+		}
 
 		// If a full page was returned there may be more rows. Used for the Next link.
 		$has_next_page = count( $rows ) >= self::PER_PAGE;
