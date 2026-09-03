@@ -89,7 +89,13 @@ final class LogsPage {
 
 		$page   = max( 1, absint( $paged ) );
 		$offset = ( $page - 1 ) * self::PER_PAGE;
-		$rows   = $this->log_repo->find_recent( self::PER_PAGE, $offset );
+
+		// Fetch one extra row to determine if there's a next page.
+		$rows   = $this->log_repo->find_recent( self::PER_PAGE + 1, $offset );
+		$has_next_page = count( $rows ) > self::PER_PAGE;
+
+		// Trim to page size.
+		$rows = array_slice( $rows, 0, self::PER_PAGE, true );
 
 		// Filter by status if requested.
 		if ( $status_filter ) {
@@ -100,9 +106,6 @@ final class LogsPage {
 				}
 			);
 		}
-
-		// If a full page was returned there may be more rows. Used for the Next link.
-		$has_next_page = count( $rows ) >= self::PER_PAGE;
 
 		require SCALYN_MAIL_RELAY_PATH . 'admin/views/logs.php';
 	}
