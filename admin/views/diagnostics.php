@@ -78,7 +78,7 @@ defined( 'ABSPATH' ) || exit;
 						}
 
 						echo '<p class="scalyn-finding__message">' . esc_html( $spf['result_message'] ) . '</p>';
-						EvidenceDisplay::render( $spf, 'SPF Record', true );
+						EvidenceDisplay::render( $spf, 'SPF Record', 'pass' !== $spf['status'] );
 
 						if ( $spf['recommended_action'] ) {
 							echo '<p class="scalyn-finding__action">' . esc_html( $spf['recommended_action'] ) . '</p>';
@@ -105,7 +105,7 @@ defined( 'ABSPATH' ) || exit;
 						}
 
 						echo '<p class="scalyn-finding__message">' . esc_html( $mx['result_message'] ) . '</p>';
-						EvidenceDisplay::render( $mx, 'MX Records', true );
+						EvidenceDisplay::render( $mx, 'MX Records', 'pass' !== $mx['status'] );
 
 						if ( $mx['recommended_action'] ) {
 							echo '<p class="scalyn-finding__action">' . esc_html( $mx['recommended_action'] ) . '</p>';
@@ -132,7 +132,7 @@ defined( 'ABSPATH' ) || exit;
 						}
 
 						echo '<p class="scalyn-finding__message">' . esc_html( $dkim['result_message'] ) . '</p>';
-						EvidenceDisplay::render( $dkim, 'DKIM Records', true );
+						EvidenceDisplay::render( $dkim, 'DKIM Records', 'pass' !== $dkim['status'] );
 
 						if ( $dkim['recommended_action'] ) {
 							echo '<p class="scalyn-finding__action">' . esc_html( $dkim['recommended_action'] ) . '</p>';
@@ -159,7 +159,7 @@ defined( 'ABSPATH' ) || exit;
 						}
 
 						echo '<p class="scalyn-finding__message">' . esc_html( $dmarc['result_message'] ) . '</p>';
-						EvidenceDisplay::render( $dmarc, 'DMARC Policy', true );
+						EvidenceDisplay::render( $dmarc, 'DMARC Policy', 'pass' !== $dmarc['status'] );
 
 						if ( $dmarc['recommended_action'] ) {
 							echo '<p class="scalyn-finding__action">' . esc_html( $dmarc['recommended_action'] ) . '</p>';
@@ -196,7 +196,7 @@ defined( 'ABSPATH' ) || exit;
 						}
 
 						echo '<p class="scalyn-finding__message">' . esc_html( $smtp_tls['result_message'] ) . '</p>';
-						EvidenceDisplay::render( $smtp_tls, 'SMTP/TLS Configuration', true );
+						EvidenceDisplay::render( $smtp_tls, 'SMTP/TLS Configuration', 'pass' !== $smtp_tls['status'] );
 
 						if ( $smtp_tls['recommended_action'] ) {
 							echo '<p class="scalyn-finding__action">' . esc_html( $smtp_tls['recommended_action'] ) . '</p>';
@@ -210,8 +210,8 @@ defined( 'ABSPATH' ) || exit;
 		</section>
 
 		<!-- Overall Health Score -->
-		<section class="scalyn-diagnostics-section" aria-labelledby="scalyn-diagnostics-health-heading">
-			<h2 id="scalyn-diagnostics-health-heading" class="scalyn-diagnostics-section__title"><?php esc_html_e( 'Overall Email Health', 'scalyn-mail-relay' ); ?></h2>
+		<section class="scalyn-diagnostics-section" aria-labelledby="scalyn-diagnostics-health-section-heading">
+			<h2 id="scalyn-diagnostics-health-section-heading" class="scalyn-diagnostics-section__title"><?php esc_html_e( 'Overall Email Health', 'scalyn-mail-relay' ); ?></h2>
 
 			<div class="scalyn-diagnostics-grid">
 				<?php
@@ -234,7 +234,7 @@ defined( 'ABSPATH' ) || exit;
 						echo '<strong class="scalyn-score" aria-label="' . esc_attr( sprintf( __( 'Health score: %d out of 100', 'scalyn-mail-relay' ), $health_score ) ) . '">' . esc_html( $health_score ) . '</strong>';
 						echo '<p class="scalyn-card__note">' . esc_html__( 'Your email health score is based on the results of all diagnostic checks (SPF, DKIM, DMARC, MX, and SMTP/TLS).', 'scalyn-mail-relay' ) . '</p>';
 					},
-					'scalyn-diagnostics-health-heading'
+					'scalyn-diagnostics-health-card-heading'
 				);
 				?>
 			</div>

@@ -46,9 +46,9 @@ final class DiagnosticResultCard {
 		}
 
 		if ( '' !== $heading_id ) {
-			printf( '<h2 id="%s">%s</h2>', esc_attr( $heading_id ), esc_html( $heading ) );
+			printf( '<h3 id="%s">%s</h3>', esc_attr( $heading_id ), esc_html( $heading ) );
 		} else {
-			printf( '<h2>%s</h2>', esc_html( $heading ) );
+			printf( '<h3>%s</h3>', esc_html( $heading ) );
 		}
 
 		echo '<div class="scalyn-diagnostic-card__status">';
