@@ -105,6 +105,26 @@
 .scalyn-severity-critical { background: #fce8e8; color: #b32d2e; border: 1px solid #f0a6a7; }
 .scalyn-severity-unknown { background: #f0f0f1; color: #50575e; }
 
+/* ---- Failure category badges ---- */
+.scalyn-badge--auth { background: #fce8e8; color: #b32d2e; border: 1px solid #f0a6a7; }
+.scalyn-badge--connectivity { background: #fef8ee; color: #996800; border: 1px solid #f0c33c; }
+.scalyn-badge--timeout { background: #fef8ee; color: #996800; border: 1px solid #f0c33c; }
+.scalyn-badge--tls { background: #fce8e8; color: #b32d2e; border: 1px solid #f0a6a7; }
+.scalyn-badge--certificate { background: #fce8e8; color: #b32d2e; border: 1px solid #f0a6a7; }
+.scalyn-badge--provider-rejection { background: #fef8ee; color: #996800; border: 1px solid #f0c33c; }
+.scalyn-badge--config { background: #fef8ee; color: #996800; border: 1px solid #f0c33c; }
+
+/* ---- Recent failures section ---- */
+.scalyn-failures-list { margin-top: 12px; }
+.scalyn-failure-item { margin-bottom: 12px; }
+.scalyn-failure-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.scalyn-failure-category { margin-bottom: 0; }
+.scalyn-failure-provider { font-size: 13px; color: #50575e; font-weight: 500; }
+.scalyn-failure-time { font-size: 12px; color: #50575e; margin-left: auto; }
+.scalyn-failure-content { margin-top: 8px; }
+.scalyn-failure-remediation { margin: 8px 0; font-size: 14px; line-height: 1.5; }
+.scalyn-failure-evidence { margin: 8px 0; font-size: 12px; color: #50575e; }
+
 /* ---- Diagnostic sections ---- */
 .scalyn-diagnostics-section { margin-bottom: 32px; }
 .scalyn-diagnostics-section__title { margin-top: 0; margin-bottom: 8px; font-size: 16px; font-weight: 600; color: #1e1e1e; }
