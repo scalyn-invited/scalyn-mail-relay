@@ -78,8 +78,8 @@ final class LogsPage {
 	 *   bool  $has_next_page Whether additional rows may exist beyond this page.
 	 */
 	private function render_list(): void {
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Read-only GET navigation; no state change. paged validated via absint(). status validated against whitelist.
-		$paged  = isset( $_GET['paged'] ) ? wp_unslash( (string) $_GET['paged'] ) : '1';
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only GET navigation; no state change.
+		$paged  = isset( $_GET['paged'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['paged'] ) ) : '1';
 		$status = isset( $_GET['status'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['status'] ) ) : '';
 
 		// Validate status filter against whitelist.

@@ -49,7 +49,10 @@ $status_labels = array(
 					<button type="submit" class="button" aria-label="<?php esc_attr_e( 'Apply filters', 'scalyn-mail-relay' ); ?>">
 						<?php esc_html_e( 'Filter', 'scalyn-mail-relay' ); ?>
 					</button>
-					<?php if ( isset( $_GET['status'] ) && '' !== $_GET['status'] ) : ?>
+					<?php
+					// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only GET navigation; no state change. Value validated in LogsPage.
+					if ( isset( $_GET['status'] ) && '' !== $_GET['status'] ) :
+						?>
 						<a href="<?php echo esc_url( $logs_base_url ); ?>" class="button">
 							<?php esc_html_e( 'Clear', 'scalyn-mail-relay' ); ?>
 						</a>
