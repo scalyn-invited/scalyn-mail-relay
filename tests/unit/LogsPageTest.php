@@ -211,8 +211,8 @@ final class LogsPageTest extends TestCase {
 
 	public function test_list_view_shows_next_link_when_full_page_returned(): void {
 		$this->grant_view_logs();
-		// A full page (25 rows) signals that more may exist.
-		$this->wpdb->get_results_return = array_fill( 0, 25, $this->make_log_row() );
+		// Fetch PER_PAGE + 1 (26 rows) to detect if more exist. 26 rows signals next page.
+		$this->wpdb->get_results_return = array_fill( 0, 26, $this->make_log_row() );
 
 		$output = $this->render_and_capture();
 
