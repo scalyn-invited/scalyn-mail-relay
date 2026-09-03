@@ -3,17 +3,24 @@
  * Diagnostics page view.
  *
  * Variables injected by DiagnosticsPage::render():
- *   bool                         $provider_configured  Whether a provider is configured and registered.
- *   string                       $wizard_url           URL to Setup Wizard.
- *   string                       $diagnostics_run_url  URL to trigger diagnostics (empty if endpoint not ready).
- *   array<string, array|null>    $diagnostics          Results organized by check type (spf, dkim, dmarc), or null if no results.
- *   int|null                     $health_score         Overall health score (0-100) or null if no results.
- *   string                       $spf_ui_status        UI status for SPF (healthy, warning, critical, unknown).
- *   string                       $dkim_ui_status       UI status for DKIM (healthy, warning, critical, unknown).
- *   string                       $dmarc_ui_status      UI status for DMARC (healthy, warning, critical, unknown).
+ *   bool                         $provider_configured   Whether a provider is configured and registered.
+ *   string                       $wizard_url            URL to Setup Wizard.
+ *   string                       $diagnostics_run_url   URL to trigger diagnostics (empty if endpoint not ready).
+ *   array<string, array|null>    $diagnostics           Results organized by check type, or null if no results.
+ *   int|null                     $health_score          Overall health score (0-100) or null if no results.
+ *   string                       $spf_ui_status         UI status for SPF (healthy, warning, critical, unknown).
+ *   string                       $spf_severity          CSS class for SPF severity (scalyn-severity-*).
+ *   string                       $mx_ui_status          UI status for MX (healthy, warning, critical, unknown).
+ *   string                       $mx_severity           CSS class for MX severity.
+ *   string                       $dkim_ui_status        UI status for DKIM (healthy, warning, critical, unknown).
+ *   string                       $dkim_severity         CSS class for DKIM severity.
+ *   string                       $dmarc_ui_status       UI status for DMARC (healthy, warning, critical, unknown).
+ *   string                       $dmarc_severity        CSS class for DMARC severity.
+ *   string                       $smtp_tls_ui_status    UI status for SMTP/TLS (healthy, warning, critical, unknown).
+ *   string                       $smtp_tls_severity     CSS class for SMTP/TLS severity.
  *
- * Displays real diagnostic findings when available, or empty states when no diagnostics have been run.
- * Each finding includes: status, message, evidence, impact, and recommended action.
+ * Displays real diagnostic findings organized by category (DNS vs Provider checks).
+ * Each finding includes: status, message, evidence, impact, severity, and recommended action.
  *
  * Privacy: Do not render credentials, SMTP transcripts, provider metadata,
  * email bodies, or recipient information. Render only sanitized evidence and status.
@@ -23,6 +30,7 @@
 
 use Scalyn\MailRelay\Admin\Components\ActionButton;
 use Scalyn\MailRelay\Admin\Components\DiagnosticResultCard;
+use Scalyn\MailRelay\Admin\Components\EvidenceDisplay;
 use Scalyn\MailRelay\Admin\Components\EmptyState;
 use Scalyn\MailRelay\Admin\Components\StatusBadge;
 
@@ -44,178 +52,196 @@ defined( 'ABSPATH' ) || exit;
 		</div>
 	<?php else : ?>
 
-		<div class="scalyn-diagnostics-grid">
+		<!-- DNS Validation Checks -->
+		<section class="scalyn-diagnostics-section" aria-labelledby="scalyn-diagnostics-dns-heading">
+			<h2 id="scalyn-diagnostics-dns-heading" class="scalyn-diagnostics-section__title"><?php esc_html_e( 'DNS Configuration', 'scalyn-mail-relay' ); ?></h2>
+			<p class="scalyn-diagnostics-section__description"><?php esc_html_e( 'Verify SPF, DKIM, DMARC, and MX records to ensure email deliverability.', 'scalyn-mail-relay' ); ?></p>
 
-			<?php
-			$spf          = $diagnostics['spf'] ?? null;
-			$spf_ui_label = $spf ? ucfirst( $spf['status'] ) : __( 'Unknown', 'scalyn-mail-relay' );
+			<div class="scalyn-diagnostics-grid">
 
-			DiagnosticResultCard::render(
-				__( 'SPF Record', 'scalyn-mail-relay' ),
-				$spf_ui_status,
-				$spf_ui_label,
-				function () use ( $spf ) {
-					if ( null === $spf ) {
-						EmptyState::render(
-							__( 'SPF record status has not yet been checked. Run diagnostics to verify your SPF configuration.', 'scalyn-mail-relay' )
-						);
-						return;
-					}
+				<?php
+				$spf          = $diagnostics['spf'] ?? null;
+				$spf_ui_label = $spf ? ucfirst( $spf['status'] ) : __( 'Unknown', 'scalyn-mail-relay' );
 
-					echo '<p class="scalyn-finding__message">' . esc_html( $spf['result_message'] ) . '</p>';
-
-					if ( $spf['raw_result'] ) {
-						$decoded  = json_decode( $spf['raw_result'], true );
-						$evidence = $decoded['evidence'] ?? '';
-
-						if ( $evidence ) {
-							echo '<details class="scalyn-finding__details">';
-							echo '<summary>' . esc_html__( 'Evidence', 'scalyn-mail-relay' ) . '</summary>';
-							echo '<pre class="scalyn-finding__evidence">' . esc_html( $evidence ) . '</pre>';
-							echo '</details>';
+				DiagnosticResultCard::render(
+					__( 'SPF Record', 'scalyn-mail-relay' ),
+					$spf_ui_status,
+					$spf_ui_label,
+					function () use ( $spf, $spf_severity ) {
+						if ( null === $spf ) {
+							EmptyState::render(
+								__( 'SPF record status has not yet been checked. Run diagnostics to verify your SPF configuration.', 'scalyn-mail-relay' )
+							);
+							return;
 						}
-					}
 
-					if ( $spf['raw_result'] ) {
-						$decoded = json_decode( $spf['raw_result'], true );
-						$impact  = $decoded['impact'] ?? '';
+						echo '<p class="scalyn-finding__message">' . esc_html( $spf['result_message'] ) . '</p>';
+						EvidenceDisplay::render( $spf, 'SPF Record', true );
 
-						if ( $impact ) {
-							echo '<p class="scalyn-finding__impact">' . esc_html( $impact ) . '</p>';
+						if ( $spf['recommended_action'] ) {
+							echo '<p class="scalyn-finding__action">' . esc_html( $spf['recommended_action'] ) . '</p>';
 						}
-					}
+					},
+					'scalyn-diagnostics-spf-heading'
+				);
+				?>
 
-					if ( $spf['recommended_action'] ) {
-						echo '<p class="scalyn-finding__action">' . esc_html( $spf['recommended_action'] ) . '</p>';
-					}
-				},
-				'scalyn-diagnostics-spf-heading'
-			);
-			?>
+				<?php
+				$mx          = $diagnostics['mx'] ?? null;
+				$mx_ui_label = $mx ? ucfirst( $mx['status'] ) : __( 'Unknown', 'scalyn-mail-relay' );
 
-			<?php
-			$dkim          = $diagnostics['dkim'] ?? null;
-			$dkim_ui_label = $dkim ? ucfirst( $dkim['status'] ) : __( 'Unknown', 'scalyn-mail-relay' );
-
-			DiagnosticResultCard::render(
-				__( 'DKIM Records', 'scalyn-mail-relay' ),
-				$dkim_ui_status,
-				$dkim_ui_label,
-				function () use ( $dkim ) {
-					if ( null === $dkim ) {
-						EmptyState::render(
-							__( 'DKIM record status has not yet been checked. Run diagnostics to verify your DKIM configuration.', 'scalyn-mail-relay' )
-						);
-						return;
-					}
-
-					echo '<p class="scalyn-finding__message">' . esc_html( $dkim['result_message'] ) . '</p>';
-
-					if ( $dkim['raw_result'] ) {
-						$decoded  = json_decode( $dkim['raw_result'], true );
-						$evidence = $decoded['evidence'] ?? '';
-
-						if ( $evidence ) {
-							echo '<details class="scalyn-finding__details">';
-							echo '<summary>' . esc_html__( 'Evidence', 'scalyn-mail-relay' ) . '</summary>';
-							echo '<pre class="scalyn-finding__evidence">' . esc_html( $evidence ) . '</pre>';
-							echo '</details>';
+				DiagnosticResultCard::render(
+					__( 'MX Records', 'scalyn-mail-relay' ),
+					$mx_ui_status,
+					$mx_ui_label,
+					function () use ( $mx, $mx_severity ) {
+						if ( null === $mx ) {
+							EmptyState::render(
+								__( 'MX record status has not yet been checked. Run diagnostics to verify your MX configuration.', 'scalyn-mail-relay' )
+							);
+							return;
 						}
-					}
 
-					if ( $dkim['raw_result'] ) {
-						$decoded = json_decode( $dkim['raw_result'], true );
-						$impact  = $decoded['impact'] ?? '';
+						echo '<p class="scalyn-finding__message">' . esc_html( $mx['result_message'] ) . '</p>';
+						EvidenceDisplay::render( $mx, 'MX Records', true );
 
-						if ( $impact ) {
-							echo '<p class="scalyn-finding__impact">' . esc_html( $impact ) . '</p>';
+						if ( $mx['recommended_action'] ) {
+							echo '<p class="scalyn-finding__action">' . esc_html( $mx['recommended_action'] ) . '</p>';
 						}
-					}
+					},
+					'scalyn-diagnostics-mx-heading'
+				);
+				?>
 
-					if ( $dkim['recommended_action'] ) {
-						echo '<p class="scalyn-finding__action">' . esc_html( $dkim['recommended_action'] ) . '</p>';
-					}
-				},
-				'scalyn-diagnostics-dkim-heading'
-			);
-			?>
+				<?php
+				$dkim          = $diagnostics['dkim'] ?? null;
+				$dkim_ui_label = $dkim ? ucfirst( $dkim['status'] ) : __( 'Unknown', 'scalyn-mail-relay' );
 
-			<?php
-			$dmarc          = $diagnostics['dmarc'] ?? null;
-			$dmarc_ui_label = $dmarc ? ucfirst( $dmarc['status'] ) : __( 'Unknown', 'scalyn-mail-relay' );
-
-			DiagnosticResultCard::render(
-				__( 'DMARC Policy', 'scalyn-mail-relay' ),
-				$dmarc_ui_status,
-				$dmarc_ui_label,
-				function () use ( $dmarc ) {
-					if ( null === $dmarc ) {
-						EmptyState::render(
-							__( 'DMARC policy status has not yet been checked. Run diagnostics to verify your DMARC configuration.', 'scalyn-mail-relay' )
-						);
-						return;
-					}
-
-					echo '<p class="scalyn-finding__message">' . esc_html( $dmarc['result_message'] ) . '</p>';
-
-					if ( $dmarc['raw_result'] ) {
-						$decoded  = json_decode( $dmarc['raw_result'], true );
-						$evidence = $decoded['evidence'] ?? '';
-
-						if ( $evidence ) {
-							echo '<details class="scalyn-finding__details">';
-							echo '<summary>' . esc_html__( 'Evidence', 'scalyn-mail-relay' ) . '</summary>';
-							echo '<pre class="scalyn-finding__evidence">' . esc_html( $evidence ) . '</pre>';
-							echo '</details>';
+				DiagnosticResultCard::render(
+					__( 'DKIM Records', 'scalyn-mail-relay' ),
+					$dkim_ui_status,
+					$dkim_ui_label,
+					function () use ( $dkim, $dkim_severity ) {
+						if ( null === $dkim ) {
+							EmptyState::render(
+								__( 'DKIM record status has not yet been checked. Run diagnostics to verify your DKIM configuration.', 'scalyn-mail-relay' )
+							);
+							return;
 						}
-					}
 
-					if ( $dmarc['raw_result'] ) {
-						$decoded = json_decode( $dmarc['raw_result'], true );
-						$impact  = $decoded['impact'] ?? '';
+						echo '<p class="scalyn-finding__message">' . esc_html( $dkim['result_message'] ) . '</p>';
+						EvidenceDisplay::render( $dkim, 'DKIM Records', true );
 
-						if ( $impact ) {
-							echo '<p class="scalyn-finding__impact">' . esc_html( $impact ) . '</p>';
+						if ( $dkim['recommended_action'] ) {
+							echo '<p class="scalyn-finding__action">' . esc_html( $dkim['recommended_action'] ) . '</p>';
 						}
-					}
+					},
+					'scalyn-diagnostics-dkim-heading'
+				);
+				?>
 
-					if ( $dmarc['recommended_action'] ) {
-						echo '<p class="scalyn-finding__action">' . esc_html( $dmarc['recommended_action'] ) . '</p>';
-					}
-				},
-				'scalyn-diagnostics-dmarc-heading'
-			);
-			?>
+				<?php
+				$dmarc          = $diagnostics['dmarc'] ?? null;
+				$dmarc_ui_label = $dmarc ? ucfirst( $dmarc['status'] ) : __( 'Unknown', 'scalyn-mail-relay' );
 
-			<?php
-			$health_ui_status = null !== $health_score ? ( $health_score >= 80 ? 'healthy' : ( $health_score >= 60 ? 'warning' : 'critical' ) ) : 'unknown';
-			/* translators: %d is the health score number (0-100) */
-			$health_ui_label = null !== $health_score ? sprintf( __( '%d/100', 'scalyn-mail-relay' ), $health_score ) : __( 'Unknown', 'scalyn-mail-relay' );
+				DiagnosticResultCard::render(
+					__( 'DMARC Policy', 'scalyn-mail-relay' ),
+					$dmarc_ui_status,
+					$dmarc_ui_label,
+					function () use ( $dmarc, $dmarc_severity ) {
+						if ( null === $dmarc ) {
+							EmptyState::render(
+								__( 'DMARC policy status has not yet been checked. Run diagnostics to verify your DMARC configuration.', 'scalyn-mail-relay' )
+							);
+							return;
+						}
 
-			DiagnosticResultCard::render(
-				__( 'Overall Email Health', 'scalyn-mail-relay' ),
-				$health_ui_status,
-				$health_ui_label,
-				function () use ( $health_score ) {
-					if ( null === $health_score ) {
-						echo '<strong class="scalyn-score" aria-label="' . esc_attr__( 'Health score not yet assessed', 'scalyn-mail-relay' ) . '">—</strong>';
-						echo '<p class="scalyn-card__note">' . esc_html__( 'Run diagnostics to generate your email health score based on SPF, DKIM, and DMARC verification.', 'scalyn-mail-relay' ) . '</p>';
-						return;
-					}
+						echo '<p class="scalyn-finding__message">' . esc_html( $dmarc['result_message'] ) . '</p>';
+						EvidenceDisplay::render( $dmarc, 'DMARC Policy', true );
 
-					/* translators: %d is the health score number (0-100) */
-					echo '<strong class="scalyn-score" aria-label="' . esc_attr( sprintf( __( 'Health score: %d out of 100', 'scalyn-mail-relay' ), $health_score ) ) . '">' . esc_html( $health_score ) . '</strong>';
-					echo '<p class="scalyn-card__note">' . esc_html__( 'Your email health score is based on the results of SPF, DKIM, and DMARC verification checks.', 'scalyn-mail-relay' ) . '</p>';
-				},
-				'scalyn-diagnostics-health-heading'
-			);
-			?>
+						if ( $dmarc['recommended_action'] ) {
+							echo '<p class="scalyn-finding__action">' . esc_html( $dmarc['recommended_action'] ) . '</p>';
+						}
+					},
+					'scalyn-diagnostics-dmarc-heading'
+				);
+				?>
 
-		</div>
+			</div>
+		</section>
 
+		<!-- Provider Health Checks -->
+		<section class="scalyn-diagnostics-section" aria-labelledby="scalyn-diagnostics-provider-heading">
+			<h2 id="scalyn-diagnostics-provider-heading" class="scalyn-diagnostics-section__title"><?php esc_html_e( 'Provider Health', 'scalyn-mail-relay' ); ?></h2>
+			<p class="scalyn-diagnostics-section__description"><?php esc_html_e( 'Verify SMTP server reachability, TLS support, and certificate validity.', 'scalyn-mail-relay' ); ?></p>
+
+			<div class="scalyn-diagnostics-grid">
+
+				<?php
+				$smtp_tls          = $diagnostics['smtp_tls'] ?? null;
+				$smtp_tls_ui_label = $smtp_tls ? ucfirst( $smtp_tls['status'] ) : __( 'Unknown', 'scalyn-mail-relay' );
+
+				DiagnosticResultCard::render(
+					__( 'SMTP/TLS Configuration', 'scalyn-mail-relay' ),
+					$smtp_tls_ui_status,
+					$smtp_tls_ui_label,
+					function () use ( $smtp_tls, $smtp_tls_severity ) {
+						if ( null === $smtp_tls ) {
+							EmptyState::render(
+								__( 'SMTP/TLS server status has not yet been checked. Run diagnostics to verify your SMTP provider configuration.', 'scalyn-mail-relay' )
+							);
+							return;
+						}
+
+						echo '<p class="scalyn-finding__message">' . esc_html( $smtp_tls['result_message'] ) . '</p>';
+						EvidenceDisplay::render( $smtp_tls, 'SMTP/TLS Configuration', true );
+
+						if ( $smtp_tls['recommended_action'] ) {
+							echo '<p class="scalyn-finding__action">' . esc_html( $smtp_tls['recommended_action'] ) . '</p>';
+						}
+					},
+					'scalyn-diagnostics-smtp-tls-heading'
+				);
+				?>
+
+			</div>
+		</section>
+
+		<!-- Overall Health Score -->
+		<section class="scalyn-diagnostics-section" aria-labelledby="scalyn-diagnostics-health-heading">
+			<h2 id="scalyn-diagnostics-health-heading" class="scalyn-diagnostics-section__title"><?php esc_html_e( 'Overall Email Health', 'scalyn-mail-relay' ); ?></h2>
+
+			<div class="scalyn-diagnostics-grid">
+				<?php
+				$health_ui_status = null !== $health_score ? ( $health_score >= 80 ? 'healthy' : ( $health_score >= 60 ? 'warning' : 'critical' ) ) : 'unknown';
+				/* translators: %d is the health score number (0-100) */
+				$health_ui_label = null !== $health_score ? sprintf( __( '%d/100', 'scalyn-mail-relay' ), $health_score ) : __( 'Unknown', 'scalyn-mail-relay' );
+
+				DiagnosticResultCard::render(
+					__( 'Health Score', 'scalyn-mail-relay' ),
+					$health_ui_status,
+					$health_ui_label,
+					function () use ( $health_score ) {
+						if ( null === $health_score ) {
+							echo '<strong class="scalyn-score" aria-label="' . esc_attr__( 'Health score not yet assessed', 'scalyn-mail-relay' ) . '">—</strong>';
+							echo '<p class="scalyn-card__note">' . esc_html__( 'Run diagnostics to generate your email health score based on SPF, DKIM, DMARC, MX, and SMTP/TLS verification.', 'scalyn-mail-relay' ) . '</p>';
+							return;
+						}
+
+						/* translators: %d is the health score number (0-100) */
+						echo '<strong class="scalyn-score" aria-label="' . esc_attr( sprintf( __( 'Health score: %d out of 100', 'scalyn-mail-relay' ), $health_score ) ) . '">' . esc_html( $health_score ) . '</strong>';
+						echo '<p class="scalyn-card__note">' . esc_html__( 'Your email health score is based on the results of all diagnostic checks (SPF, DKIM, DMARC, MX, and SMTP/TLS).', 'scalyn-mail-relay' ) . '</p>';
+					},
+					'scalyn-diagnostics-health-heading'
+				);
+				?>
+			</div>
+		</section>
+
+		<!-- Run Diagnostics Action -->
 		<section class="scalyn-card scalyn-actions-card" aria-labelledby="scalyn-diagnostics-actions-heading">
 			<h2 id="scalyn-diagnostics-actions-heading"><?php esc_html_e( 'Run Diagnostics', 'scalyn-mail-relay' ); ?></h2>
-			<p class="scalyn-actions__note"><?php esc_html_e( 'Click the button below to run a complete email deliverability diagnostic check. Results will appear in the sections above.', 'scalyn-mail-relay' ); ?></p>
+			<p class="scalyn-actions__note"><?php esc_html_e( 'Click the button below to run a complete email deliverability diagnostic check. This includes DNS validation (SPF, DKIM, DMARC, MX) and provider health checks (SMTP/TLS). Results will appear in the sections above.', 'scalyn-mail-relay' ); ?></p>
 			<div class="scalyn-actions">
 				<?php
 				ActionButton::render(

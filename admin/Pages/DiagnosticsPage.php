@@ -56,10 +56,21 @@ final class DiagnosticsPage {
 		$latest_score = $score_repo->find_latest();
 		$health_score = $latest_score ? (int) $latest_score['overall_score'] : null;
 
-		// Pre-calculate UI status values for each diagnostic check.
+		// Pre-calculate UI status and severity values for each diagnostic check.
 		$spf_ui_status   = $diagnostics['spf'] ? $this->get_ui_status( $diagnostics['spf']['status'] ) : 'unknown';
+		$spf_severity    = $diagnostics['spf'] ? $this->get_severity_class( $diagnostics['spf']['severity'] ?? '' ) : '';
+
+		$mx_ui_status    = $diagnostics['mx'] ? $this->get_ui_status( $diagnostics['mx']['status'] ) : 'unknown';
+		$mx_severity     = $diagnostics['mx'] ? $this->get_severity_class( $diagnostics['mx']['severity'] ?? '' ) : '';
+
 		$dkim_ui_status  = $diagnostics['dkim'] ? $this->get_ui_status( $diagnostics['dkim']['status'] ) : 'unknown';
+		$dkim_severity   = $diagnostics['dkim'] ? $this->get_severity_class( $diagnostics['dkim']['severity'] ?? '' ) : '';
+
 		$dmarc_ui_status = $diagnostics['dmarc'] ? $this->get_ui_status( $diagnostics['dmarc']['status'] ) : 'unknown';
+		$dmarc_severity  = $diagnostics['dmarc'] ? $this->get_severity_class( $diagnostics['dmarc']['severity'] ?? '' ) : '';
+
+		$smtp_tls_ui_status = $diagnostics['smtp_tls'] ? $this->get_ui_status( $diagnostics['smtp_tls']['status'] ) : 'unknown';
+		$smtp_tls_severity  = $diagnostics['smtp_tls'] ? $this->get_severity_class( $diagnostics['smtp_tls']['severity'] ?? '' ) : '';
 
 		require SCALYN_MAIL_RELAY_PATH . 'admin/views/diagnostics.php';
 	}
@@ -86,14 +97,23 @@ final class DiagnosticsPage {
 	 * Maps check_name (e.g., 'spf_record') to display keys (e.g., 'spf').
 	 * Returns an associative array keyed by diagnostic type, or null for missing checks.
 	 *
+	 * Supported checks:
+	 * - 'spf_record' → 'spf'
+	 * - 'mx_record' → 'mx'
+	 * - 'dkim_record' → 'dkim'
+	 * - 'dmarc_policy' → 'dmarc'
+	 * - 'smtp_tls' → 'smtp_tls'
+	 *
 	 * @param array<int, array<string, mixed>> $raw_results Rows from DiagnosticRepository.
 	 * @return array<string, array<string, mixed>|null> Organized by check type.
 	 */
 	private function organize_diagnostics( array $raw_results ): array {
 		$organized = array(
-			'spf'   => null,
-			'dkim'  => null,
-			'dmarc' => null,
+			'spf'      => null,
+			'mx'       => null,
+			'dkim'     => null,
+			'dmarc'    => null,
+			'smtp_tls' => null,
 		);
 
 		foreach ( $raw_results as $result ) {
@@ -101,10 +121,14 @@ final class DiagnosticsPage {
 
 			if ( 'spf_record' === $check_name ) {
 				$organized['spf'] = $result;
+			} elseif ( 'mx_record' === $check_name ) {
+				$organized['mx'] = $result;
 			} elseif ( 'dkim_record' === $check_name ) {
 				$organized['dkim'] = $result;
 			} elseif ( 'dmarc_policy' === $check_name ) {
 				$organized['dmarc'] = $result;
+			} elseif ( 'smtp_tls' === $check_name ) {
+				$organized['smtp_tls'] = $result;
 			}
 		}
 
@@ -124,6 +148,22 @@ final class DiagnosticsPage {
 			'fail'  => 'critical',
 			'error' => 'warning',
 			default => 'unknown',
+		};
+	}
+
+	/**
+	 * Maps a diagnostic check severity to a CSS class name.
+	 *
+	 * @param string $severity Severity from DiagnosticResult: 'low', 'medium', 'high', 'critical'.
+	 * @return string CSS class name for styling (e.g., 'scalyn-severity-high').
+	 */
+	private function get_severity_class( string $severity ): string {
+		return match ( $severity ) {
+			'low'      => 'scalyn-severity-low',
+			'medium'   => 'scalyn-severity-medium',
+			'high'     => 'scalyn-severity-high',
+			'critical' => 'scalyn-severity-critical',
+			default    => 'scalyn-severity-unknown',
 		};
 	}
 }

@@ -96,3 +96,16 @@
 .scalyn-finding__evidence { background: #f9f9f9; padding: 12px; border-radius: 3px; overflow-x: auto; font-size: 12px; font-family: monospace; line-height: 1.4; white-space: pre-wrap; word-wrap: break-word; }
 .scalyn-finding__impact { margin-top: 12px; padding: 12px; background: #fef8ee; border-left: 4px solid #f0c33c; color: #996800; font-size: 13px; line-height: 1.5; }
 .scalyn-finding__action { margin-top: 12px; padding: 12px; background: #f0f0f1; border-left: 4px solid #50575e; font-size: 13px; line-height: 1.5; }
+
+/* ---- Severity badges ---- */
+.scalyn-finding__severity { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin-right: 8px; margin-bottom: 8px; }
+.scalyn-severity-low { background: #f0f0f1; color: #50575e; }
+.scalyn-severity-medium { background: #fef8ee; color: #996800; border: 1px solid #f0c33c; }
+.scalyn-severity-high { background: #fef5e7; color: #996800; border: 1px solid #f0a6a7; }
+.scalyn-severity-critical { background: #fce8e8; color: #b32d2e; border: 1px solid #f0a6a7; }
+.scalyn-severity-unknown { background: #f0f0f1; color: #50575e; }
+
+/* ---- Diagnostic sections ---- */
+.scalyn-diagnostics-section { margin-bottom: 32px; }
+.scalyn-diagnostics-section__title { margin-top: 0; margin-bottom: 8px; font-size: 16px; font-weight: 600; color: #1e1e1e; }
+.scalyn-diagnostics-section__description { margin: 0 0 16px; color: #50575e; font-size: 14px; }
