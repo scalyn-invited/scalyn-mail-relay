@@ -346,9 +346,10 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 			case 6:
 				?>
 				<h2><?php esc_html_e( 'Initial Health Check', 'scalyn-mail-relay' ); ?></h2>
-				<div class="scalyn-empty-state">
-					<p class="scalyn-empty-state__message"><?php esc_html_e( 'Health check is not yet available. The health check module will verify SPF, DKIM, and DMARC records and produce your first email health score once it is implemented.', 'scalyn-mail-relay' ); ?></p>
-				</div>
+				<p><?php esc_html_e( 'Your email health check is ready. The diagnostics module will verify SPF, DKIM, DMARC, and MX records and produce your email health score.', 'scalyn-mail-relay' ); ?></p>
+				<p class="description">
+					<?php esc_html_e( 'After completing this wizard, visit the Diagnostics page to run your first health check and view detailed findings and remediation guidance.', 'scalyn-mail-relay' ); ?>
+				</p>
 				<?php
 				break;
 
@@ -360,7 +361,7 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 				<?php if ( '' !== $active_provider_id ) : ?>
 					<p><?php esc_html_e( 'Your SMTP mail provider has been configured.', 'scalyn-mail-relay' ); ?></p>
 					<p class="description">
-						<?php esc_html_e( 'Connection test and test email results are action-based and are not persisted here. Use the connection test and test email steps to verify your SMTP settings. Email health diagnostics are not yet implemented.', 'scalyn-mail-relay' ); ?>
+						<?php esc_html_e( 'Visit the Diagnostics page to run email health checks, verify DNS configuration (SPF/DKIM/DMARC/MX), and view detailed findings with remediation guidance. Recent mail failures are automatically classified and monitored.', 'scalyn-mail-relay' ); ?>
 					</p>
 				<?php else : ?>
 					<div class="notice notice-warning inline">
