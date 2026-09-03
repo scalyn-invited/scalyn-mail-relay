@@ -225,13 +225,10 @@ defined( 'ABSPATH' ) || exit;
 					$health_ui_label,
 					function () use ( $health_score ) {
 						if ( null === $health_score ) {
-							echo '<strong class="scalyn-score" aria-label="' . esc_attr__( 'Health score not yet assessed', 'scalyn-mail-relay' ) . '">—</strong>';
 							echo '<p class="scalyn-card__note">' . esc_html__( 'Run diagnostics to generate your email health score based on SPF, DKIM, DMARC, MX, and SMTP/TLS verification.', 'scalyn-mail-relay' ) . '</p>';
 							return;
 						}
 
-						/* translators: %d is the health score number (0-100) */
-						echo '<strong class="scalyn-score" aria-label="' . esc_attr( sprintf( __( 'Health score: %d out of 100', 'scalyn-mail-relay' ), $health_score ) ) . '">' . esc_html( $health_score ) . '</strong>';
 						echo '<p class="scalyn-card__note">' . esc_html__( 'Your email health score is based on the results of all diagnostic checks (SPF, DKIM, DMARC, MX, and SMTP/TLS).', 'scalyn-mail-relay' ) . '</p>';
 					},
 					'scalyn-diagnostics-health-card-heading'

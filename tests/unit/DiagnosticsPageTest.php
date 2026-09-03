@@ -205,8 +205,9 @@ final class DiagnosticsPageTest extends TestCase {
 		// Button should now be enabled with the REST endpoint URL.
 		$this->assertStringContainsString( 'href="http://example.com/wp-json/scalyn-mail-relay/v1/diagnostics/run"', $output );
 		$this->assertStringContainsString( 'button button-primary', $output );
-		$this->assertStringContainsString( '>—</strong>', $output );
-		$this->assertStringContainsString( 'aria-label="Health score not yet assessed"', $output );
+		// Health score displays as a badge (from StatusBadge), not as duplicate large text.
+		$this->assertStringContainsString( 'Unknown', $output );
+		$this->assertStringContainsString( 'Run diagnostics to generate', $output );
 	}
 
 	/**
@@ -382,8 +383,9 @@ final class DiagnosticsPageTest extends TestCase {
 		$this->set_mock_diagnostic_data( $mock_results );
 		$output = $this->render_and_capture();
 
-		// When data exists, health score should be rendered with a numeric value.
-		// The actual value depends on backend calculation, so we just verify presence.
-		$this->assertStringContainsString( 'scalyn-score', $output );
+		// When data exists, health score is displayed in the StatusBadge (e.g., "81/100").
+		// The duplicate large-text display was removed to avoid redundancy (issue #19).
+		$this->assertStringContainsString( 'Health Score', $output );
+		$this->assertStringContainsString( 'scalyn-badge', $output );
 	}
 }

@@ -29,8 +29,9 @@ final class ActionButton {
 	 * @param bool   $disabled       Whether to force a disabled state regardless of URL.
 	 * @param string $id             Optional button ID (e.g., 'scalyn-run-diagnostics').
 	 * @param array  $data_attrs     Optional array of data-* attributes, keyed without 'data-' prefix.
+	 * @param bool   $is_primary     Whether to style as primary button (default true). Secondary buttons use .button only.
 	 */
-	public static function render( string $label, string $url = '', bool $disabled = false, string $id = '', array $data_attrs = array() ): void {
+	public static function render( string $label, string $url = '', bool $disabled = false, string $id = '', array $data_attrs = array(), bool $is_primary = true ): void {
 		$id_attr = $id ? sprintf( ' id="%s"', esc_attr( $id ) ) : '';
 		$data_attr_str = '';
 		foreach ( $data_attrs as $key => $value ) {
@@ -47,9 +48,11 @@ final class ActionButton {
 			return;
 		}
 
+		$primary_class = $is_primary ? ' button-primary' : '';
 		printf(
-			'<a href="%s" class="button button-primary scalyn-action-btn"%s%s>%s</a>',
+			'<a href="%s" class="button%s scalyn-action-btn"%s%s>%s</a>',
 			esc_url( $url ),
+			$primary_class,
 			$id_attr,
 			$data_attr_str,
 			esc_html( $label )

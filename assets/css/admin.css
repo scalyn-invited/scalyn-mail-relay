@@ -43,7 +43,7 @@
 .scalyn-actions-card { margin-top: 20px; }
 .scalyn-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
 .scalyn-actions__note { margin: 0; }
-.scalyn-action-btn[disabled] { opacity: .6; cursor: not-allowed; pointer-events: none; }
+.scalyn-action-btn[disabled] { opacity: .6; cursor: not-allowed; }
 
 /* ---- Mail log status badges ---- */
 .scalyn-badge--accepted { background: #edfaef; color: #00a32a; border: 1px solid #b8e6bf; }
@@ -84,9 +84,16 @@
 
 /* ---- Diagnostic results ---- */
 .scalyn-diagnostics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 20px; }
-.scalyn-diagnostic-card { /* Inherits .scalyn-card base styles */ }
 .scalyn-diagnostic-card__status { margin-top: 8px; }
 .scalyn-diagnostic-card__content { margin-top: 12px; }
+
+/* ---- Provider option radio ---- */
+.scalyn-provider-option { display: flex; align-items: center; padding: 12px; margin: 8px 0; border: 1px solid #dcdcde; border-radius: 4px; cursor: pointer; transition: all 0.15s ease-in-out; }
+.scalyn-provider-option:hover { border-color: #2271b1; background-color: #f5f5f5; }
+.scalyn-provider-option input[type="radio"] { margin-right: 12px; cursor: pointer; }
+.scalyn-provider-option input[type="radio"]:checked + label { color: #2271b1; font-weight: 500; }
+.scalyn-provider-option label { cursor: pointer; margin: 0; }
+.scalyn-provider-option:focus-within { box-shadow: inset 0 0 0 2px #2271b1; }
 
 /* ---- Diagnostic findings display ---- */
 .scalyn-finding__message { margin: 8px 0; font-weight: 500; line-height: 1.5; }
@@ -101,7 +108,7 @@
 .scalyn-finding__severity { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin-right: 8px; margin-bottom: 8px; }
 .scalyn-severity-low { background: #f0f0f1; color: #50575e; }
 .scalyn-severity-medium { background: #fef8ee; color: #996800; border: 1px solid #f0c33c; }
-.scalyn-severity-high { background: #fef5e7; color: #996800; border: 1px solid #f0a6a7; }
+.scalyn-severity-high { background: #fdf0ef; color: #b32d2e; border: 1px solid #d86b72; }
 .scalyn-severity-critical { background: #fce8e8; color: #b32d2e; border: 1px solid #f0a6a7; }
 .scalyn-severity-unknown { background: #f0f0f1; color: #50575e; }
 
