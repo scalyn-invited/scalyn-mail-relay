@@ -38,12 +38,27 @@ $status_labels = array(
 
 	<?php if ( $uuid_error ) : ?>
 
-		<div class="scalyn-card">
-			<?php
-			EmptyState::render(
-				__( 'The message ID is not valid. Please use the View Timeline link from the Email Logs table.', 'scalyn-mail-relay' )
-			);
-			?>
+		<div class="scalyn-card scalyn-error-state">
+			<h2><?php esc_html_e( 'Invalid Message ID', 'scalyn-mail-relay' ); ?></h2>
+			<p><?php esc_html_e( 'The message ID format is not valid.', 'scalyn-mail-relay' ); ?></p>
+			<p class="description">
+				<?php esc_html_e( 'Valid message IDs are UUIDs in the format:', 'scalyn-mail-relay' ); ?><br />
+				<code>xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx</code><br />
+				<?php esc_html_e( '(where x is a hexadecimal digit 0-9, a-f)', 'scalyn-mail-relay' ); ?>
+			</p>
+			<p>
+				<?php esc_html_e( 'To find a specific email:', 'scalyn-mail-relay' ); ?>
+			</p>
+			<ol>
+				<li><?php esc_html_e( 'Go to the Email Logs page', 'scalyn-mail-relay' ); ?></li>
+				<li><?php esc_html_e( 'Find the message in the table', 'scalyn-mail-relay' ); ?></li>
+				<li><?php esc_html_e( 'Click the "View Timeline" link', 'scalyn-mail-relay' ); ?></li>
+			</ol>
+			<p>
+				<a href="<?php echo esc_url( $logs_base_url ); ?>" class="button">
+					<?php esc_html_e( 'Back to Email Logs', 'scalyn-mail-relay' ); ?>
+				</a>
+			</p>
 		</div>
 
 	<?php elseif ( null === $log ) : ?>

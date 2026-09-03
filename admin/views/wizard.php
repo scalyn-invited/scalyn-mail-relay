@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * Setup Wizard view.
  *
@@ -45,7 +45,11 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 				}
 				?>
 				<li class="<?php echo esc_attr( $step_class ); ?>">
-					<span class="scalyn-wizard-step__number" aria-hidden="true"><?php echo esc_html( (string) $num ); ?></span>
+					<?php if ( $num < $current_step ) : ?>
+						<span class="scalyn-wizard-step__number" aria-hidden="true">✓</span>
+					<?php else : ?>
+						<span class="scalyn-wizard-step__number" aria-hidden="true"><?php echo esc_html( (string) $num ); ?></span>
+					<?php endif; ?>
 					<span class="scalyn-wizard-step__label"><?php echo esc_html( $label ); ?></span>
 					<span class="screen-reader-text"><?php echo esc_html( $aria_status ); ?></span>
 				</li>
