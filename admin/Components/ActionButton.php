@@ -39,6 +39,7 @@ final class ActionButton {
 		}
 
 		if ( $disabled || '' === $url ) {
+			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $id_attr and $data_attr_str are pre-escaped with esc_attr().
 			printf(
 				'<button type="button" class="button scalyn-action-btn"%s%s disabled aria-disabled="true">%s</button>',
 				$id_attr,
@@ -49,6 +50,7 @@ final class ActionButton {
 		}
 
 		$primary_class = $is_primary ? ' button-primary' : '';
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $id_attr and $data_attr_str are pre-escaped with esc_attr().
 		printf(
 			'<a href="%s" class="button%s scalyn-action-btn"%s%s>%s</a>',
 			esc_url( $url ),
