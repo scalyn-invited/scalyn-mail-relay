@@ -66,8 +66,7 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 					<li><?php esc_html_e( 'Enter provider credentials', 'scalyn-mail-relay' ); ?></li>
 					<li><?php esc_html_e( 'Verify the connection', 'scalyn-mail-relay' ); ?></li>
 					<li><?php esc_html_e( 'Send a test email', 'scalyn-mail-relay' ); ?></li>
-					<li><?php esc_html_e( 'Run an initial health check', 'scalyn-mail-relay' ); ?></li>
-				</ol>
+						</ol>
 				<p class="description"><?php esc_html_e( 'SMTP acceptance by a provider does not guarantee inbox delivery. Scalyn Mail Relay will help you identify and resolve deliverability issues.', 'scalyn-mail-relay' ); ?></p>
 				<?php
 				break;
@@ -344,17 +343,6 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 
 			// -----------------------------------------------------------------
 			case 6:
-				?>
-				<h2><?php esc_html_e( 'Initial Health Check', 'scalyn-mail-relay' ); ?></h2>
-				<p><?php esc_html_e( 'Your email health check is ready. The diagnostics module will verify SPF, DKIM, DMARC, and MX records and produce your email health score.', 'scalyn-mail-relay' ); ?></p>
-				<p class="description">
-					<?php esc_html_e( 'After completing this wizard, visit the Diagnostics page to run your first health check and view detailed findings and remediation guidance.', 'scalyn-mail-relay' ); ?>
-				</p>
-				<?php
-				break;
-
-			// -----------------------------------------------------------------
-			case 7:
 				?>
 				<h2><?php esc_html_e( 'SMTP Configuration Complete', 'scalyn-mail-relay' ); ?></h2>
 
