@@ -128,9 +128,9 @@ final class AdminMenu {
 				'scalyn-mail-relay-admin',
 				'scalynMailRelaySettings',
 				array(
-					'restNonce'   => wp_create_nonce( 'wp_rest' ),
+					'restNonce'    => wp_create_nonce( 'wp_rest' ),
 					'runningLabel' => __( 'Running...', 'scalyn-mail-relay' ),
-					'errorPrefix' => __( 'Error running diagnostics:', 'scalyn-mail-relay' ),
+					'errorPrefix'  => __( 'Error running diagnostics:', 'scalyn-mail-relay' ),
 				)
 			);
 			wp_set_script_translations( 'scalyn-mail-relay-admin', 'scalyn-mail-relay' );

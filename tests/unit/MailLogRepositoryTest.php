@@ -232,7 +232,12 @@ final class MailLogRepositoryTest extends TestCase {
 	public function test_upsert_reads_source_type_from_context(): void {
 		$this->wpdb->get_var_return = null;
 		$message                    = $this->make_message(
-			array( 'context' => array( 'source_type' => 'woocommerce', 'source_name' => 'order_complete' ) )
+			array(
+				'context' => array(
+					'source_type' => 'woocommerce',
+					'source_name' => 'order_complete',
+				),
+			)
 		);
 
 		$this->make_repo()->upsert( $message, $this->make_success_result(), MailStatus::ACCEPTED );
@@ -320,7 +325,11 @@ final class MailLogRepositoryTest extends TestCase {
 	}
 
 	public function test_find_by_uuid_returns_row_when_found(): void {
-		$expected                   = array( 'id' => '1', 'message_uuid' => 'uuid-xyz', 'status' => 'accepted' );
+		$expected                   = array(
+			'id'           => '1',
+			'message_uuid' => 'uuid-xyz',
+			'status'       => 'accepted',
+		);
 		$this->wpdb->get_row_return = $expected;
 
 		$result = $this->make_repo()->find_by_uuid( 'uuid-xyz' );
@@ -342,8 +351,14 @@ final class MailLogRepositoryTest extends TestCase {
 
 	public function test_find_recent_returns_configured_rows(): void {
 		$rows                           = array(
-			array( 'id' => '2', 'status' => 'accepted' ),
-			array( 'id' => '1', 'status' => 'failed' ),
+			array(
+				'id'     => '2',
+				'status' => 'accepted',
+			),
+			array(
+				'id'     => '1',
+				'status' => 'failed',
+			),
 		);
 		$this->wpdb->get_results_return = $rows;
 
@@ -397,7 +412,7 @@ final class MailLogRepositoryTest extends TestCase {
 	 * The subscriber's catch boundary absorbs it; mail delivery is unaffected.
 	 */
 	public function test_upsert_throws_runtime_exception_when_insert_fails(): void {
-		$this->wpdb->get_var_return      = null; // No existing row → INSERT path.
+		$this->wpdb->get_var_return         = null; // No existing row → INSERT path.
 		$this->wpdb->return_false_on_insert = true;
 
 		$this->expectException( \RuntimeException::class );
@@ -409,7 +424,7 @@ final class MailLogRepositoryTest extends TestCase {
 	 * no $wpdb->last_error, no SQL, no credentials, no provider metadata.
 	 */
 	public function test_upsert_insert_exception_message_is_safe(): void {
-		$this->wpdb->get_var_return      = null;
+		$this->wpdb->get_var_return         = null;
 		$this->wpdb->return_false_on_insert = true;
 
 		try {
@@ -429,7 +444,7 @@ final class MailLogRepositoryTest extends TestCase {
 	 * When $wpdb->update() returns false, upsert() must throw RuntimeException.
 	 */
 	public function test_upsert_throws_runtime_exception_when_update_fails(): void {
-		$this->wpdb->get_var_return      = '42'; // Existing row → UPDATE path.
+		$this->wpdb->get_var_return         = '42'; // Existing row → UPDATE path.
 		$this->wpdb->return_false_on_update = true;
 
 		$this->expectException( \RuntimeException::class );
@@ -440,7 +455,7 @@ final class MailLogRepositoryTest extends TestCase {
 	 * The UPDATE failure exception message must be a fixed safe string.
 	 */
 	public function test_upsert_update_exception_message_is_safe(): void {
-		$this->wpdb->get_var_return      = '1';
+		$this->wpdb->get_var_return         = '1';
 		$this->wpdb->return_false_on_update = true;
 
 		try {
@@ -467,8 +482,14 @@ final class MailLogRepositoryTest extends TestCase {
 
 	public function test_count_recent_by_status_maps_status_to_row_count(): void {
 		$this->wpdb->get_results_return = array(
-			array( 'status' => MailStatus::ACCEPTED, 'row_count' => '42' ),
-			array( 'status' => MailStatus::FAILED, 'row_count' => '3' ),
+			array(
+				'status'    => MailStatus::ACCEPTED,
+				'row_count' => '42',
+			),
+			array(
+				'status'    => MailStatus::FAILED,
+				'row_count' => '3',
+			),
 		);
 
 		$counts = $this->make_repo()->count_recent_by_status();
@@ -479,7 +500,10 @@ final class MailLogRepositoryTest extends TestCase {
 
 	public function test_count_recent_by_status_omits_statuses_with_no_rows(): void {
 		$this->wpdb->get_results_return = array(
-			array( 'status' => MailStatus::ACCEPTED, 'row_count' => '5' ),
+			array(
+				'status'    => MailStatus::ACCEPTED,
+				'row_count' => '5',
+			),
 		);
 
 		$counts = $this->make_repo()->count_recent_by_status();

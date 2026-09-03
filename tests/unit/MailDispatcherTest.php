@@ -35,14 +35,19 @@ final class MailDispatcherTest extends TestCase {
 	private function make_provider( string $id, bool $success ): ProviderInterface {
 		return new class( $id, $success ) implements ProviderInterface {
 			public function __construct( private string $id, private bool $success ) {}
-			public function get_id(): string { return $this->id; }
-			public function get_label(): string { return 'Test Provider'; }
-			public function validate_config( array $config ): ValidationResult { return new ValidationResult( true ); }
-			public function test_connection( array $config ): ConnectionResult { return new ConnectionResult( true ); }
+			public function get_id(): string {
+				return $this->id; }
+			public function get_label(): string {
+				return 'Test Provider'; }
+			public function validate_config( array $config ): ValidationResult {
+				return new ValidationResult( true ); }
+			public function test_connection( array $config ): ConnectionResult {
+				return new ConnectionResult( true ); }
 			public function send( MailMessage $message, array $config ): SendResult {
 				return new SendResult( $this->success, $this->id );
 			}
-			public function get_capabilities(): array { return array(); }
+			public function get_capabilities(): array {
+				return array(); }
 		};
 	}
 
@@ -214,7 +219,10 @@ final class MailDispatcherTest extends TestCase {
 		$GLOBALS['_test_wp_actions'][ HookNames::MAIL_SENT ] = static function (
 			SendResult $result,
 			MailMessage $message
-		) use ( &$captured_result, &$captured_message ): void {
+		) use (
+			&$captured_result,
+			&$captured_message
+): void {
 			$captured_result  = $result;
 			$captured_message = $message;
 		};

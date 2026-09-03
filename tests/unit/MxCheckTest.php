@@ -58,10 +58,10 @@ final class MxCheckTest extends TestCase {
 
 	public static function invalidDomainProvider(): array {
 		return array(
-			'ip literal'     => array( '192.168.1.1' ),
-			'no tld'         => array( 'example' ),
-			'wildcard'       => array( '*.example.com' ),
-			'control chars'  => array( "example.com\r\nInjected" ),
+			'ip literal'    => array( '192.168.1.1' ),
+			'no tld'        => array( 'example' ),
+			'wildcard'      => array( '*.example.com' ),
+			'control chars' => array( "example.com\r\nInjected" ),
 		);
 	}
 

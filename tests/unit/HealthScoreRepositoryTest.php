@@ -131,7 +131,10 @@ final class HealthScoreRepositoryTest extends TestCase {
 	}
 
 	public function test_find_latest_returns_configured_row(): void {
-		$row                        = array( 'id' => '1', 'overall_score' => 80 );
+		$row                        = array(
+			'id'            => '1',
+			'overall_score' => 80,
+		);
 		$this->wpdb->get_row_return = $row;
 
 		$this->assertSame( $row, $this->make_repo()->find_latest() );
@@ -158,7 +161,7 @@ final class HealthScoreRepositoryTest extends TestCase {
 	}
 
 	public function test_find_recent_returns_configured_rows(): void {
-		$rows                            = array( array( 'id' => '1' ), array( 'id' => '2' ) );
+		$rows                           = array( array( 'id' => '1' ), array( 'id' => '2' ) );
 		$this->wpdb->get_results_return = $rows;
 
 		$this->assertSame( $rows, $this->make_repo()->find_recent() );

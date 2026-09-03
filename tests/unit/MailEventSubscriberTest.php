@@ -42,7 +42,7 @@ final class MailEventSubscriberTest extends TestCase {
 	}
 
 	protected function tearDown(): void {
-		$GLOBALS['_test_current_time'] = null;
+		$GLOBALS['_test_current_time']     = null;
 		$GLOBALS['_test_wp_added_actions'] = array();
 		unset( $GLOBALS['wpdb'] );
 	}
@@ -68,7 +68,10 @@ final class MailEventSubscriberTest extends TestCase {
 			content_type: 'text/html',
 			headers: array(),
 			attachments: array(),
-			context: $overrides['context'] ?? array( 'source_type' => 'test', 'source_name' => 'PHPUnit' )
+			context: $overrides['context'] ?? array(
+				'source_type' => 'test',
+				'source_name' => 'PHPUnit',
+			)
 		);
 	}
 
@@ -105,11 +108,13 @@ final class MailEventSubscriberTest extends TestCase {
 	 * @return array<int, array<string, mixed>>
 	 */
 	private function inserts_for_table( string $table_fragment ): array {
-		return array_values( array_filter(
-			array_map( fn( $i ) => $i['data'], $this->wpdb->inserts ),
-			fn( $data, $idx ) => false !== strpos( $this->wpdb->inserts[ $idx ]['table'], $table_fragment ),
-			ARRAY_FILTER_USE_BOTH
-		) );
+		return array_values(
+			array_filter(
+				array_map( fn( $i ) => $i['data'], $this->wpdb->inserts ),
+				fn( $data, $idx ) => false !== strpos( $this->wpdb->inserts[ $idx ]['table'], $table_fragment ),
+				ARRAY_FILTER_USE_BOTH
+			)
+		);
 	}
 
 	// -------------------------------------------------------------------------
@@ -268,7 +273,12 @@ final class MailEventSubscriberTest extends TestCase {
 	public function test_on_mail_sent_event_data_excludes_metadata(): void {
 		$this->wpdb->get_var_return = null;
 		$result                     = $this->make_success_result(
-			array( 'metadata' => array( 'api_key' => 'secret-api-key', 'password' => 'smtp-password' ) )
+			array(
+				'metadata' => array(
+					'api_key'  => 'secret-api-key',
+					'password' => 'smtp-password',
+				),
+			)
 		);
 
 		$this->make_subscriber()->on_mail_sent( $result, $this->make_message() );
@@ -482,12 +492,18 @@ final class MailEventSubscriberTest extends TestCase {
 	private function make_stub_provider( SendResult $result ): ProviderInterface {
 		return new class( $result ) implements ProviderInterface {
 			public function __construct( private SendResult $r ) {}
-			public function get_id(): string { return 'smtp'; }
-			public function get_label(): string { return 'SMTP'; }
-			public function get_capabilities(): array { return array(); }
-			public function validate_config( array $config ): ValidationResult { return new ValidationResult( true ); }
-			public function test_connection( array $config ): ConnectionResult { return new ConnectionResult( true ); }
-			public function send( MailMessage $message, array $config ): SendResult { return $this->r; }
+			public function get_id(): string {
+				return 'smtp'; }
+			public function get_label(): string {
+				return 'SMTP'; }
+			public function get_capabilities(): array {
+				return array(); }
+			public function validate_config( array $config ): ValidationResult {
+				return new ValidationResult( true ); }
+			public function test_connection( array $config ): ConnectionResult {
+				return new ConnectionResult( true ); }
+			public function send( MailMessage $message, array $config ): SendResult {
+				return $this->r; }
 		};
 	}
 

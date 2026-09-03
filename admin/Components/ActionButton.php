@@ -32,7 +32,7 @@ final class ActionButton {
 	 * @param bool   $is_primary     Whether to style as primary button (default true). Secondary buttons use .button only.
 	 */
 	public static function render( string $label, string $url = '', bool $disabled = false, string $id = '', array $data_attrs = array(), bool $is_primary = true ): void {
-		$id_attr = $id ? sprintf( ' id="%s"', esc_attr( $id ) ) : '';
+		$id_attr       = $id ? sprintf( ' id="%s"', esc_attr( $id ) ) : '';
 		$data_attr_str = '';
 		foreach ( $data_attrs as $key => $value ) {
 			$data_attr_str .= sprintf( ' data-%s="%s"', esc_attr( $key ), esc_attr( $value ) );

@@ -126,7 +126,13 @@ final class HealthScorerTest extends TestCase {
 	// -------------------------------------------------------------------------
 
 	public function test_failure_score_derived_from_accepted_and_failed_counts(): void {
-		$result = $this->make_scorer()->score( array(), array( 'accepted' => 9, 'failed' => 1 ) );
+		$result = $this->make_scorer()->score(
+			array(),
+			array(
+				'accepted' => 9,
+				'failed'   => 1,
+			)
+		);
 
 		$this->assertSame( 90, $result->failure_score );
 	}
@@ -193,7 +199,13 @@ final class HealthScorerTest extends TestCase {
 			$this->row( 'smtp', 'pass' ),
 		);
 
-		$result = $this->make_scorer()->score( $rows, array( 'accepted' => 10, 'failed' => 0 ) );
+		$result = $this->make_scorer()->score(
+			$rows,
+			array(
+				'accepted' => 10,
+				'failed'   => 0,
+			)
+		);
 
 		$this->assertSame( 100, $result->overall_score );
 	}

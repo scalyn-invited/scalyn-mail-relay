@@ -74,7 +74,10 @@ defined( 'ABSPATH' ) || exit;
 					$diagnostics_run_url,
 					false,
 					'scalyn-run-diagnostics',
-					array( 'scalyn-action' => 'run-diagnostics', 'endpoint' => $diagnostics_run_url ),
+					array(
+						'scalyn-action' => 'run-diagnostics',
+						'endpoint'      => $diagnostics_run_url,
+					),
 					true
 				);
 				?>

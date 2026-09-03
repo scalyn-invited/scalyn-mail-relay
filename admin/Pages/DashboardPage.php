@@ -59,8 +59,8 @@ final class DashboardPage {
 		}
 
 		// Fetch health score from latest diagnostic run.
-		$diagnostic_repo = $container->get( DiagnosticRepository::class );
-		$run_data        = $diagnostic_repo->find_latest_run();
+		$diagnostic_repo  = $container->get( DiagnosticRepository::class );
+		$run_data         = $diagnostic_repo->find_latest_run();
 		$health_score     = $run_data['health_score'];
 		$health_ui_status = null !== $health_score ? ( $health_score >= 80 ? 'healthy' : ( $health_score >= 60 ? 'warning' : 'critical' ) ) : 'unknown';
 		/* translators: %d is the numeric health score out of 100 */

@@ -230,7 +230,7 @@ final class LogsPageTest extends TestCase {
 
 	public function test_list_view_shows_prev_link_on_page_two(): void {
 		$this->grant_view_logs();
-		$_GET['paged']                  = '2';
+		$_GET['paged'] = '2';
 		// Need at least one row so the table (with pagination) renders.
 		$this->wpdb->get_results_return = array( $this->make_log_row() );
 
@@ -386,8 +386,8 @@ final class LogsPageTest extends TestCase {
 		$this->wpdb->get_results_return = array(
 			$this->make_log_row(
 				array(
-					'status'   => 'failed',
-					'sent_at'  => null,
+					'status'    => 'failed',
+					'sent_at'   => null,
 					'failed_at' => '2026-08-24 10:00:00',
 				)
 			),
@@ -643,7 +643,12 @@ final class LogsPageTest extends TestCase {
 		$uuid                 = '550e8400-e29b-41d4-a716-446655440000';
 		$_GET['message_uuid'] = $uuid;
 
-		$this->wpdb->get_row_return     = $this->make_log_row( array( 'message_uuid' => $uuid, 'status' => 'accepted' ) );
+		$this->wpdb->get_row_return     = $this->make_log_row(
+			array(
+				'message_uuid' => $uuid,
+				'status'       => 'accepted',
+			)
+		);
 		$this->wpdb->get_results_return = array( $this->make_timeline_event( array( 'message_uuid' => $uuid ) ) );
 
 		$output = $this->render_and_capture();

@@ -19,11 +19,11 @@ use Scalyn\MailRelay\Contracts\ProviderInterface;
  * Allows control of validate_config, test_connection, and send results.
  */
 final class WizardTestProvider implements ProviderInterface {
-	public string $id    = 'smtp';
-	public string $label = 'SMTP (Test)';
+	public string $id                           = 'smtp';
+	public string $label                        = 'SMTP (Test)';
 	public ?ValidationResult $validation_result = null;
 	public ?ConnectionResult $connection_result = null;
-	public ?SendResult $send_result = null;
+	public ?SendResult $send_result             = null;
 
 	/** Records the config passed to validate_config(). */
 	public array $last_validate_config = array();
@@ -34,9 +34,12 @@ final class WizardTestProvider implements ProviderInterface {
 	/** Tracks whether send() was called. */
 	public bool $send_called = false;
 
-	public function get_id(): string { return $this->id; }
-	public function get_label(): string { return $this->label; }
-	public function get_capabilities(): array { return array(); }
+	public function get_id(): string {
+		return $this->id; }
+	public function get_label(): string {
+		return $this->label; }
+	public function get_capabilities(): array {
+		return array(); }
 
 	public function validate_config( array $config ): ValidationResult {
 		$this->last_validate_config = $config;
@@ -57,7 +60,7 @@ final class WizardTestProvider implements ProviderInterface {
 final class WizardControllerTest extends TestCase {
 
 	private WizardTestProvider $provider;
-	private ProviderRegistry   $registry;
+	private ProviderRegistry $registry;
 
 	protected function setUp(): void {
 		// Reset Plugin singleton so each test gets a fresh Container.
@@ -168,7 +171,10 @@ final class WizardControllerTest extends TestCase {
 	}
 
 	public function test_step2_missing_capability_dies(): void {
-		$_POST = array( 'wizard_step' => '2', 'provider_id' => 'smtp' );
+		$_POST = array(
+			'wizard_step' => '2',
+			'provider_id' => 'smtp',
+		);
 		// No capability granted.
 
 		$this->expectException( RuntimeException::class );
@@ -304,7 +310,9 @@ final class WizardControllerTest extends TestCase {
 			$fresh->get_active_provider_id(),
 			'Step 3 save must not overwrite provider.active written during Step 2.'
 		);
-		$this->assertSame( 'smtp.example.com', $fresh->get_smtp_config()['host'],
+		$this->assertSame(
+			'smtp.example.com',
+			$fresh->get_smtp_config()['host'],
 			'SMTP settings saved in Step 3 must also be readable from a fresh instance.'
 		);
 	}
@@ -344,7 +352,7 @@ final class WizardControllerTest extends TestCase {
 		$GLOBALS['_test_wp_options'][ SettingsRepository::OPTION_KEY ] = array(
 			'provider' => array( 'active' => 'smtp' ),
 		);
-		$this->provider->connection_result = new ConnectionResult( true, 'Connected.' );
+		$this->provider->connection_result                             = new ConnectionResult( true, 'Connected.' );
 		$this->post_step( 4 );
 
 		$this->run_handle();
@@ -358,7 +366,7 @@ final class WizardControllerTest extends TestCase {
 		$GLOBALS['_test_wp_options'][ SettingsRepository::OPTION_KEY ] = array(
 			'provider' => array( 'active' => 'smtp' ),
 		);
-		$this->provider->connection_result = new ConnectionResult( true, 'Successfully connected to the configured SMTP server.' );
+		$this->provider->connection_result                             = new ConnectionResult( true, 'Successfully connected to the configured SMTP server.' );
 		$this->post_step( 4 );
 
 		$this->run_handle();
@@ -373,7 +381,7 @@ final class WizardControllerTest extends TestCase {
 		$GLOBALS['_test_wp_options'][ SettingsRepository::OPTION_KEY ] = array(
 			'provider' => array( 'active' => 'smtp' ),
 		);
-		$this->provider->connection_result = new ConnectionResult( false, 'Unable to connect to the SMTP server.' );
+		$this->provider->connection_result                             = new ConnectionResult( false, 'Unable to connect to the SMTP server.' );
 		$this->post_step( 4 );
 
 		$this->run_handle();
@@ -387,7 +395,7 @@ final class WizardControllerTest extends TestCase {
 			'provider' => array( 'active' => 'smtp' ),
 			'smtp'     => array( 'password' => 'super-secret-password' ),
 		);
-		$this->provider->connection_result = new ConnectionResult( true, 'OK.' );
+		$this->provider->connection_result                             = new ConnectionResult( true, 'OK.' );
 		$this->post_step( 4 );
 
 		$this->run_handle();
@@ -450,9 +458,12 @@ final class WizardControllerTest extends TestCase {
 	public function test_step5_dispatches_via_mail_dispatcher(): void {
 		$GLOBALS['_test_wp_options'][ SettingsRepository::OPTION_KEY ] = array(
 			'provider' => array( 'active' => 'smtp' ),
-			'smtp'     => array( 'from_email' => 'from@example.com', 'from_name' => 'Test' ),
+			'smtp'     => array(
+				'from_email' => 'from@example.com',
+				'from_name'  => 'Test',
+			),
 		);
-		$this->provider->send_result = new SendResult( true, 'smtp', null, null, 'Message accepted by the configured SMTP server.', false );
+		$this->provider->send_result                                   = new SendResult( true, 'smtp', null, null, 'Message accepted by the configured SMTP server.', false );
 
 		$this->post_step( 5, array( 'test_recipient' => 'recipient@example.com' ) );
 
@@ -469,7 +480,7 @@ final class WizardControllerTest extends TestCase {
 			'provider' => array( 'active' => 'smtp' ),
 			'smtp'     => array( 'from_email' => 'from@example.com' ),
 		);
-		$this->provider->send_result = new SendResult( true, 'smtp', null, null, 'Message accepted by the configured SMTP server.', false );
+		$this->provider->send_result                                   = new SendResult( true, 'smtp', null, null, 'Message accepted by the configured SMTP server.', false );
 
 		$this->post_step( 5, array( 'test_recipient' => 'recipient@example.com' ) );
 		$this->run_handle();
@@ -483,7 +494,7 @@ final class WizardControllerTest extends TestCase {
 			'provider' => array( 'active' => 'smtp' ),
 			'smtp'     => array( 'from_email' => 'from@example.com' ),
 		);
-		$this->provider->send_result = new SendResult( false, 'smtp', null, null, 'SMTP transport failed.', false, 'network' );
+		$this->provider->send_result                                   = new SendResult( false, 'smtp', null, null, 'SMTP transport failed.', false, 'network' );
 
 		$this->post_step( 5, array( 'test_recipient' => 'recipient@example.com' ) );
 		$this->run_handle();
@@ -502,7 +513,7 @@ final class WizardControllerTest extends TestCase {
 				'from_name'  => 'Sender Name',
 			),
 		);
-		$this->provider->send_result = new SendResult( true, 'smtp' );
+		$this->provider->send_result                                   = new SendResult( true, 'smtp' );
 
 		$this->post_step( 5, array( 'test_recipient' => 'to@example.com' ) );
 		$this->run_handle();
@@ -521,7 +532,7 @@ final class WizardControllerTest extends TestCase {
 			'provider' => array( 'active' => 'smtp' ),
 			'smtp'     => array( 'from_email' => 'from@example.com' ),
 		);
-		$this->provider->send_result = new SendResult( true, 'smtp' );
+		$this->provider->send_result                                   = new SendResult( true, 'smtp' );
 
 		$this->post_step( 5, array( 'test_recipient' => 'to@example.com' ) );
 		$this->run_handle();
@@ -550,7 +561,7 @@ final class WizardControllerTest extends TestCase {
 			'provider' => array( 'active' => 'smtp' ),
 			'smtp'     => array( 'from_email' => 'from@example.com' ),
 		);
-		$this->provider->send_result = new SendResult( true, 'smtp' );
+		$this->provider->send_result                                   = new SendResult( true, 'smtp' );
 
 		$this->post_step( 5, array( 'test_recipient' => 'to@example.com' ) );
 		$this->run_handle();

@@ -88,7 +88,10 @@ final class TimelineRepositoryTest extends TestCase {
 	}
 
 	public function test_insert_event_json_encodes_event_data_array(): void {
-		$event_data = array( 'provider' => 'smtp', 'response_code' => '250' );
+		$event_data = array(
+			'provider'      => 'smtp',
+			'response_code' => '250',
+		);
 
 		$this->make_repo()->insert_event( 'uuid-001', 'mail_sent', MailStatus::ACCEPTED, 'Label', null, $event_data );
 
@@ -112,7 +115,10 @@ final class TimelineRepositoryTest extends TestCase {
 	public function test_insert_event_does_not_store_metadata_key(): void {
 		// Verify that even if caller accidentally passes metadata in event_data,
 		// this test acts as a guardrail for the subscriber's allowlist.
-		$safe_data = array( 'provider' => 'smtp', 'response_code' => null );
+		$safe_data = array(
+			'provider'      => 'smtp',
+			'response_code' => null,
+		);
 
 		$this->make_repo()->insert_event( 'uuid-001', 'mail_sent', MailStatus::ACCEPTED, 'Label', null, $safe_data );
 
@@ -149,9 +155,17 @@ final class TimelineRepositoryTest extends TestCase {
 	}
 
 	public function test_find_by_uuid_returns_configured_rows(): void {
-		$rows = array(
-			array( 'id' => '1', 'event_type' => 'mail_sent', 'event_status' => 'accepted' ),
-			array( 'id' => '2', 'event_type' => 'mail_sent', 'event_status' => 'accepted' ),
+		$rows                           = array(
+			array(
+				'id'           => '1',
+				'event_type'   => 'mail_sent',
+				'event_status' => 'accepted',
+			),
+			array(
+				'id'           => '2',
+				'event_type'   => 'mail_sent',
+				'event_status' => 'accepted',
+			),
 		);
 		$this->wpdb->get_results_return = $rows;
 

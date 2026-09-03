@@ -13,12 +13,18 @@ final class ProviderRegistryTest extends TestCase {
 	private function make_provider( string $id, string $label = 'Test Provider' ): ProviderInterface {
 		return new class( $id, $label ) implements ProviderInterface {
 			public function __construct( private string $id, private string $label ) {}
-			public function get_id(): string { return $this->id; }
-			public function get_label(): string { return $this->label; }
-			public function validate_config( array $config ): ValidationResult { return new ValidationResult( true ); }
-			public function test_connection( array $config ): ConnectionResult { return new ConnectionResult( true ); }
-			public function send( MailMessage $message, array $config ): SendResult { return new SendResult( true, $this->id ); }
-			public function get_capabilities(): array { return array(); }
+			public function get_id(): string {
+				return $this->id; }
+			public function get_label(): string {
+				return $this->label; }
+			public function validate_config( array $config ): ValidationResult {
+				return new ValidationResult( true ); }
+			public function test_connection( array $config ): ConnectionResult {
+				return new ConnectionResult( true ); }
+			public function send( MailMessage $message, array $config ): SendResult {
+				return new SendResult( true, $this->id ); }
+			public function get_capabilities(): array {
+				return array(); }
 		};
 	}
 
