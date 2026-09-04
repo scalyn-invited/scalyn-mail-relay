@@ -16,6 +16,14 @@ final class MailDispatcherTest extends TestCase {
 	protected function setUp(): void {
 		$GLOBALS['_test_wp_options'] = array();
 		$GLOBALS['_test_wp_actions'] = array();
+
+		// Other test cases (Plugin boot, service wiring) register a real
+		// MailEventSubscriber against the shared stub hook registry. Those
+		// listeners survive into this file and turn every dispatch() here into
+		// a repository write against a $wpdb that this test never sets up.
+		// The dispatcher is under test in isolation; it must not inherit
+		// foreign listeners.
+		$GLOBALS['_test_wp_added_actions'] = array();
 	}
 
 	// -------------------------------------------------------------------------
