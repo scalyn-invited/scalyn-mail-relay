@@ -7,11 +7,12 @@
 
 namespace Scalyn\MailRelay\Admin\Pages;
 
+use Scalyn\MailRelay\Admin\HealthScorePresenter;
 use Scalyn\MailRelay\Core\Capabilities;
 use Scalyn\MailRelay\Core\Plugin;
 use Scalyn\MailRelay\Core\ProviderRegistry;
 use Scalyn\MailRelay\Core\SettingsRepository;
-use Scalyn\MailRelay\Database\DiagnosticRepository;
+use Scalyn\MailRelay\Database\HealthScoreRepository;
 use Scalyn\MailRelay\Logging\MailLogRepository;
 
 defined( 'ABSPATH' ) || exit;
@@ -58,13 +59,14 @@ final class DashboardPage {
 			}
 		}
 
-		// Fetch health score from latest diagnostic run.
-		$diagnostic_repo  = $container->get( DiagnosticRepository::class );
-		$run_data         = $diagnostic_repo->find_latest_run();
-		$health_score     = $run_data['health_score'];
-		$health_ui_status = null !== $health_score ? ( $health_score >= 80 ? 'healthy' : ( $health_score >= 60 ? 'warning' : 'critical' ) ) : 'unknown';
-		/* translators: %d is the numeric health score out of 100 */
-		$health_ui_label = null !== $health_score ? sprintf( __( '%d/100', 'scalyn-mail-relay' ), $health_score ) : __( 'Unknown', 'scalyn-mail-relay' );
+		// Health score: read the last HealthScorer snapshot — the same source and
+		// presentation the Diagnostics page uses — so both screens agree.
+		$health            = HealthScorePresenter::present( $container->get( HealthScoreRepository::class )->find_latest() );
+		$health_score      = $health['score'];
+		$health_ui_status  = $health['ui_status'];
+		$health_ui_label   = $health['label'];
+		$health_components = $health['components'];
+		$health_summary    = $health['summary'];
 
 		// Wire the "Run Diagnostics" button to the REST endpoint.
 		$diagnostics_run_url = rest_url( 'scalyn-mail-relay/v1/diagnostics/run' );

@@ -21,9 +21,10 @@ defined( 'ABSPATH' ) || exit;
  * This restriction also applies to any data derived from $settings that is
  * later stored in DiagnosticResult::$raw or DiagnosticResult::$evidence.
  *
- * The complete diagnostics context architecture — including a credential-safe
- * context builder — will be designed when the Diagnostics module is implemented.
- * This value object is intentionally minimal until that work begins.
+ * Production callers must not construct this class from raw settings. Use
+ * DiagnosticContextBuilder, which copies only an explicit allowlist of
+ * non-sensitive SMTP keys (host, port, encryption) and derives the sending
+ * domain from the configured From address.
  */
 final class DiagnosticContext {
 

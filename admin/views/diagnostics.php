@@ -8,6 +8,10 @@
  *   string                       $diagnostics_run_url   URL to trigger diagnostics (empty if endpoint not ready).
  *   array<string, array|null>    $diagnostics           Results organized by check type, or null if no results.
  *   int|null                     $health_score          Overall health score (0-100) or null if no results.
+ *   string                       $health_ui_status      UI status for the score (healthy, warning, critical, unknown).
+ *   string                       $health_ui_label       Formatted score label (e.g., "80/100" or "Unknown").
+ *   array<string, int|null>      $health_components     Component label => score, or null when not evaluated.
+ *   string                       $health_summary        HealthScorer summary of what the score is based on, or ''.
  *   string                       $spf_ui_status         UI status for SPF (healthy, warning, critical, unknown).
  *   string                       $spf_severity          CSS class for SPF severity (scalyn-severity-*).
  *   string                       $mx_ui_status          UI status for MX (healthy, warning, critical, unknown).
@@ -34,6 +38,7 @@ use Scalyn\MailRelay\Admin\Components\ActionButton;
 use Scalyn\MailRelay\Admin\Components\DiagnosticResultCard;
 use Scalyn\MailRelay\Admin\Components\EvidenceDisplay;
 use Scalyn\MailRelay\Admin\Components\EmptyState;
+use Scalyn\MailRelay\Admin\Components\HealthScoreBreakdown;
 use Scalyn\MailRelay\Admin\Components\StatusBadge;
 
 defined( 'ABSPATH' ) || exit;
@@ -258,21 +263,21 @@ defined( 'ABSPATH' ) || exit;
 
 			<div class="scalyn-diagnostics-grid">
 				<?php
-				$health_ui_status = null !== $health_score ? ( $health_score >= 80 ? 'healthy' : ( $health_score >= 60 ? 'warning' : 'critical' ) ) : 'unknown';
-				/* translators: %d is the health score number (0-100) */
-				$health_ui_label = null !== $health_score ? sprintf( __( '%d/100', 'scalyn-mail-relay' ), $health_score ) : __( 'Unknown', 'scalyn-mail-relay' );
-
 				DiagnosticResultCard::render(
 					__( 'Health Score', 'scalyn-mail-relay' ),
 					$health_ui_status,
 					$health_ui_label,
-					function () use ( $health_score ) {
+					function () use ( $health_score, $health_components, $health_summary ) {
 						if ( null === $health_score ) {
-							echo '<p class="scalyn-card__note">' . esc_html__( 'Run diagnostics to generate your email health score based on SPF, DKIM, DMARC, MX, and SMTP/TLS verification.', 'scalyn-mail-relay' ) . '</p>';
+							echo '<p class="scalyn-card__note">' . esc_html__( 'Run diagnostics to generate your email health score. It combines DNS authentication checks (SPF, DKIM, DMARC, MX), the SMTP/TLS provider check, and recent delivery results.', 'scalyn-mail-relay' ) . '</p>';
 							return;
 						}
 
-						echo '<p class="scalyn-card__note">' . esc_html__( 'Your email health score is based on the results of all diagnostic checks (SPF, DKIM, DMARC, MX, and SMTP/TLS).', 'scalyn-mail-relay' ) . '</p>';
+						// Be explicit about provenance: a component whose checks returned
+						// Unknown (or never ran) is excluded from the weighted score, not
+						// scored as zero, so the number can be high while cards are Unknown.
+						echo '<p class="scalyn-card__note">' . esc_html__( 'The score is a weighted average of the components below that have evidence. A component shows "Not evaluated" when its checks returned Unknown or have not run; it is excluded rather than counted as zero.', 'scalyn-mail-relay' ) . '</p>';
+						HealthScoreBreakdown::render( $health_components, $health_summary );
 					},
 					'scalyn-diagnostics-health-card-heading'
 				);

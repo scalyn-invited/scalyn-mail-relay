@@ -137,9 +137,10 @@ final class AdminMenu {
 			'scalyn-mail-relay-admin',
 			'scalynMailRelaySettings',
 			array(
-				'restNonce'    => wp_create_nonce( 'wp_rest' ),
-				'runningLabel' => __( 'Running...', 'scalyn-mail-relay' ),
-				'errorPrefix'  => __( 'Error running diagnostics:', 'scalyn-mail-relay' ),
+				'restNonce'      => wp_create_nonce( 'wp_rest' ),
+				'runningLabel'   => __( 'Running...', 'scalyn-mail-relay' ),
+				'errorPrefix'    => __( 'Error running diagnostics:', 'scalyn-mail-relay' ),
+				'timeoutMessage' => __( 'The diagnostics run is taking longer than expected. Reload the page in a moment to see the latest results.', 'scalyn-mail-relay' ),
 			)
 		);
 		wp_set_script_translations( 'scalyn-mail-relay-admin', 'scalyn-mail-relay' );
