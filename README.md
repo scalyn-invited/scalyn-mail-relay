@@ -8,12 +8,41 @@ Scalyn Mail Relay is a WordPress Email Operations Platform focused on delivery, 
 - WordPress 6.5+
 - PHP 8.2+
 - MySQL 8+ or MariaDB 10.6+
+- Single-site WordPress. **Multisite is not supported in 0.1.0.**
+
+The WordPress and PHP minimums are enforced at activation and are verified in CI
+against PHP 8.2 and 8.3.
+
+## Known limitations in 0.1.0
+
+Recorded with rationale in
+[ADR-0002](docs/adr/0002-mvp-release-hardening-accepted-risks.md).
+
+- **Log retention is not enforced.** The `log_retention_days` setting is stored
+  but no purge job runs, so mail logs, timeline events, diagnostic results and
+  health scores accumulate without bound. On a high-volume site, prune these
+  tables manually until retention ships.
+- **Destructive uninstall has no admin UI.** Data is retained on uninstall by
+  default; opting into deletion requires setting the option programmatically.
+  See [UNINSTALL-POLICY.md](docs/UNINSTALL-POLICY.md).
+- **Multisite is unsupported.** Uninstall only removes data for the site that
+  runs it.
 
 ## Development setup
 ```bash
 composer install
 composer check
 ```
+
+`composer check` runs PHP linting, WordPress Coding Standards and PHPUnit. All
+three must be clean before a PR.
+
+## Releasing
+
+Follow [docs/RELEASE-CHECKLIST.md](docs/RELEASE-CHECKLIST.md), which covers the
+supported baseline, fresh install, upgrade, both uninstall modes, security and
+privacy review, provider/diagnostic regression, and the packaging procedure with
+its verification steps.
 
 ## Branch model
 - `main` — releases only
