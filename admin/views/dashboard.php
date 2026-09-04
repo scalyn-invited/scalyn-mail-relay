@@ -24,9 +24,10 @@ use Scalyn\MailRelay\Admin\Components\StatusBadge;
 
 defined( 'ABSPATH' ) || exit;
 
-$wizard_url    = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
-$logs_url      = admin_url( 'admin.php?page=scalyn-mail-relay-logs' );
-$status_labels = array(
+$wizard_url           = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
+$logs_url             = admin_url( 'admin.php?page=scalyn-mail-relay-logs' );
+$diagnostics_page_url = admin_url( 'admin.php?page=scalyn-mail-relay-diagnostics' );
+$status_labels        = array(
 	'accepted' => __( 'Accepted', 'scalyn-mail-relay' ),
 	'failed'   => __( 'Failed', 'scalyn-mail-relay' ),
 );
@@ -38,7 +39,7 @@ $setup_steps = array(
 	),
 	array(
 		'label'  => __( 'Verify connection', 'scalyn-mail-relay' ),
-		'status' => 'pending',
+		'status' => $provider_verified ? 'complete' : 'pending',
 	),
 	array(
 		'label'  => __( 'Send test email', 'scalyn-mail-relay' ),
@@ -168,7 +169,23 @@ $setup_steps = array(
 		<h2 id="scalyn-actions-heading"><?php esc_html_e( 'Quick Actions', 'scalyn-mail-relay' ); ?></h2>
 		<div class="scalyn-actions">
 			<?php ActionButton::render( __( 'Configure Mailer', 'scalyn-mail-relay' ), $wizard_url, false, '', array(), true ); ?>
-			<?php ActionButton::render( __( 'Run Diagnostics', 'scalyn-mail-relay' ), $diagnostics_run_url, ! $provider_verified, '', array(), false ); ?>
+			<?php
+			// The id and data attributes let assets/js/admin.js intercept the click
+			// and POST to the REST endpoint (which does not accept GET), then send
+			// the user to the Diagnostics page to view the results.
+			ActionButton::render(
+				__( 'Run Diagnostics', 'scalyn-mail-relay' ),
+				$diagnostics_run_url,
+				! $provider_verified,
+				'scalyn-run-diagnostics',
+				array(
+					'scalyn-action' => 'run-diagnostics',
+					'endpoint'      => $diagnostics_run_url,
+					'redirect'      => $diagnostics_page_url,
+				),
+				false
+			);
+			?>
 			<?php ActionButton::render( __( 'Send Test Email', 'scalyn-mail-relay' ), '', ! $provider_verified, '', array(), false ); ?>
 			<?php ActionButton::render( __( 'View Logs', 'scalyn-mail-relay' ), $logs_url, false, '', array(), false ); ?>
 		</div>

@@ -140,4 +140,58 @@ final class AdminMenuTest extends TestCase {
 			'handle_wizard_post() must not redirect when the request method is GET.'
 		);
 	}
+
+	// -------------------------------------------------------------------------
+	// enqueue_assets() — admin script loading
+	// -------------------------------------------------------------------------
+
+	private function reset_enqueue_globals(): void {
+		$GLOBALS['_test_wp_enqueued_styles']   = array();
+		$GLOBALS['_test_wp_enqueued_scripts']  = array();
+		$GLOBALS['_test_wp_localized_scripts'] = array();
+	}
+
+	public function test_enqueue_assets_ignores_non_plugin_screens(): void {
+		$this->reset_enqueue_globals();
+
+		( new AdminMenu() )->enqueue_assets( 'index.php' );
+
+		$this->assertSame( array(), $GLOBALS['_test_wp_enqueued_styles'] );
+		$this->assertSame( array(), $GLOBALS['_test_wp_enqueued_scripts'] );
+	}
+
+	/**
+	 * Regression guard: the Diagnostics screen is a sub-menu page, so WordPress
+	 * passes "mail-relay_page_scalyn-mail-relay-diagnostics" as its hook suffix
+	 * (not "toplevel_page_..."). The admin script must load there so the
+	 * Run Diagnostics button POSTs to the REST endpoint instead of navigating
+	 * to it via GET.
+	 */
+	public function test_enqueue_assets_loads_admin_script_on_diagnostics_submenu_hook(): void {
+		$this->reset_enqueue_globals();
+
+		( new AdminMenu() )->enqueue_assets( 'mail-relay_page_scalyn-mail-relay-diagnostics' );
+
+		$this->assertArrayHasKey( 'scalyn-mail-relay-admin', $GLOBALS['_test_wp_enqueued_styles'] );
+		$this->assertArrayHasKey( 'scalyn-mail-relay-admin', $GLOBALS['_test_wp_enqueued_scripts'] );
+		$this->assertStringEndsWith( 'assets/js/admin.js', $GLOBALS['_test_wp_enqueued_scripts']['scalyn-mail-relay-admin'] );
+
+		$settings = $GLOBALS['_test_wp_localized_scripts']['scalyn-mail-relay-admin']['scalynMailRelaySettings'] ?? null;
+		$this->assertIsArray( $settings, 'REST nonce and labels must be localized onto the admin script.' );
+		$this->assertArrayHasKey( 'restNonce', $settings );
+		$this->assertNotSame( '', $settings['restNonce'] );
+	}
+
+	/**
+	 * The Dashboard renders a Run Diagnostics quick action too, so the script
+	 * must also load on the top-level page hook.
+	 */
+	public function test_enqueue_assets_loads_admin_script_on_dashboard_hook(): void {
+		$this->reset_enqueue_globals();
+
+		( new AdminMenu() )->enqueue_assets( 'toplevel_page_scalyn-mail-relay' );
+
+		$this->assertArrayHasKey( 'scalyn-mail-relay-admin', $GLOBALS['_test_wp_enqueued_scripts'] );
+		$this->assertArrayHasKey( 'scalyn-mail-relay-admin', $GLOBALS['_test_wp_localized_scripts'] );
+	}
 }

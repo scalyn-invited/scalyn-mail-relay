@@ -23,10 +23,50 @@ $GLOBALS['_test_current_user_id']  = 1;
 $GLOBALS['_test_wp_nonce_valid']   = false;
 $GLOBALS['_test_wp_redirect']      = null;
 $GLOBALS['_test_current_time']     = null; // null = use real time; string = fixed time for tests.
+$GLOBALS['_test_wp_enqueued_styles']    = array(); // handle => src.
+$GLOBALS['_test_wp_enqueued_scripts']   = array(); // handle => src.
+$GLOBALS['_test_wp_localized_scripts']  = array(); // handle => array( object_name => data ).
 
 // Define plugin constants for tests.
 if ( ! defined( 'SCALYN_MAIL_RELAY_REST_NAMESPACE' ) ) {
 	define( 'SCALYN_MAIL_RELAY_REST_NAMESPACE', 'scalyn-mail-relay/v1' );
+}
+
+if ( ! defined( 'SCALYN_MAIL_RELAY_VERSION' ) ) {
+	define( 'SCALYN_MAIL_RELAY_VERSION', '0.1.0' );
+}
+
+if ( ! defined( 'SCALYN_MAIL_RELAY_URL' ) ) {
+	define( 'SCALYN_MAIL_RELAY_URL', 'http://example.com/wp-content/plugins/scalyn-mail-relay/' );
+}
+
+if ( ! function_exists( 'wp_enqueue_style' ) ) {
+	/** Records enqueued style handles. */
+	function wp_enqueue_style( string $handle, string $src = '', array $deps = array(), $ver = false, string $media = 'all' ): void {
+		$GLOBALS['_test_wp_enqueued_styles'][ $handle ] = $src;
+	}
+}
+
+if ( ! function_exists( 'wp_enqueue_script' ) ) {
+	/** Records enqueued script handles. */
+	function wp_enqueue_script( string $handle, string $src = '', array $deps = array(), $ver = false, $args = array() ): void {
+		$GLOBALS['_test_wp_enqueued_scripts'][ $handle ] = $src;
+	}
+}
+
+if ( ! function_exists( 'wp_localize_script' ) ) {
+	/** Records data localized onto a script handle. */
+	function wp_localize_script( string $handle, string $object_name, array $l10n ): bool {
+		$GLOBALS['_test_wp_localized_scripts'][ $handle ][ $object_name ] = $l10n;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'wp_set_script_translations' ) ) {
+	/** No-op stub. */
+	function wp_set_script_translations( string $handle, string $domain = 'default', string $path = '' ): bool {
+		return true;
+	}
 }
 
 if ( ! function_exists( 'get_option' ) ) {

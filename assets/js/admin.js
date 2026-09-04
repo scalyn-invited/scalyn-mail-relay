@@ -64,8 +64,13 @@
 			.then( ( data ) => {
 				// Check if the response indicates success
 				if ( data && data.success ) {
-					// Success - reload page to show updated results
-					window.location.reload();
+					// Success - go to the results page when one is configured
+					// (Dashboard button), otherwise reload to show updated results.
+					if ( button.dataset.redirect ) {
+						window.location.assign( button.dataset.redirect );
+					} else {
+						window.location.reload();
+					}
 				} else {
 					// Server returned 200 but payload indicates failure
 					const errorMsg = data && data.data ? data.data.message : 'Diagnostics run failed';
@@ -76,8 +81,12 @@
 				// Show error in notice area instead of alert
 				console.error( error );
 				const notice = createErrorNotice( window.scalynMailRelaySettings?.errorPrefix || 'Error running diagnostics: ', error.message );
-				const container = document.querySelector( '.scalyn-diagnostics-section' );
-				if ( container ) {
+				// Diagnostics page: above the first results section. Dashboard: above
+				// the Quick Actions card. Fallback: directly above the button.
+				const container = document.querySelector( '.scalyn-diagnostics-section' )
+					|| button.closest( '.scalyn-card' )
+					|| button;
+				if ( container && container.parentNode ) {
 					container.parentNode.insertBefore( notice, container );
 				}
 				// Restore button state
