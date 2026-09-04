@@ -64,7 +64,7 @@ final class DiagnosticsPageTest extends TestCase {
 			}
 
 			public function get_row( string $sql, string $output = 'OBJECT' ) {
-				return null; // No health score yet in test
+				return $this->parent->get_mock_health_row();
 			}
 		};
 	}
@@ -75,6 +75,16 @@ final class DiagnosticsPageTest extends TestCase {
 
 	public function get_mock_diagnostic_data(): array {
 		return $this->wpdb_mock_data;
+	}
+
+	private ?array $health_row_mock = null;
+
+	public function set_mock_health_row( ?array $row ): void {
+		$this->health_row_mock = $row;
+	}
+
+	public function get_mock_health_row(): ?array {
+		return $this->health_row_mock;
 	}
 
 	private function grant_run_diagnostics(): void {
@@ -387,5 +397,56 @@ final class DiagnosticsPageTest extends TestCase {
 		// The duplicate large-text display was removed to avoid redundancy (issue #19).
 		$this->assertStringContainsString( 'Health Score', $output );
 		$this->assertStringContainsString( 'scalyn-badge', $output );
+	}
+
+	/**
+	 * Regression guard for the QA report: five Unknown cards next to "100/100"
+	 * with copy claiming the score derives from those checks. The card must
+	 * now show which components had evidence and mark the rest "Not evaluated".
+	 */
+	public function test_health_card_explains_score_provenance_when_checks_are_unknown(): void {
+		$this->grant_run_diagnostics();
+		$this->configure_provider();
+		$this->set_mock_health_row(
+			array(
+				'overall_score'  => 100,
+				'dns_score'      => null,
+				'provider_score' => null,
+				'failure_score'  => 100,
+				'summary'        => 'Health score based on: Operational reliability. Security posture and WordPress/system health are not yet evaluated by this version and are excluded, not scored as zero.',
+				'created_at'     => '2026-09-04 10:00:00',
+			)
+		);
+
+		$output = $this->render_and_capture();
+
+		$this->assertStringContainsString( '100/100', $output );
+		$this->assertStringContainsString( 'scalyn-badge--healthy', $output );
+		$this->assertStringContainsString( 'Not evaluated', $output );
+		$this->assertStringContainsString( 'Operational reliability', $output );
+		$this->assertStringContainsString( 'Health score based on: Operational reliability.', $output );
+		$this->assertStringNotContainsString( 'based on the results of all diagnostic checks', $output );
+		// The five check cards are still Unknown; the health card is the only healthy badge.
+		$this->assertSame( 5, substr_count( $output, 'scalyn-badge--unknown' ) );
+		$this->assertSame( 1, substr_count( $output, 'scalyn-badge--healthy' ) );
+	}
+
+	public function test_health_card_uses_same_thresholds_as_dashboard(): void {
+		$this->grant_run_diagnostics();
+		$this->configure_provider();
+		$this->set_mock_health_row(
+			array(
+				'overall_score'  => 68,
+				'dns_score'      => 68,
+				'provider_score' => null,
+				'failure_score'  => null,
+				'summary'        => 'Health score based on: DNS & authentication.',
+			)
+		);
+
+		$output = $this->render_and_capture();
+
+		$this->assertStringContainsString( '68/100', $output );
+		$this->assertStringContainsString( 'scalyn-badge--warning', $output );
 	}
 }

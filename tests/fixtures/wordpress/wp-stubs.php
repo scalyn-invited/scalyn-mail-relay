@@ -309,11 +309,9 @@ if ( ! function_exists( 'wp_parse_url' ) ) {
 	 * @return array|string|int|null
 	 */
 	function wp_parse_url( string $url, ?int $component = -1 ) {
-		$parsed = parse_url( $url );
-		if ( -1 === $component ) {
-			return $parsed;
-		}
-		return $parsed[ $component ] ?? null;
+		// Mirror core: the component is a PHP_URL_* int constant understood by parse_url().
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url -- test stub for the wrapper itself.
+		return parse_url( $url, null === $component ? -1 : $component );
 	}
 }
 
@@ -353,6 +351,23 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
 
 		public function set_param( string $key, mixed $value ): void {
 			$this->params[ $key ] = $value;
+		}
+	}
+}
+
+if ( ! class_exists( 'WP_REST_Response' ) ) {
+	/**
+	 * Minimal WP_REST_Response stub for unit tests.
+	 */
+	class WP_REST_Response {
+		public function __construct( private mixed $data = null, private int $status = 200 ) {}
+
+		public function get_data(): mixed {
+			return $this->data;
+		}
+
+		public function get_status(): int {
+			return $this->status;
 		}
 	}
 }

@@ -9,9 +9,11 @@ namespace Scalyn\MailRelay\Rest;
 
 use Scalyn\MailRelay\Core\Capabilities;
 use Scalyn\MailRelay\Core\Plugin;
+use Scalyn\MailRelay\Core\SettingsRepository;
 use Scalyn\MailRelay\Database\DiagnosticRepository;
 use Scalyn\MailRelay\Database\HealthScoreRepository;
 use Scalyn\MailRelay\Diagnostics\DiagnosticCheckRegistry;
+use Scalyn\MailRelay\Diagnostics\DiagnosticContextBuilder;
 use Scalyn\MailRelay\Diagnostics\DiagnosticRunner;
 use Scalyn\MailRelay\Diagnostics\HealthScorer;
 use Scalyn\MailRelay\Logging\MailLogRepository;
@@ -80,9 +82,14 @@ final class DiagnosticsRunEndpoint {
 			$scorer        = $container->get( HealthScorer::class );
 			$score_repo    = $container->get( HealthScoreRepository::class );
 
-			// Create a diagnostic context with the WordPress domain and safe settings.
-			$domain  = wp_parse_url( home_url(), PHP_URL_HOST ) ?? 'localhost';
-			$context = new \Scalyn\MailRelay\Diagnostics\DiagnosticContext( $domain );
+			// Build the context through the credential-safe builder: it exposes only
+			// host/port/encryption to checks (never username/password) and targets
+			// the sending domain from the From address, falling back to the site host.
+			$site_host = wp_parse_url( home_url(), PHP_URL_HOST );
+			$context   = $container->get( DiagnosticContextBuilder::class )->build(
+				$container->get( SettingsRepository::class ),
+				is_string( $site_host ) && '' !== $site_host ? $site_host : 'localhost'
+			);
 
 			// Execute all registered diagnostic checks and collect results.
 			$checks        = $registry->get_all();
