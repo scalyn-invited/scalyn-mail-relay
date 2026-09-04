@@ -1,0 +1,34 @@
+# Line endings
+#
+# The repository stores LF in every blob. Without this file a Windows checkout
+# with core.autocrlf=true materializes CRLF in the working tree, which makes
+# WordPress Coding Standards report "End of line character is invalid" on every
+# PHP file locally while CI (Linux) stays green. Forcing eol=lf keeps the
+# working tree, the index and CI identical on every platform.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.zip binary
+
+# Distribution boundary
+#
+# Everything below is development tooling and must not appear in a release
+# package. `git archive` honours export-ignore, so the documented packaging
+# procedure in docs/RELEASE-CHECKLIST.md produces a clean plugin ZIP without
+# any manual pruning step.
+/.github            export-ignore
+/.editorconfig      export-ignore
+/.gitattributes     export-ignore
+/.gitignore         export-ignore
+/tests              export-ignore
+/docs               export-ignore
+/AGENTS.md          export-ignore
+/phpcs.xml.dist     export-ignore
+/phpunit.xml.dist   export-ignore
+/package.json       export-ignore
