@@ -7,6 +7,7 @@
 
 namespace Scalyn\MailRelay\Admin\Pages;
 
+use Scalyn\MailRelay\Admin\HealthScorePresenter;
 use Scalyn\MailRelay\Core\Capabilities;
 use Scalyn\MailRelay\Core\Plugin;
 use Scalyn\MailRelay\Core\ProviderRegistry;
@@ -56,9 +57,14 @@ final class DiagnosticsPage {
 		$run_data        = $diagnostic_repo->find_latest_run();
 		$diagnostics     = $this->organize_diagnostics( $run_data['results'] );
 
-		// Read the computed health score from HealthScoreRepository (wired by Y3's HealthScorer).
-		$latest_score = $score_repo->find_latest();
-		$health_score = $latest_score ? (int) $latest_score['overall_score'] : null;
+		// Read the last HealthScorer snapshot from HealthScoreRepository and present it
+		// exactly as the Dashboard does (same source, same thresholds, same breakdown).
+		$health            = HealthScorePresenter::present( $score_repo->find_latest() );
+		$health_score      = $health['score'];
+		$health_ui_status  = $health['ui_status'];
+		$health_ui_label   = $health['label'];
+		$health_components = $health['components'];
+		$health_summary    = $health['summary'];
 
 		// Fetch and classify recent mail failures.
 		$recent_failures = $this->get_recent_failures( $mail_log_repo, $classifier );

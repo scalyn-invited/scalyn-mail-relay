@@ -44,6 +44,14 @@
 .scalyn-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
 .scalyn-actions__note { margin: 0; }
 .scalyn-action-btn[disabled] { opacity: .6; cursor: not-allowed; }
+/* Anchor-based action buttons have no native disabled state; aria-busy is set while a run is in flight. */
+.scalyn-action-btn[aria-busy="true"] { opacity: .6; cursor: progress; pointer-events: none; }
+
+/* ---- Health score breakdown ---- */
+.scalyn-health-breakdown { margin: 12px 0 0; padding: 0; list-style: none; }
+.scalyn-health-breakdown__item { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px solid #f0f0f1; font-size: 13px; }
+.scalyn-health-breakdown__item:last-child { border-bottom: 0; }
+.scalyn-health-breakdown__value { color: #50575e; white-space: nowrap; }
 
 /* ---- Mail log status badges ---- */
 .scalyn-badge--accepted { background: #edfaef; color: #00a32a; border: 1px solid #b8e6bf; }

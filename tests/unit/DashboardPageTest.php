@@ -533,124 +533,86 @@ final class DashboardPageTest extends TestCase {
 		$this->assertStringNotContainsString( 'scalyn-badge--critical', $output );
 	}
 
+	/**
+	 * The Dashboard reads the persisted HealthScorer snapshot (scalyn_health_scores),
+	 * the same source as the Diagnostics page — never a per-row average of
+	 * scalyn_diagnostics, which no check populates.
+	 */
+	private function store_health_row( int $overall, ?int $dns, ?int $provider, ?int $failure, string $summary ): void {
+		$this->wpdb->get_row_return = array(
+			'overall_score'  => $overall,
+			'dns_score'      => $dns,
+			'provider_score' => $provider,
+			'failure_score'  => $failure,
+			'summary'        => $summary,
+			'created_at'     => '2026-09-04 10:00:00',
+		);
+	}
+
 	public function test_email_health_displays_healthy_score(): void {
 		$this->grant_view_dashboard();
-
-		// Mock diagnostic data that will average to 85 (healthy).
-		$this->set_mock_diagnostic_data(
-			array(
-				array(
-					'check_name'         => 'spf_record',
-					'status'             => 'pass',
-					'score'              => 100,
-					'result_message'     => 'SPF OK',
-					'recommended_action' => '',
-					'raw_result'         => '{}',
-				),
-				array(
-					'check_name'         => 'dkim_record',
-					'status'             => 'pass',
-					'score'              => 100,
-					'result_message'     => 'DKIM OK',
-					'recommended_action' => '',
-					'raw_result'         => '{}',
-				),
-				array(
-					'check_name'         => 'dmarc_policy',
-					'status'             => 'fail',
-					'score'              => 65,
-					'result_message'     => 'DMARC not configured',
-					'recommended_action' => 'Configure DMARC',
-					'raw_result'         => '{}',
-				),
-			)
-		);
+		$this->store_health_row( 88, 88, null, null, 'Health score based on: DNS & authentication.' );
 
 		$output = $this->render_and_capture();
 
-		// Average of 100, 100, 65 = 88.33 -> rounds to 88 or shows 88.
 		$this->assertStringContainsString( 'scalyn-badge--healthy', $output );
-		$this->assertStringContainsString( '/100', $output );
+		$this->assertStringContainsString( '88/100', $output );
 	}
 
 	public function test_email_health_displays_warning_score(): void {
 		$this->grant_view_dashboard();
-
-		// Mock diagnostic data that will average to 70 (warning).
-		$this->set_mock_diagnostic_data(
-			array(
-				array(
-					'check_name'         => 'spf_record',
-					'status'             => 'warn',
-					'score'              => 75,
-					'result_message'     => 'SPF warning',
-					'recommended_action' => 'Review SPF',
-					'raw_result'         => '{}',
-				),
-				array(
-					'check_name'         => 'dkim_record',
-					'status'             => 'fail',
-					'score'              => 50,
-					'result_message'     => 'DKIM not configured',
-					'recommended_action' => 'Configure DKIM',
-					'raw_result'         => '{}',
-				),
-				array(
-					'check_name'         => 'dmarc_policy',
-					'status'             => 'fail',
-					'score'              => 80,
-					'result_message'     => 'DMARC not configured',
-					'recommended_action' => 'Configure DMARC',
-					'raw_result'         => '{}',
-				),
-			)
-		);
+		$this->store_health_row( 68, 68, null, null, 'Health score based on: DNS & authentication.' );
 
 		$output = $this->render_and_capture();
 
-		// Average of 75, 50, 80 = 68.33 -> warning.
 		$this->assertStringContainsString( 'scalyn-badge--warning', $output );
-		$this->assertStringContainsString( '/100', $output );
+		$this->assertStringContainsString( '68/100', $output );
 	}
 
 	public function test_email_health_displays_critical_score(): void {
 		$this->grant_view_dashboard();
+		$this->store_health_row( 45, 45, null, null, 'Health score based on: DNS & authentication.' );
 
-		// Mock diagnostic data that will average to 45 (critical).
+		$output = $this->render_and_capture();
+
+		$this->assertStringContainsString( 'scalyn-badge--critical', $output );
+		$this->assertStringContainsString( '45/100', $output );
+	}
+
+	public function test_email_health_ignores_diagnostic_row_scores(): void {
+		$this->grant_view_dashboard();
+
+		// Diagnostic rows exist (with legacy per-row scores) but no HealthScorer
+		// snapshot has been persisted: the Dashboard must show Unknown, exactly
+		// like the Diagnostics page, instead of averaging the rows itself.
 		$this->set_mock_diagnostic_data(
 			array(
 				array(
-					'check_name'         => 'spf_record',
-					'status'             => 'fail',
-					'score'              => 30,
-					'result_message'     => 'SPF not configured',
-					'recommended_action' => 'Configure SPF',
-					'raw_result'         => '{}',
-				),
-				array(
-					'check_name'         => 'dkim_record',
-					'status'             => 'fail',
-					'score'              => 40,
-					'result_message'     => 'DKIM not configured',
-					'recommended_action' => 'Configure DKIM',
-					'raw_result'         => '{}',
-				),
-				array(
-					'check_name'         => 'dmarc_policy',
-					'status'             => 'fail',
-					'score'              => 65,
-					'result_message'     => 'DMARC not configured',
-					'recommended_action' => 'Configure DMARC',
-					'raw_result'         => '{}',
+					'check_name' => 'spf_record',
+					'status'     => 'pass',
+					'score'      => 100,
+					'raw_result' => '{}',
 				),
 			)
 		);
 
 		$output = $this->render_and_capture();
 
-		// Average of 30, 40, 65 = 45 -> critical.
-		$this->assertStringContainsString( 'scalyn-badge--critical', $output );
-		$this->assertStringContainsString( '/100', $output );
+		$this->assertStringContainsString( 'scalyn-badge--unknown', $output );
+		$this->assertStringNotContainsString( '/100', $output );
+	}
+
+	public function test_email_health_explains_which_components_have_evidence(): void {
+		$this->grant_view_dashboard();
+		$this->store_health_row( 100, null, null, 100, 'Health score based on: Operational reliability.' );
+
+		$output = $this->render_and_capture();
+
+		$this->assertStringContainsString( '100/100', $output );
+		$this->assertStringContainsString( 'DNS &amp; authentication', $output );
+		$this->assertStringContainsString( 'Not evaluated', $output );
+		$this->assertStringContainsString( 'Health score based on: Operational reliability.', $output );
+		$this->assertStringNotContainsString( 'based on SPF, DKIM, DMARC configuration', $output );
 	}
 
 	// =========================================================================
@@ -718,11 +680,18 @@ final class DashboardPageTest extends TestCase {
 
 		$this->render_and_capture();
 
-		// find_recent() calls prepare() with the limit and offset as args.
-		$last_prepare = end( $this->wpdb->prepare_calls );
-		$this->assertIsArray( $last_prepare );
-		$this->assertSame( 1, $last_prepare['args'][0], 'Dashboard must request exactly 1 row.' );
-		$this->assertSame( 0, $last_prepare['args'][1], 'Dashboard must use offset 0.' );
+		// find_recent() calls prepare() with the limit and offset as args. Other
+		// repositories (health score) also prepare queries, so select the mail-log one.
+		$log_prepare = null;
+		foreach ( $this->wpdb->prepare_calls as $call ) {
+			if ( false !== strpos( $call['query'], 'scalyn_mail_logs' ) ) {
+				$log_prepare = $call;
+				break;
+			}
+		}
+		$this->assertIsArray( $log_prepare, 'Dashboard must query mail logs through the repository.' );
+		$this->assertSame( 1, $log_prepare['args'][0], 'Dashboard must request exactly 1 row.' );
+		$this->assertSame( 0, $log_prepare['args'][1], 'Dashboard must use offset 0.' );
 	}
 
 	public function test_no_direct_sql_exists_in_dashboard_render_path(): void {
@@ -733,11 +702,13 @@ final class DashboardPageTest extends TestCase {
 		// If prepare_calls is populated it means the query went through $wpdb->prepare().
 		$this->render_and_capture();
 
+		// The only tables the dashboard may read are the ones its repositories own:
+		// mail logs (MailLogRepository) and the persisted health score (HealthScoreRepository).
 		foreach ( $this->wpdb->prepare_calls as $call ) {
-			$this->assertStringContainsString(
-				'scalyn_mail_logs',
+			$this->assertMatchesRegularExpression(
+				'/scalyn_(mail_logs|health_scores)/',
 				$call['query'],
-				'All wpdb queries from render() must target the mail_logs table via the repository.'
+				'All wpdb queries from render() must go through MailLogRepository or HealthScoreRepository.'
 			);
 		}
 	}

@@ -11,6 +11,7 @@ use Scalyn\MailRelay\Admin\AdminMenu;
 use Scalyn\MailRelay\Database\DiagnosticRepository;
 use Scalyn\MailRelay\Database\HealthScoreRepository;
 use Scalyn\MailRelay\Diagnostics\DiagnosticCheckRegistry;
+use Scalyn\MailRelay\Diagnostics\DiagnosticContextBuilder;
 use Scalyn\MailRelay\Diagnostics\DiagnosticRunner;
 use Scalyn\MailRelay\Diagnostics\HealthScorer;
 use Scalyn\MailRelay\Diagnostics\Checks\DkimCheck;
@@ -126,6 +127,7 @@ final class Plugin {
 
 		$this->container->set( DiagnosticCheckRegistry::class, static fn(): DiagnosticCheckRegistry => new DiagnosticCheckRegistry() );
 		$this->container->set( DiagnosticRunner::class, static fn(): DiagnosticRunner => new DiagnosticRunner() );
+		$this->container->set( DiagnosticContextBuilder::class, static fn(): DiagnosticContextBuilder => new DiagnosticContextBuilder() );
 		$this->container->set( DiagnosticRepository::class, static fn(): DiagnosticRepository => new DiagnosticRepository() );
 		$this->container->set( HealthScorer::class, static fn(): HealthScorer => new HealthScorer() );
 		$this->container->set( HealthScoreRepository::class, static fn(): HealthScoreRepository => new HealthScoreRepository() );
