@@ -19,6 +19,9 @@ $GLOBALS['_test_wp_options']       = array();
 $GLOBALS['_test_wp_actions']       = array();
 $GLOBALS['_test_wp_added_actions'] = array();
 $GLOBALS['_test_wp_transients']    = array();
+$GLOBALS['_test_wp_cron']           = array(); // hook => next-run timestamp.
+$GLOBALS['_test_wp_cleared_hooks']  = array(); // hooks passed to wp_clear_scheduled_hook().
+$GLOBALS['_test_wp_roles']          = array(); // role name => RoleStub.
 $GLOBALS['_test_current_user_id']  = 1;
 $GLOBALS['_test_wp_nonce_valid']   = false;
 $GLOBALS['_test_wp_redirect']      = null;
@@ -89,6 +92,80 @@ if ( ! function_exists( 'update_option' ) ) {
 	function update_option( string $option, $value, $autoload = null ): bool {
 		$GLOBALS['_test_wp_options'][ $option ] = $value;
 		return true;
+	}
+}
+
+if ( ! function_exists( 'delete_option' ) ) {
+	/**
+	 * @param string $option
+	 */
+	function delete_option( string $option ): bool {
+		if ( ! array_key_exists( $option, $GLOBALS['_test_wp_options'] ) ) {
+			return false;
+		}
+		unset( $GLOBALS['_test_wp_options'][ $option ] );
+		return true;
+	}
+}
+
+if ( ! function_exists( 'wp_next_scheduled' ) ) {
+	/**
+	 * Returns the timestamp recorded in $GLOBALS['_test_wp_cron'], or false.
+	 *
+	 * @param string $hook
+	 * @return int|false
+	 */
+	function wp_next_scheduled( string $hook ) {
+		return $GLOBALS['_test_wp_cron'][ $hook ] ?? false;
+	}
+}
+
+if ( ! function_exists( 'wp_schedule_event' ) ) {
+	/**
+	 * Records a scheduled event in $GLOBALS['_test_wp_cron'].
+	 *
+	 * @param int    $timestamp
+	 * @param string $recurrence
+	 * @param string $hook
+	 */
+	function wp_schedule_event( int $timestamp, string $recurrence, string $hook ): bool {
+		$GLOBALS['_test_wp_cron'][ $hook ] = $timestamp;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'wp_clear_scheduled_hook' ) ) {
+	/**
+	 * Removes a hook from $GLOBALS['_test_wp_cron'] and records the clear call
+	 * in $GLOBALS['_test_wp_cleared_hooks'] so tests can assert on hooks that
+	 * were never scheduled in the first place.
+	 *
+	 * @param string $hook
+	 */
+	function wp_clear_scheduled_hook( string $hook ): void {
+		$GLOBALS['_test_wp_cleared_hooks'][] = $hook;
+		unset( $GLOBALS['_test_wp_cron'][ $hook ] );
+	}
+}
+
+if ( ! function_exists( 'get_role' ) ) {
+	/**
+	 * Returns the RoleStub registered in $GLOBALS['_test_wp_roles'], or null.
+	 *
+	 * @param string $role
+	 * @return RoleStub|null
+	 */
+	function get_role( string $role ): ?RoleStub {
+		return $GLOBALS['_test_wp_roles'][ $role ] ?? null;
+	}
+}
+
+if ( ! function_exists( 'wp_roles' ) ) {
+	/**
+	 * Returns a WpRolesStub view over $GLOBALS['_test_wp_roles'].
+	 */
+	function wp_roles(): WpRolesStub {
+		return new WpRolesStub();
 	}
 }
 
@@ -575,6 +652,63 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 }
 
 /**
+ * Minimal WP_Role stub.
+ *
+ * Records add_cap()/remove_cap() so lifecycle tests can assert exactly which
+ * capabilities were granted on activation and revoked on uninstall.
+ */
+class RoleStub {
+
+	/** Capabilities currently held: capability => true. */
+	public array $capabilities = array();
+
+	/** Every capability passed to remove_cap(), in call order. */
+	public array $removed = array();
+
+	/**
+	 * @param string $capability
+	 */
+	public function add_cap( string $capability ): void {
+		$this->capabilities[ $capability ] = true;
+	}
+
+	/**
+	 * @param string $capability
+	 */
+	public function remove_cap( string $capability ): void {
+		$this->removed[] = $capability;
+		unset( $this->capabilities[ $capability ] );
+	}
+
+	/**
+	 * @param string $capability
+	 */
+	public function has_cap( string $capability ): bool {
+		return isset( $this->capabilities[ $capability ] );
+	}
+}
+
+/**
+ * Minimal WP_Roles stub exposing the role names registered in
+ * $GLOBALS['_test_wp_roles'].
+ */
+class WpRolesStub {
+
+	/**
+	 * Returns role name => display name for every registered role.
+	 *
+	 * @return array<string, string>
+	 */
+	public function get_names(): array {
+		$names = array();
+		foreach ( array_keys( $GLOBALS['_test_wp_roles'] ) as $role_name ) {
+			$names[ $role_name ] = ucfirst( $role_name );
+		}
+		return $names;
+	}
+}
+
+/**
  * Minimal $wpdb stub for unit tests.
  *
  * Tracks INSERT/UPDATE calls and configures return values for SELECT queries.
@@ -597,6 +731,9 @@ class WpdbStub {
 
 	/** Recorded prepare() calls: [ ['query' => string, 'args' => array], ... ] */
 	public array $prepare_calls = array();
+
+	/** Recorded raw query() calls, in call order. */
+	public array $queries = array();
 
 	/** Value returned by get_var(). Set per-test to simulate existing/absent rows. */
 	public mixed $get_var_return = null;
@@ -633,6 +770,18 @@ class WpdbStub {
 	 * @param mixed  ...$args Substitution values (recorded for assertion).
 	 * @return string The unmodified query template.
 	 */
+	/**
+	 * Records a raw query and reports success. Used by uninstall.php's
+	 * DROP TABLE statements.
+	 *
+	 * @param string $query The SQL statement.
+	 * @return int Simulated rows affected.
+	 */
+	public function query( string $query ): int {
+		$this->queries[] = $query;
+		return 1;
+	}
+
 	public function prepare( string $query, mixed ...$args ): string {
 		$this->prepare_calls[] = array(
 			'query' => $query,
