@@ -445,6 +445,38 @@ final class WizardControllerTest extends TestCase {
 	// Step 5 — Test email
 	// -------------------------------------------------------------------------
 
+	/**
+	 * Regression guard: WizardPage clamps navigation to step 4 until the
+	 * provider is verified, so a successful connection test must persist the
+	 * verified flag or the wizard can never reach step 5.
+	 */
+	public function test_step4_success_marks_provider_verified(): void {
+		$GLOBALS['_test_wp_options'][ SettingsRepository::OPTION_KEY ] = array(
+			'provider' => array( 'active' => 'smtp' ),
+		);
+		$this->provider->connection_result                             = new ConnectionResult( true, 'Connected.' );
+		$this->post_step( 4 );
+
+		$this->run_handle();
+
+		$fresh = new SettingsRepository();
+		$this->assertTrue( $fresh->is_provider_verified() );
+		$this->assertNotNull( $fresh->get_provider_verified_at() );
+		$this->assertSame( 'smtp', $fresh->get_active_provider_id(), 'Marking verified must not clobber the active provider.' );
+	}
+
+	public function test_step4_failure_does_not_mark_provider_verified(): void {
+		$GLOBALS['_test_wp_options'][ SettingsRepository::OPTION_KEY ] = array(
+			'provider' => array( 'active' => 'smtp' ),
+		);
+		$this->provider->connection_result                             = new ConnectionResult( false, 'Unable to connect to the SMTP server.' );
+		$this->post_step( 4 );
+
+		$this->run_handle();
+
+		$this->assertFalse( ( new SettingsRepository() )->is_provider_verified() );
+	}
+
 	public function test_step5_invalid_recipient_stores_failure_and_redirects(): void {
 		$this->post_step( 5, array( 'test_recipient' => 'not-an-email' ) );
 
@@ -570,5 +602,33 @@ final class WizardControllerTest extends TestCase {
 		$this->assertIsArray( $result );
 		$this->assertTrue( $result['success'] );
 		$this->assertNotEmpty( $result['message'] );
+	}
+
+	public function test_step5_success_marks_provider_verified(): void {
+		$GLOBALS['_test_wp_options'][ SettingsRepository::OPTION_KEY ] = array(
+			'provider' => array( 'active' => 'smtp' ),
+			'smtp'     => array( 'from_email' => 'from@example.com' ),
+		);
+		$this->provider->send_result                                   = new SendResult( true, 'smtp' );
+
+		$this->post_step( 5, array( 'test_recipient' => 'to@example.com' ) );
+		$this->run_handle();
+
+		$fresh = new SettingsRepository();
+		$this->assertTrue( $fresh->is_provider_verified() );
+		$this->assertSame( 'from@example.com', $fresh->get_smtp_config()['from_email'], 'Marking verified must not clobber SMTP settings.' );
+	}
+
+	public function test_step5_failure_does_not_mark_provider_verified(): void {
+		$GLOBALS['_test_wp_options'][ SettingsRepository::OPTION_KEY ] = array(
+			'provider' => array( 'active' => 'smtp' ),
+			'smtp'     => array( 'from_email' => 'from@example.com' ),
+		);
+		$this->provider->send_result                                   = new SendResult( false, 'smtp', null, null, 'SMTP transport failed.', false, 'network' );
+
+		$this->post_step( 5, array( 'test_recipient' => 'to@example.com' ) );
+		$this->run_handle();
+
+		$this->assertFalse( ( new SettingsRepository() )->is_provider_verified() );
 	}
 }

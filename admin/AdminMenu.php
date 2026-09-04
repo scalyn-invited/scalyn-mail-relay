@@ -119,22 +119,30 @@ final class AdminMenu {
 
 		wp_enqueue_style( 'scalyn-mail-relay-admin', SCALYN_MAIL_RELAY_URL . 'assets/css/admin.css', array(), SCALYN_MAIL_RELAY_VERSION );
 
-		// Enqueue diagnostics-specific script only on the Diagnostics page.
-		if ( 'toplevel_page_scalyn-mail-relay-diagnostics' === $hook ) {
-			wp_enqueue_script( 'scalyn-mail-relay-admin', SCALYN_MAIL_RELAY_URL . 'assets/js/admin.js', array(), SCALYN_MAIL_RELAY_VERSION, true );
+		// Enqueue the admin script on every plugin screen. The script self-gates
+		// on the presence of the #scalyn-run-diagnostics button, which is rendered
+		// on both the Dashboard (Quick Actions) and the Diagnostics page.
+		//
+		// Do not gate this on a literal hook suffix: sub-menu pages registered
+		// under "Mail Relay" receive hooks such as
+		// "mail-relay_page_scalyn-mail-relay-diagnostics" (only the top-level
+		// Dashboard is "toplevel_page_scalyn-mail-relay"). A previous
+		// "toplevel_page_scalyn-mail-relay-diagnostics" comparison never matched,
+		// so the script was never loaded and the Run Diagnostics link navigated
+		// to the POST-only REST endpoint via GET, producing a rest_no_route 404.
+		wp_enqueue_script( 'scalyn-mail-relay-admin', SCALYN_MAIL_RELAY_URL . 'assets/js/admin.js', array(), SCALYN_MAIL_RELAY_VERSION, true );
 
-			// Pass REST API nonce and translatable strings to script.
-			wp_localize_script(
-				'scalyn-mail-relay-admin',
-				'scalynMailRelaySettings',
-				array(
-					'restNonce'    => wp_create_nonce( 'wp_rest' ),
-					'runningLabel' => __( 'Running...', 'scalyn-mail-relay' ),
-					'errorPrefix'  => __( 'Error running diagnostics:', 'scalyn-mail-relay' ),
-				)
-			);
-			wp_set_script_translations( 'scalyn-mail-relay-admin', 'scalyn-mail-relay' );
-		}
+		// Pass REST API nonce and translatable strings to script.
+		wp_localize_script(
+			'scalyn-mail-relay-admin',
+			'scalynMailRelaySettings',
+			array(
+				'restNonce'    => wp_create_nonce( 'wp_rest' ),
+				'runningLabel' => __( 'Running...', 'scalyn-mail-relay' ),
+				'errorPrefix'  => __( 'Error running diagnostics:', 'scalyn-mail-relay' ),
+			)
+		);
+		wp_set_script_translations( 'scalyn-mail-relay-admin', 'scalyn-mail-relay' );
 	}
 
 	/**

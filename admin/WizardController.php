@@ -226,6 +226,13 @@ final class WizardController {
 		$config   = $settings->get_provider_config( $provider_id );
 		$result   = $provider->test_connection( $config );
 
+		// A successful connection test verifies the provider. WizardPage clamps
+		// navigation to step 4 until the provider is verified, so without this
+		// the wizard could never advance to step 5.
+		if ( $result->success ) {
+			$settings->mark_provider_verified();
+		}
+
 		// @security Store only the normalized boolean and message string.
 		// Never store $config, $result->metadata, or any credential-bearing data.
 		set_transient(
@@ -301,6 +308,12 @@ final class WizardController {
 
 		$dispatcher = $this->get_dispatcher();
 		$result     = $dispatcher->dispatch( $message );
+
+		// A test email accepted by the provider also verifies the provider
+		// (see SettingsRepository::mark_provider_verified()).
+		if ( $result->success ) {
+			$settings->mark_provider_verified();
+		}
 
 		$safe_message = $result->success
 			? __( 'The configured SMTP server accepted the test email. Check your inbox to confirm receipt.', 'scalyn-mail-relay' )
