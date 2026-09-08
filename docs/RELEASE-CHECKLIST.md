@@ -43,13 +43,18 @@ and are declared in the plugin header (`Requires at least`, `Requires PHP`).
 
 ## 3. Fresh install
 
-- [ ] Activate on a clean WordPress with no prior plugin data
-- [ ] All six tables created at the correct prefix — **no automated coverage.** `LifecycleTest` pre-seeds `scalyn_mail_relay_db_version`, which keeps activation clear of `dbDelta()`, so `Migrator::create_foundation_tables()` is executed by no test. `UninstallTest` covers the six *drops*; the six *creates* are unverified
-- [ ] `scalyn_mail_relay_db_version` and `scalyn_mail_relay_version` written — *(unit-covered for `_version`: `LifecycleTest::test_activation_records_the_plugin_version`; `_db_version` uncovered, same reason as above)*
-- [ ] All seven `scalyn_mail_relay_*` capabilities present on Administrator — *(unit-covered: `LifecycleTest::test_activation_grants_every_capability_to_administrator`, which iterates `Capabilities::all()` — it does not assert the count is seven)*
-- [ ] No PHP notices/warnings in `debug.log` during activation
-- [ ] Admin menu renders; every page loads without error
-- [ ] Setup wizard completes end to end (provider → SMTP → connection test → test email) — *(unit-covered for step transitions, capabilities and nonces: `WizardControllerTest`; the live provider round trip is not)*
+Verified **2026-09-08** on a clean live installation running WordPress 7.1,
+PHP 8.2.12, and MariaDB 10.6.20. Manual QA and screenshots were supplied for
+the environment, activation, database, role capabilities, Admin UI, wizard, and
+log checks.
+
+- [x] Activate on a clean WordPress with no prior plugin data — activation completed without error, WordPress remained responsive, the Mail Relay menu appeared, and no recovery email was generated
+- [x] All six tables created at the correct prefix — exactly six expected tables were returned under the site's prefix, with no equivalent tables under `wp_` or another prefix
+- [x] `scalyn_mail_relay_db_version` and `scalyn_mail_relay_version` written — both options were verified at `0.1.0`
+- [x] All seven `scalyn_mail_relay_*` capabilities present on Administrator — the serialized role record showed all seven capabilities enabled (`b:1`)
+- [x] No PHP notices/warnings in `debug.log` during activation — no debug log was generated and no database, `dbDelta()`, credential, or plugin PHP errors were observed
+- [x] Admin menu renders; every page loads without error — Dashboard, Setup Wizard, Providers, Email Logs, and Diagnostics rendered fully; assets, accessibility checks, empty states, and browser requests passed
+- [x] Setup wizard completes end to end (provider → SMTP → connection test → test email) — every step passed, the completion screen rendered, and the Dashboard recognized the configured provider
 
 ## 4. Upgrade
 
