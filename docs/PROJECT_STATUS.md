@@ -53,45 +53,61 @@ No concrete diagnostic check implementations are present. SPF, DKIM, DMARC, MX, 
 
 ## Remaining MVP Work
 
-### DNS diagnostics
+The planned 0.1.0 MVP product capabilities are implemented on `origin/develop`
+at `ed87103`. Work completed since the handoff snapshot includes:
 
-- Implement normalized SPF, DKIM, DMARC, and MX checks with safe, explainable evidence and remediation.
-- Define domain/selector inputs, timeouts, unknown/error behavior, and test fixtures.
+- SPF, MX, DKIM, DMARC, and SMTP/TLS diagnostic checks with normalized,
+  credential-safe results.
+- Credential-safe diagnostic context construction, check registration, isolated
+  execution, grouped persistence, and the capability-protected diagnostics REST
+  endpoint.
+- Deterministic health-score calculation, persistence, and Admin read paths.
+- Diagnostics results and Dashboard integration, including secure run actions,
+  evidence/remediation presentation, empty/error states, and current score data.
+- Deterministic transport-failure classification with stable categories and
+  remediation guidance.
+- Release hardening for capabilities, inactive cron hooks, line endings,
+  packaging boundaries, and provider/diagnostic regressions.
 
-### SMTP/TLS diagnostics
+No additional product feature is required for the 0.1.0 MVP. The remaining work
+is release validation and publication rather than feature implementation.
 
-- Implement connectivity, authentication, encryption/certificate, and relevant SMTP capability checks without exposing credentials.
-- Normalize transport failures into stable categories that other modules can consume.
+### Live environment validation
 
-### Failure analysis and remediation
+- Activate on a clean WordPress installation and verify all six tables, version
+  options, seven Administrator capabilities, Admin pages, and the complete setup
+  wizard without PHP notices or warnings. Foundation table creation remains the
+  principal automated-test gap.
+- Exercise both uninstall modes against a real database and confirm retained or
+  deleted data, options, capabilities, and cron hooks match the documented
+  policy. Upgrade testing is not applicable to this first release.
+- Complete live security and privacy checks for capabilities, nonces, REST
+  authorization, error redaction, diagnostic evidence, logs, rendered HTML, and
+  `debug.log`.
+- Run the provider and diagnostics regression against real SMTP and DNS targets,
+  including safe failure paths, correlated mail history, persisted health
+  scores, and rendered remediation.
+- Confirm supported WordPress, PHP, and MySQL/MariaDB behavior and complete
+  accessibility/manual UI QA.
 
-- Add deterministic failure classification based on concrete mail and diagnostic outputs.
-- Provide evidence-backed impact and remediation guidance; distinguish unavailable evidence from passing checks.
+### Packaging and release
 
-### Health scoring
+- Build the production ZIP with non-development Composer dependencies, verify
+  its inclusion/exclusion boundary and secret-file hygiene, and install it on a
+  clean site.
+- Obtain the required review, merge `develop` to release-only `main`, record
+  rollback notes, create the release tag, and publish the GitHub release with
+  the verified ZIP.
+- Re-run every automated and manual gate in `docs/RELEASE-CHECKLIST.md` against
+  the exact release candidate before tagging.
 
-- Define a deterministic, explainable scoring policy and implement calculation/persistence/read services around the foundation table.
-- Trace every contribution to stable diagnostic evidence and handle partial runs explicitly.
+### Explicit post-MVP deferrals
 
-### Diagnostics execution and read integration
-
-- Build a credential-safe context factory and run orchestration that groups and persists check results.
-- Add capability-protected, validated, bounded execution/read contracts and REST endpoints.
-
-### Dashboard and Diagnostics integration
-
-- Connect approved backend read models/endpoints to the Diagnostics page and enable run actions securely.
-- Surface current diagnostic and scoring summaries on the Dashboard with clear stale/empty/error states.
-
-### Retention and hardening
-
-- Implement and verify retention jobs for logs, timelines, diagnostic history, and scores.
-- Harden permissions, nonces, REST permission callbacks, redaction, rate/timeout behavior, migrations, and uninstall consistency.
-
-### Reporting and release hardening
-
-- Add MVP reporting only after diagnostic and scoring contracts stabilize.
-- Complete clean-site activation/upgrade/uninstall QA, supported WordPress/PHP/database compatibility testing, accessibility/manual UI QA, packaging, rollback notes, and release checks.
+- Automated retention for mail logs, timeline events, diagnostic results, and
+  health scores remains the first post-MVP feature; no cleanup cron is scheduled
+  in 0.1.0.
+- A destructive-uninstall Admin UI, multisite support, and broader reporting
+  remain outside the 0.1.0 MVP, as recorded in ADR-0002.
 
 ## Later / Out-of-Scope Roadmap
 
