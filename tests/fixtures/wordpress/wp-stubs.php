@@ -543,6 +543,17 @@ if ( ! function_exists( 'esc_attr' ) ) {
 	}
 }
 
+if ( ! function_exists( 'selected' ) ) {
+	/** Mirrors WordPress selected() for view-output assertions. */
+	function selected( mixed $selected, mixed $current = true, bool $display = true ): string {
+		$result = (string) $selected === (string) $current ? ' selected="selected"' : '';
+		if ( $display ) {
+			echo $result; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Fixed attribute string.
+		}
+		return $result;
+	}
+}
+
 if ( ! function_exists( 'esc_html' ) ) {
 	/** Escapes a string for safe HTML output. */
 	function esc_html( string $text ): string {

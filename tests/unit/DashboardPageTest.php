@@ -175,6 +175,46 @@ final class DashboardPageTest extends TestCase {
 		);
 	}
 
+	/** Renders the dashboard with a registered, verified provider. */
+	private function render_verified_provider_dashboard( bool $test_email_accepted = false ): string {
+		$GLOBALS['_test_wp_options'][ SettingsRepository::OPTION_KEY ] = array(
+			'provider' => array(
+				'active'                 => 'test-provider',
+				'verified'               => true,
+				'verified_at'            => '2026-09-04T10:00:00+00:00',
+				'test_email_accepted_at' => $test_email_accepted ? '2026-09-04T10:05:00+00:00' : null,
+			),
+		);
+		$this->boot_plugin();
+
+		Plugin::instance()->container()->get( ProviderRegistry::class )->register(
+			new class() implements ProviderInterface {
+				public function get_id(): string {
+					return 'test-provider';
+				}
+				public function get_label(): string {
+					return 'Test Provider';
+				}
+				public function validate_config( array $config ): \Scalyn\MailRelay\Providers\ValidationResult {
+					throw new \LogicException( 'Not called in this test.' );
+				}
+				public function test_connection( array $config ): \Scalyn\MailRelay\Providers\ConnectionResult {
+					throw new \LogicException( 'Not called in this test.' );
+				}
+				public function send( \Scalyn\MailRelay\Mail\MailMessage $message, array $config ): \Scalyn\MailRelay\Mail\SendResult {
+					throw new \LogicException( 'Not called in this test.' );
+				}
+				public function get_capabilities(): array {
+					return array();
+				}
+			}
+		);
+
+		ob_start();
+		( new DashboardPage() )->render();
+		return (string) ob_get_clean();
+	}
+
 	// =========================================================================
 	// CAPABILITY GATE
 	// =========================================================================
@@ -668,6 +708,41 @@ final class DashboardPageTest extends TestCase {
 
 		$this->assertStringContainsString( 'Configured', $output );
 		$this->assertStringContainsString( 'scalyn-badge--connected', $output );
+	}
+
+	public function test_verified_provider_has_enabled_test_email_link(): void {
+		$this->grant_view_dashboard();
+
+		$output = $this->render_verified_provider_dashboard();
+
+		$this->assertMatchesRegularExpression( '/href="[^"]*scalyn-mail-relay-wizard[^"]*step=5[^"]*"[^>]*>Send Test Email<\/a>/', $output );
+		$this->assertStringNotContainsString( 'aria-disabled="true">Send Test Email', $output );
+	}
+
+	public function test_connection_verification_alone_keeps_test_email_step_pending(): void {
+		$this->grant_view_dashboard();
+
+		$output = $this->render_verified_provider_dashboard();
+
+		$this->assertMatchesRegularExpression( '/scalyn-step--pending[^>]*>.*Send test email/s', $output );
+	}
+
+	public function test_accepted_test_email_completes_setup_progress_step(): void {
+		$this->grant_view_dashboard();
+
+		$output = $this->render_verified_provider_dashboard( true );
+
+		$this->assertMatchesRegularExpression( '/scalyn-step--complete[^>]*>.*Send test email/s', $output );
+	}
+
+	public function test_completed_diagnostics_updates_setup_progress(): void {
+		$this->grant_view_dashboard();
+		$this->store_health_row( 88, 88, null, null, 'Health score based on: DNS & authentication.' );
+
+		$output = $this->render_verified_provider_dashboard();
+
+		$this->assertMatchesRegularExpression( '/scalyn-step--complete[^>]*>.*Verify SPF, DKIM and DMARC/s', $output );
+		$this->assertMatchesRegularExpression( '/scalyn-step--complete[^>]*>.*Run diagnostics and health check/s', $output );
 	}
 
 	// =========================================================================

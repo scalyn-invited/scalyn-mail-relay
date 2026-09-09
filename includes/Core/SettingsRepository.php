@@ -20,9 +20,10 @@ defined( 'ABSPATH' ) || exit;
  *
  *   array(
  *       'provider' => array(
- *           'active'      => string,      // Registered provider ID, e.g. 'smtp'.
- *           'verified'    => bool,        // True if connection/send verified after config.
- *           'verified_at' => string|null, // ISO 8601 timestamp of last successful verification.
+ *           'active'                 => string,      // Registered provider ID, e.g. 'smtp'.
+ *           'verified'               => bool,        // True if connection/send verified after config.
+ *           'verified_at'            => string|null, // ISO 8601 timestamp of last successful verification.
+ *           'test_email_accepted_at' => string|null, // ISO 8601 timestamp of the last accepted wizard test email.
  *       ),
  *       'smtp' => array(
  *           'host'       => string,
@@ -57,9 +58,10 @@ final class SettingsRepository {
 
 	private const DEFAULTS = array(
 		'provider' => array(
-			'active'      => '',
-			'verified'    => false,
-			'verified_at' => null,
+			'active'                 => '',
+			'verified'               => false,
+			'verified_at'            => null,
+			'test_email_accepted_at' => null,
 		),
 		'smtp'     => array(
 			'host'       => '',
@@ -132,6 +134,34 @@ final class SettingsRepository {
 	public function mark_provider_verified(): bool {
 		$this->data['provider']['verified']    = true;
 		$this->data['provider']['verified_at'] = current_time( 'c' );
+		return update_option( self::OPTION_KEY, $this->data );
+	}
+
+	/**
+	 * Returns whether the setup wizard has recorded an accepted test email.
+	 *
+	 * Provider verification alone is insufficient because a connection test can
+	 * verify the provider without sending a message.
+	 */
+	public function has_accepted_test_email(): bool {
+		return null !== ( $this->data['provider']['test_email_accepted_at'] ?? null );
+	}
+
+	/**
+	 * Records an accepted setup-wizard test email and verifies the provider.
+	 *
+	 * Accepted means the configured provider acknowledged the message. It does
+	 * not assert inbox delivery.
+	 *
+	 * @return bool True on success; false if the option was not updated.
+	 */
+	public function mark_test_email_accepted(): bool {
+		$now = current_time( 'c' );
+
+		$this->data['provider']['verified']               = true;
+		$this->data['provider']['verified_at']            = $now;
+		$this->data['provider']['test_email_accepted_at'] = $now;
+
 		return update_option( self::OPTION_KEY, $this->data );
 	}
 
@@ -215,6 +245,10 @@ final class SettingsRepository {
 
 		if ( isset( $input['provider']['verified_at'] ) ) {
 			$output['provider']['verified_at'] = sanitize_text_field( (string) $input['provider']['verified_at'] );
+		}
+
+		if ( isset( $input['provider']['test_email_accepted_at'] ) ) {
+			$output['provider']['test_email_accepted_at'] = sanitize_text_field( (string) $input['provider']['test_email_accepted_at'] );
 		}
 
 		if ( isset( $input['smtp'] ) && is_array( $input['smtp'] ) ) {

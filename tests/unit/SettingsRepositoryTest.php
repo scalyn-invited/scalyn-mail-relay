@@ -48,6 +48,29 @@ final class SettingsRepositoryTest extends TestCase {
 		$this->assertFalse( $repo->get_delete_data_on_uninstall() );
 	}
 
+	public function test_test_email_defaults_to_not_accepted(): void {
+		$repo = new SettingsRepository();
+
+		$this->assertFalse( $repo->has_accepted_test_email() );
+	}
+
+	public function test_mark_test_email_accepted_persists_completion_and_verification(): void {
+		$GLOBALS['_test_wp_options'][ SettingsRepository::OPTION_KEY ] = array(
+			'provider' => array( 'active' => 'smtp' ),
+			'smtp'     => array( 'from_email' => 'from@example.com' ),
+		);
+
+		$repo = new SettingsRepository();
+		$repo->mark_test_email_accepted();
+
+		$fresh = new SettingsRepository();
+		$this->assertTrue( $fresh->has_accepted_test_email() );
+		$this->assertTrue( $fresh->is_provider_verified() );
+		$this->assertNotNull( $fresh->get_provider_verified_at() );
+		$this->assertSame( 'smtp', $fresh->get_active_provider_id() );
+		$this->assertSame( 'from@example.com', $fresh->get_smtp_config()['from_email'] );
+	}
+
 	public function test_save_persists_provider_id_and_is_readable_on_fresh_instance(): void {
 		$repo = new SettingsRepository();
 		$repo->save( array( 'provider' => array( 'active' => 'smtp' ) ) );

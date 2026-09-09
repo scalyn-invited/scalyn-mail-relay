@@ -6,6 +6,7 @@
  *   array $rows          Log rows as associative arrays, newest first. May be empty.
  *   int   $page          Current page number (≥ 1).
  *   bool  $has_next_page Whether additional rows may exist beyond this page.
+ *   string $status       Validated status filter, or an empty string.
  *
  * Privacy: Do not add columns for recipient, subject, body, response_message,
  * or event_data. Only fields explicitly listed in this template are permitted.
@@ -19,20 +20,30 @@ use Scalyn\MailRelay\Admin\Components\StatusBadge;
 defined( 'ABSPATH' ) || exit;
 
 $logs_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-logs' );
+$logs_form_url = admin_url( 'admin.php' );
 
 $status_labels = array(
 	'accepted' => __( 'Accepted', 'scalyn-mail-relay' ),
 	'failed'   => __( 'Failed', 'scalyn-mail-relay' ),
 );
+
+$previous_page_args = array( 'paged' => $page - 1 );
+$next_page_args     = array( 'paged' => $page + 1 );
+if ( '' !== $status ) {
+	$previous_page_args['status'] = $status;
+	$next_page_args['status']     = $status;
+}
+$previous_page_url = add_query_arg( $previous_page_args, $logs_base_url );
+$next_page_url     = add_query_arg( $next_page_args, $logs_base_url );
 ?>
 <div class="wrap scalyn-mail-relay">
 	<h1><?php esc_html_e( 'Email Logs', 'scalyn-mail-relay' ); ?></h1>
 	<p class="scalyn-lead"><?php esc_html_e( 'Recent email outcomes recorded by Scalyn Mail Relay.', 'scalyn-mail-relay' ); ?></p>
 
-	<?php if ( ! empty( $rows ) ) : ?>
-		<div class="scalyn-card scalyn-logs-filters">
-			<form method="get" action="<?php echo esc_url( $logs_base_url ); ?>" class="scalyn-filter-form">
-				<fieldset>
+	<div class="scalyn-card scalyn-logs-filters">
+		<form method="get" action="<?php echo esc_url( $logs_form_url ); ?>" class="scalyn-filter-form">
+			<input type="hidden" name="page" value="scalyn-mail-relay-logs" />
+			<fieldset>
 					<legend class="screen-reader-text"><?php esc_html_e( 'Filter email logs', 'scalyn-mail-relay' ); ?></legend>
 					<div class="scalyn-filter-controls">
 						<div class="scalyn-filter-group">
@@ -40,38 +51,48 @@ $status_labels = array(
 								<?php esc_html_e( 'Status:', 'scalyn-mail-relay' ); ?>
 							</label>
 							<select id="scalyn-filter-status" name="status" class="scalyn-filter-select" aria-label="<?php esc_attr_e( 'Filter by status', 'scalyn-mail-relay' ); ?>">
-								<option value=""><?php esc_html_e( 'All', 'scalyn-mail-relay' ); ?></option>
-								<option value="accepted"><?php esc_html_e( 'Accepted', 'scalyn-mail-relay' ); ?></option>
-								<option value="failed"><?php esc_html_e( 'Failed', 'scalyn-mail-relay' ); ?></option>
+								<option value="" <?php selected( $status, '' ); ?>><?php esc_html_e( 'All', 'scalyn-mail-relay' ); ?></option>
+								<option value="accepted" <?php selected( $status, 'accepted' ); ?>><?php esc_html_e( 'Accepted', 'scalyn-mail-relay' ); ?></option>
+								<option value="failed" <?php selected( $status, 'failed' ); ?>><?php esc_html_e( 'Failed', 'scalyn-mail-relay' ); ?></option>
 							</select>
 						</div>
+						<button type="submit" class="button" aria-label="<?php esc_attr_e( 'Apply filters', 'scalyn-mail-relay' ); ?>">
+							<?php esc_html_e( 'Filter', 'scalyn-mail-relay' ); ?>
+						</button>
+						<?php
+						if ( '' !== $status ) :
+							?>
+							<a href="<?php echo esc_url( $logs_base_url ); ?>" class="button">
+								<?php esc_html_e( 'Clear', 'scalyn-mail-relay' ); ?>
+							</a>
+						<?php endif; ?>
 					</div>
-					<button type="submit" class="button" aria-label="<?php esc_attr_e( 'Apply filters', 'scalyn-mail-relay' ); ?>">
-						<?php esc_html_e( 'Filter', 'scalyn-mail-relay' ); ?>
-					</button>
-					<?php
-					// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only GET navigation; no state change. Value validated in LogsPage.
-					if ( isset( $_GET['status'] ) && '' !== $_GET['status'] ) :
-						?>
-						<a href="<?php echo esc_url( $logs_base_url ); ?>" class="button">
-							<?php esc_html_e( 'Clear', 'scalyn-mail-relay' ); ?>
-						</a>
-					<?php endif; ?>
-				</fieldset>
-			</form>
-		</div>
-	<?php endif; ?>
+			</fieldset>
+		</form>
+	</div>
 
 	<?php if ( empty( $rows ) ) : ?>
 
 		<div class="scalyn-card">
 			<?php
-			EmptyState::render(
-				__( 'No email activity has been recorded yet.', 'scalyn-mail-relay' )
-			);
+			if ( '' !== $status ) {
+				EmptyState::render(
+					__( 'No email activity matches the selected status.', 'scalyn-mail-relay' )
+				);
+			} else {
+				EmptyState::render(
+					__( 'No email activity has been recorded yet.', 'scalyn-mail-relay' )
+				);
+			}
 			?>
 			<p class="scalyn-card__note description">
-				<?php esc_html_e( 'Logs will appear here after Scalyn Mail Relay sends its first email.', 'scalyn-mail-relay' ); ?>
+				<?php
+				if ( '' !== $status ) {
+					esc_html_e( 'Choose another status or clear the filter.', 'scalyn-mail-relay' );
+				} else {
+					esc_html_e( 'Logs will appear here after Scalyn Mail Relay sends its first email.', 'scalyn-mail-relay' );
+				}
+				?>
 			</p>
 		</div>
 
@@ -82,12 +103,12 @@ $status_labels = array(
 				<table class="wp-list-table widefat fixed striped scalyn-log-table">
 				<thead>
 					<tr>
-						<th scope="col" class="scalyn-log-col-status"><?php esc_html_e( 'Status', 'scalyn-mail-relay' ); ?></th>
-						<th scope="col" class="scalyn-log-col-provider"><?php esc_html_e( 'Provider', 'scalyn-mail-relay' ); ?></th>
-						<th scope="col" class="scalyn-log-col-source"><?php esc_html_e( 'Source', 'scalyn-mail-relay' ); ?></th>
-						<th scope="col" class="scalyn-log-col-attachments"><?php esc_html_e( 'Attachments', 'scalyn-mail-relay' ); ?></th>
-						<th scope="col" class="scalyn-log-col-timestamp"><?php esc_html_e( 'Timestamp', 'scalyn-mail-relay' ); ?></th>
-						<th scope="col" class="scalyn-log-col-action"><?php esc_html_e( 'Timeline', 'scalyn-mail-relay' ); ?></th>
+						<th scope="col" class="scalyn-log-col-status" style="width: 100px;"><?php esc_html_e( 'Status', 'scalyn-mail-relay' ); ?></th>
+						<th scope="col" class="scalyn-log-col-provider" style="width: 80px;"><?php esc_html_e( 'Provider', 'scalyn-mail-relay' ); ?></th>
+						<th scope="col" class="scalyn-log-col-source" style="width: 70px; white-space: nowrap;"><?php esc_html_e( 'Source', 'scalyn-mail-relay' ); ?></th>
+						<th scope="col" class="scalyn-log-col-attachments" style="width: 90px;"><?php esc_html_e( 'Attachments', 'scalyn-mail-relay' ); ?></th>
+						<th scope="col" class="scalyn-log-col-timestamp" style="width: 150px;"><?php esc_html_e( 'Timestamp', 'scalyn-mail-relay' ); ?></th>
+						<th scope="col" class="scalyn-log-col-action" style="width: 100px;"><?php esc_html_e( 'Timeline', 'scalyn-mail-relay' ); ?></th>
 					</tr>
 				</thead>
 				<tbody>
@@ -116,19 +137,19 @@ $status_labels = array(
 						);
 						?>
 						<tr>
-							<td class="scalyn-log-col-status">
+							<td class="scalyn-log-col-status" data-label="<?php esc_attr_e( 'Status', 'scalyn-mail-relay' ); ?>">
 								<?php StatusBadge::render( $row_status, $label ); ?>
 							</td>
-							<td class="scalyn-log-col-provider">
+							<td class="scalyn-log-col-provider" data-label="<?php esc_attr_e( 'Provider', 'scalyn-mail-relay' ); ?>">
 								<?php echo '' !== $provider ? esc_html( $provider ) : '<span aria-label="' . esc_attr__( 'Unknown provider', 'scalyn-mail-relay' ) . '">—</span>'; ?>
 							</td>
-							<td class="scalyn-log-col-source">
+							<td class="scalyn-log-col-source" data-label="<?php esc_attr_e( 'Source', 'scalyn-mail-relay' ); ?>">
 								<?php echo '—' === $source_display ? '<span>—</span>' : esc_html( $source_display ); ?>
 							</td>
-							<td class="scalyn-log-col-attachments">
+							<td class="scalyn-log-col-attachments" data-label="<?php esc_attr_e( 'Attachments', 'scalyn-mail-relay' ); ?>">
 								<?php echo esc_html( (string) $att_count ); ?>
 							</td>
-							<td class="scalyn-log-col-timestamp">
+							<td class="scalyn-log-col-timestamp" data-label="<?php esc_attr_e( 'Timestamp', 'scalyn-mail-relay' ); ?>">
 								<?php
 								if ( ! empty( $created_at ) ) {
 									$timestamp = strtotime( $created_at );
@@ -147,7 +168,7 @@ $status_labels = array(
 								}
 								?>
 							</td>
-							<td class="scalyn-log-col-action">
+							<td class="scalyn-log-col-action" data-label="<?php esc_attr_e( 'Timeline', 'scalyn-mail-relay' ); ?>">
 								<?php if ( '' !== $uuid ) : ?>
 									<a href="<?php echo esc_url( $timeline_url ); ?>" class="button button-small">
 										<?php esc_html_e( 'View Timeline', 'scalyn-mail-relay' ); ?>
@@ -164,12 +185,12 @@ $status_labels = array(
 				<div class="scalyn-log-pagination tablenav">
 					<div class="tablenav-pages">
 						<?php if ( $page > 1 ) : ?>
-							<a class="button prev-page" href="<?php echo esc_url( add_query_arg( array( 'paged' => $page - 1 ), $logs_base_url ) ); ?>">
+							<a class="button prev-page" href="<?php echo esc_url( $previous_page_url ); ?>">
 								&laquo; <?php esc_html_e( 'Previous', 'scalyn-mail-relay' ); ?>
 							</a>
 						<?php endif; ?>
 						<?php if ( $has_next_page ) : ?>
-							<a class="button next-page" href="<?php echo esc_url( add_query_arg( array( 'paged' => $page + 1 ), $logs_base_url ) ); ?>">
+							<a class="button next-page" href="<?php echo esc_url( $next_page_url ); ?>">
 								<?php esc_html_e( 'Next', 'scalyn-mail-relay' ); ?> &raquo;
 							</a>
 						<?php endif; ?>

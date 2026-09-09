@@ -155,6 +155,36 @@ final class MailLogRepository {
 	}
 
 	/**
+	 * Returns recent mail log rows for one terminal status, newest first.
+	 *
+	 * The status is restricted to the public terminal outcomes exposed by the
+	 * admin log filter. Invalid values return an empty result without querying.
+	 *
+	 * @param string $status MailStatus::ACCEPTED or MailStatus::FAILED.
+	 * @param int    $limit  Number of rows to return; clamped to 1–MAX_PAGE_SIZE.
+	 * @param int    $offset Zero-based row offset; negative values treated as 0.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function find_recent_by_status( string $status, int $limit = 25, int $offset = 0 ): array {
+		global $wpdb;
+
+		if ( ! in_array( $status, array( MailStatus::ACCEPTED, MailStatus::FAILED ), true ) ) {
+			return array();
+		}
+
+		$limit  = min( max( 1, $limit ), self::MAX_PAGE_SIZE );
+		$offset = max( 0, $offset );
+		$table  = $wpdb->prefix . 'scalyn_mail_logs';
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $table is derived from $wpdb->prefix, not user input.
+		$sql = $wpdb->prepare( "SELECT * FROM {$table} WHERE status = %s ORDER BY created_at DESC, id DESC LIMIT %d OFFSET %d", $status, $limit, $offset );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- $sql is the output of $wpdb->prepare(); log rows are write-heavy and must not be cached.
+		$results = $wpdb->get_results( $sql, ARRAY_A );
+
+		return $results ? $results : array();
+	}
+
+	/**
 	 * Returns mail log row counts grouped by status for the last N days.
 	 *
 	 * Used as the operational-reliability evidence source for health scoring
