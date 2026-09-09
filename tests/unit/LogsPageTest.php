@@ -146,6 +146,72 @@ final class LogsPageTest extends TestCase {
 		$this->assertStringNotContainsString( '<table', $output );
 	}
 
+	public function test_filter_form_keeps_logs_page_parameter(): void {
+		$this->grant_view_logs();
+		$this->wpdb->get_results_return = array();
+
+		$output = $this->render_and_capture();
+
+		$this->assertStringContainsString( 'name="page" value="scalyn-mail-relay-logs"', $output );
+	}
+
+	public function test_filter_button_is_grouped_inline_with_status_control(): void {
+		$this->grant_view_logs();
+		$this->wpdb->get_results_return = array();
+
+		$output = $this->render_and_capture();
+
+		$this->assertMatchesRegularExpression( '/scalyn-filter-controls.*scalyn-filter-status.*>\s*Filter\s*<.*<\/div>/s', $output );
+	}
+
+	public function test_status_filter_is_applied_in_repository_query(): void {
+		$this->grant_view_logs();
+		$_GET['status']                  = 'failed';
+		$this->wpdb->get_results_return = array();
+
+		$this->render_and_capture();
+
+		$last = end( $this->wpdb->prepare_calls );
+		$this->assertStringContainsString( 'WHERE status = %s', $last['query'] );
+		$this->assertSame( array( 'failed', 26, 0 ), $last['args'] );
+	}
+
+	public function test_selected_status_is_preserved_in_filter(): void {
+		$this->grant_view_logs();
+		$_GET['status']                  = 'accepted';
+		$this->wpdb->get_results_return = array( $this->make_log_row() );
+
+		$output = $this->render_and_capture();
+
+		$this->assertMatchesRegularExpression( '/value="accepted"\\s+selected=[\'\"]selected[\'\"]/', $output );
+	}
+
+	public function test_filtered_empty_state_keeps_filter_and_explains_no_matches(): void {
+		$this->grant_view_logs();
+		$_GET['status']                  = 'failed';
+		$this->wpdb->get_results_return = array();
+
+		$output = $this->render_and_capture();
+
+		$this->assertStringContainsString( 'Filter by status', $output );
+		$this->assertStringContainsString( 'No email activity matches the selected status', $output );
+		$this->assertStringContainsString( 'Choose another status or clear the filter', $output );
+		$this->assertStringContainsString( '>Clear<', str_replace( array( "\r", "\n", "\t" ), '', $output ) );
+		$this->assertStringNotContainsString( 'No email activity has been recorded yet', $output );
+	}
+
+	public function test_log_cells_include_mobile_data_labels(): void {
+		$this->grant_view_logs();
+		$this->wpdb->get_results_return = array( $this->make_log_row() );
+
+		$output = $this->render_and_capture();
+
+		$this->assertStringContainsString( 'data-label="Provider"', $output );
+		$this->assertStringContainsString( 'data-label="Source"', $output );
+		$this->assertStringContainsString( 'data-label="Attachments"', $output );
+		$this->assertStringContainsString( 'data-label="Timestamp"', $output );
+	}
+
 	// =========================================================================
 	// LIST VIEW — pagination
 	// =========================================================================
@@ -237,6 +303,16 @@ final class LogsPageTest extends TestCase {
 		$output = $this->render_and_capture();
 
 		$this->assertStringContainsString( 'Previous', $output );
+	}
+
+	public function test_filtered_pagination_preserves_status(): void {
+		$this->grant_view_logs();
+		$_GET['status']                  = 'accepted';
+		$this->wpdb->get_results_return = array_fill( 0, 26, $this->make_log_row() );
+
+		$output = $this->render_and_capture();
+
+		$this->assertStringContainsString( 'status=accepted', $output );
 	}
 
 	// =========================================================================

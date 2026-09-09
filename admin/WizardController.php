@@ -309,10 +309,10 @@ final class WizardController {
 		$dispatcher = $this->get_dispatcher();
 		$result     = $dispatcher->dispatch( $message );
 
-		// A test email accepted by the provider also verifies the provider
-		// (see SettingsRepository::mark_provider_verified()).
+		// Persist test-email completion separately from connection verification so
+		// the Dashboard can represent the setup steps accurately.
 		if ( $result->success ) {
-			$settings->mark_provider_verified();
+			$settings->mark_test_email_accepted();
 		}
 
 		$safe_message = $result->success

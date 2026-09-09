@@ -59,8 +59,8 @@
 
 /* ---- Email Logs filters ---- */
 .scalyn-logs-filters { margin-bottom: 20px; background: #f9f9f9; }
-.scalyn-filter-form { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
-.scalyn-filter-controls { display: flex; gap: 16px; flex-wrap: wrap; flex: 1; }
+.scalyn-filter-form fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.scalyn-filter-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .scalyn-filter-group { display: flex; align-items: center; gap: 8px; }
 .scalyn-filter-label { font-weight: 500; color: #1e1e1e; white-space: nowrap; margin: 0; }
 .scalyn-filter-select { padding: 6px 8px; border: 1px solid #dcdcde; border-radius: 4px; font-size: 13px; min-width: 120px; }
@@ -69,22 +69,19 @@
 /* ---- Email Logs list table ---- */
 .scalyn-log-table { margin-top: 12px; width: 100%; }
 .scalyn-log-table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.scalyn-log-table .scalyn-log-col-status { width: 110px; }
-.scalyn-log-table .scalyn-log-col-provider { width: 90px; }
-.scalyn-log-table .scalyn-log-col-source { width: auto; }
-.scalyn-log-table .scalyn-log-col-attachments { width: 100px; }
-.scalyn-log-table .scalyn-log-col-timestamp { width: 160px; }
-.scalyn-log-table .scalyn-log-col-action { width: 120px; }
+.scalyn-log-table thead th { white-space: nowrap; }
+.scalyn-log-table .scalyn-log-col-status { width: 100px; }
+.scalyn-log-table .scalyn-log-col-provider { width: 80px; }
+.scalyn-log-table .scalyn-log-col-source { width: 70px; }
+.scalyn-log-table .scalyn-log-col-attachments { width: 90px; }
+.scalyn-log-table .scalyn-log-col-timestamp { width: 150px; }
+.scalyn-log-table .scalyn-log-col-action { width: 100px; }
 .scalyn-log-pagination { margin-top: 10px; display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
 .scalyn-log-pagination .button { padding: 6px 12px; font-size: 13px; }
 .scalyn-log-note { margin-top: 12px; }
 
 /* ---- Responsive design ---- */
 @media (max-width: 768px) {
-	.scalyn-filter-form { flex-direction: column; align-items: stretch; }
-	.scalyn-filter-controls { flex-direction: column; }
-	.scalyn-filter-select { width: 100%; }
-	.scalyn-filter-form .button { width: 100%; }
 	.scalyn-log-table { font-size: 13px; }
 	.scalyn-log-table .scalyn-log-col-source,
 	.scalyn-log-table .scalyn-log-col-attachments { display: none; }
@@ -98,13 +95,24 @@
 }
 
 @media (max-width: 480px) {
-	.scalyn-log-table { font-size: 12px; }
-	.scalyn-log-table-wrapper { margin: 0 -20px; padding: 0 20px; }
-	.scalyn-log-table .scalyn-log-col-provider { display: none; }
-	.scalyn-log-table .scalyn-log-col-status { width: 70px; font-size: 11px; }
-	.scalyn-log-table .scalyn-log-col-timestamp { display: none; }
-	.scalyn-log-table .scalyn-log-col-action { width: 90px; }
-	.scalyn-log-table th, .scalyn-log-table td { padding: 6px 4px; }
+	.scalyn-log-table-wrapper { margin: 0; padding: 0; overflow: visible; }
+	.scalyn-log-table,
+	.scalyn-log-table tbody,
+	.scalyn-log-table tr,
+	.scalyn-log-table td { display: block; width: 100%; }
+	.scalyn-log-table thead { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+	.scalyn-log-table tbody { display: grid; gap: 12px; }
+	.scalyn-log-table tbody tr { box-sizing: border-box; padding: 10px 12px; border: 1px solid #dcdcde; border-radius: 6px; background: #fff; }
+	.scalyn-log-table tbody td,
+	.scalyn-log-table .scalyn-log-col-status,
+	.scalyn-log-table .scalyn-log-col-provider,
+	.scalyn-log-table .scalyn-log-col-source,
+	.scalyn-log-table .scalyn-log-col-attachments,
+	.scalyn-log-table .scalyn-log-col-timestamp,
+	.scalyn-log-table .scalyn-log-col-action { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; box-sizing: border-box; width: 100%; padding: 7px 0; font-size: 12px; text-align: right; border: 0; border-bottom: 1px solid #f0f0f1; }
+	.scalyn-log-table tbody td:last-child { border-bottom: 0; }
+	.scalyn-log-table tbody td::before { content: attr(data-label); flex: 0 0 42%; font-weight: 600; color: #1d2327; text-align: left; }
+	.scalyn-log-table .scalyn-badge { margin: 0; }
 	.scalyn-log-table .button { padding: 4px 8px; font-size: 11px; }
 	.scalyn-log-pagination { justify-content: center; margin-left: -8px; margin-right: -8px; }
 	.scalyn-wizard-step__label { display: none; }

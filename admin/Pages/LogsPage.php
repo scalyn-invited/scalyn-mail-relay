@@ -91,22 +91,15 @@ final class LogsPage {
 		$page   = max( 1, absint( $paged ) );
 		$offset = ( $page - 1 ) * self::PER_PAGE;
 
-		// Fetch one extra row to determine if there's a next page.
-		$rows          = $this->log_repo->find_recent( self::PER_PAGE + 1, $offset );
+		// Fetch one extra row to determine if there's a next page. Apply the status
+		// in the repository so filtering and pagination describe the full result set.
+		$rows          = $status
+			? $this->log_repo->find_recent_by_status( $status, self::PER_PAGE + 1, $offset )
+			: $this->log_repo->find_recent( self::PER_PAGE + 1, $offset );
 		$has_next_page = count( $rows ) > self::PER_PAGE;
 
 		// Trim to page size.
 		$rows = array_slice( $rows, 0, self::PER_PAGE, true );
-
-		// Filter by status if requested.
-		if ( $status ) {
-			$rows = array_filter(
-				$rows,
-				function ( $row ) use ( $status ) {
-					return ( $row['status'] ?? '' ) === $status;
-				}
-			);
-		}
 
 		require SCALYN_MAIL_RELAY_PATH . 'admin/views/logs.php';
 	}

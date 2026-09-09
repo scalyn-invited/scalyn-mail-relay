@@ -43,6 +43,7 @@ final class DashboardPage {
 		$settings            = $container->get( SettingsRepository::class );
 		$provider_configured = $this->is_provider_configured();
 		$provider_verified   = $provider_configured && $settings->is_provider_verified();
+		$test_email_accepted = $provider_configured && $settings->has_accepted_test_email();
 
 		$log_repo   = $container->get( MailLogRepository::class );
 		$rows       = $log_repo->find_recent( 1, 0 );
@@ -61,15 +62,20 @@ final class DashboardPage {
 
 		// Health score: read the last HealthScorer snapshot — the same source and
 		// presentation the Diagnostics page uses — so both screens agree.
-		$health            = HealthScorePresenter::present( $container->get( HealthScoreRepository::class )->find_latest() );
-		$health_score      = $health['score'];
-		$health_ui_status  = $health['ui_status'];
-		$health_ui_label   = $health['label'];
-		$health_components = $health['components'];
-		$health_summary    = $health['summary'];
+		$health                    = HealthScorePresenter::present( $container->get( HealthScoreRepository::class )->find_latest() );
+		$health_score              = $health['score'];
+		$health_ui_status          = $health['ui_status'];
+		$health_ui_label           = $health['label'];
+		$health_components         = $health['components'];
+		$health_summary            = $health['summary'];
+		$has_completed_diagnostics = null !== $health['created_at'];
 
 		// Wire the "Run Diagnostics" button to the REST endpoint.
 		$diagnostics_run_url = rest_url( 'scalyn-mail-relay/v1/diagnostics/run' );
+		$test_email_url      = add_query_arg(
+			array( 'step' => 5 ),
+			admin_url( 'admin.php?page=scalyn-mail-relay-wizard' )
+		);
 
 		require SCALYN_MAIL_RELAY_PATH . 'admin/views/dashboard.php';
 	}

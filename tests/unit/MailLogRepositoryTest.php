@@ -404,6 +404,37 @@ final class MailLogRepositoryTest extends TestCase {
 	}
 
 	// -------------------------------------------------------------------------
+	// find_recent_by_status()
+	// -------------------------------------------------------------------------
+
+	public function test_find_recent_by_status_applies_status_before_pagination(): void {
+		$this->wpdb->get_results_return = array();
+
+		$this->make_repo()->find_recent_by_status( MailStatus::FAILED, 26, 25 );
+
+		$last = end( $this->wpdb->prepare_calls );
+		$this->assertStringContainsString( 'WHERE status = %s', $last['query'] );
+		$this->assertSame( array( MailStatus::FAILED, 26, 25 ), $last['args'] );
+	}
+
+	public function test_find_recent_by_status_rejects_unknown_status_without_query(): void {
+		$result = $this->make_repo()->find_recent_by_status( 'pending' );
+
+		$this->assertSame( array(), $result );
+		$this->assertCount( 0, $this->wpdb->prepare_calls );
+	}
+
+	public function test_find_recent_by_status_clamps_limit_and_offset(): void {
+		$this->wpdb->get_results_return = array();
+
+		$this->make_repo()->find_recent_by_status( MailStatus::ACCEPTED, MailLogRepository::MAX_PAGE_SIZE + 1, -5 );
+
+		$last = end( $this->wpdb->prepare_calls );
+		$this->assertSame( MailLogRepository::MAX_PAGE_SIZE, $last['args'][1] );
+		$this->assertSame( 0, $last['args'][2] );
+	}
+
+	// -------------------------------------------------------------------------
 	// DB write failure handling
 	// -------------------------------------------------------------------------
 

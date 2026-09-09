@@ -461,6 +461,7 @@ final class WizardControllerTest extends TestCase {
 
 		$fresh = new SettingsRepository();
 		$this->assertTrue( $fresh->is_provider_verified() );
+		$this->assertFalse( $fresh->has_accepted_test_email(), 'A connection test must not complete the test-email step.' );
 		$this->assertNotNull( $fresh->get_provider_verified_at() );
 		$this->assertSame( 'smtp', $fresh->get_active_provider_id(), 'Marking verified must not clobber the active provider.' );
 	}
@@ -616,6 +617,7 @@ final class WizardControllerTest extends TestCase {
 
 		$fresh = new SettingsRepository();
 		$this->assertTrue( $fresh->is_provider_verified() );
+		$this->assertTrue( $fresh->has_accepted_test_email() );
 		$this->assertSame( 'from@example.com', $fresh->get_smtp_config()['from_email'], 'Marking verified must not clobber SMTP settings.' );
 	}
 
@@ -630,5 +632,6 @@ final class WizardControllerTest extends TestCase {
 		$this->run_handle();
 
 		$this->assertFalse( ( new SettingsRepository() )->is_provider_verified() );
+		$this->assertFalse( ( new SettingsRepository() )->has_accepted_test_email() );
 	}
 }

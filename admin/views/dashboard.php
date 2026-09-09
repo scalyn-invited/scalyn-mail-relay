@@ -4,6 +4,7 @@
  *
  * Variables injected by DashboardPage::render():
  *   bool       $provider_configured  Whether a provider is configured and registered.
+ *   bool       $test_email_accepted Whether the setup wizard recorded provider acceptance of a test email.
  *   array|null $latest_log           Most recent mail log row, or null when no records exist.
  *   string     $timeline_url         Validated timeline URL, or '' when no valid UUID exists.
  *   int|null   $health_score         Overall health score (0-100) or null if no results.
@@ -11,6 +12,8 @@
  *   string     $health_ui_label      Formatted health label (e.g., "80/100" or "Unknown").
  *   array      $health_components    Component label => score (0-100) or null when not evaluated.
  *   string     $health_summary       HealthScorer summary of what the score is based on, or ''.
+ *   bool       $has_completed_diagnostics Whether at least one health snapshot exists.
+ *   string     $test_email_url       Setup Wizard URL for the test-email step.
  *
  * Privacy: Do not render response_message, event_data, recipient, subject, body,
  * credentials, raw SMTP transcripts, or unrestricted provider error metadata.
@@ -46,15 +49,15 @@ $setup_steps = array(
 	),
 	array(
 		'label'  => __( 'Send test email', 'scalyn-mail-relay' ),
-		'status' => 'pending',
+		'status' => $test_email_accepted ? 'complete' : 'pending',
 	),
 	array(
 		'label'  => __( 'Verify SPF, DKIM and DMARC', 'scalyn-mail-relay' ),
-		'status' => 'pending',
+		'status' => $has_completed_diagnostics ? 'complete' : 'pending',
 	),
 	array(
 		'label'  => __( 'Run diagnostics and health check', 'scalyn-mail-relay' ),
-		'status' => 'pending',
+		'status' => $has_completed_diagnostics ? 'complete' : 'pending',
 	),
 );
 ?>
@@ -189,7 +192,7 @@ $setup_steps = array(
 				false
 			);
 			?>
-			<?php ActionButton::render( __( 'Send Test Email', 'scalyn-mail-relay' ), '', ! $provider_verified, '', array(), false ); ?>
+			<?php ActionButton::render( __( 'Send Test Email', 'scalyn-mail-relay' ), $test_email_url, ! $provider_verified, '', array(), false ); ?>
 			<?php ActionButton::render( __( 'View Logs', 'scalyn-mail-relay' ), $logs_url, false, '', array(), false ); ?>
 		</div>
 		<?php if ( ! $provider_verified ) : ?>
