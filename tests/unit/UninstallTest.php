@@ -57,6 +57,7 @@ final class UninstallTest extends TestCase {
 		$GLOBALS['_test_wp_options'] = array(
 			'scalyn_mail_relay_db_version' => '0.1.0',
 			'scalyn_mail_relay_version'    => '0.1.0',
+			'scalyn_mail_relay_retention_status' => array( 'state' => 'complete' ),
 			'unrelated_plugin_option'      => 'keep me',
 		);
 	}
@@ -99,9 +100,10 @@ final class UninstallTest extends TestCase {
 		$this->assertSame( array(), $this->wpdb->queries, 'No table may be dropped by default.' );
 		$this->assertArrayHasKey( 'scalyn_mail_relay_settings', $GLOBALS['_test_wp_options'] );
 		$this->assertArrayHasKey( 'scalyn_mail_relay_db_version', $GLOBALS['_test_wp_options'] );
+		$this->assertArrayHasKey( 'scalyn_mail_relay_retention_status', $GLOBALS['_test_wp_options'] );
 		$this->assertTrue( $this->administrator()->has_cap( Capabilities::VIEW_DASHBOARD ) );
 		$this->assertArrayHasKey( 'scalyn_mail_relay_health_cache', $GLOBALS['_test_wp_transients'] );
-		$this->assertSame( array(), $GLOBALS['_test_wp_cleared_hooks'] );
+		$this->assertSame( \Scalyn\MailRelay\Core\ScheduledHooks::all(), $GLOBALS['_test_wp_cleared_hooks'] );
 	}
 
 	public function test_retains_everything_when_the_flag_is_false(): void {
@@ -117,7 +119,7 @@ final class UninstallTest extends TestCase {
 	 */
 	public function test_retains_everything_for_a_truthy_non_boolean_flag(): void {
 		$GLOBALS['_test_wp_options']['scalyn_mail_relay_settings'] = array(
-			'advanced' => array( 'delete_data_on_uninstall' => '0' ),
+			'advanced' => array( 'delete_data_on_uninstall' => 'true' ),
 		);
 
 		require dirname( __DIR__, 2 ) . '/uninstall.php';
@@ -150,6 +152,7 @@ final class UninstallTest extends TestCase {
 		$this->assertArrayNotHasKey( 'scalyn_mail_relay_settings', $GLOBALS['_test_wp_options'] );
 		$this->assertArrayNotHasKey( 'scalyn_mail_relay_db_version', $GLOBALS['_test_wp_options'] );
 		$this->assertArrayNotHasKey( 'scalyn_mail_relay_version', $GLOBALS['_test_wp_options'] );
+		$this->assertArrayNotHasKey( 'scalyn_mail_relay_retention_status', $GLOBALS['_test_wp_options'] );
 		$this->assertSame( 'keep me', $GLOBALS['_test_wp_options']['unrelated_plugin_option'] );
 	}
 

@@ -199,14 +199,26 @@ final class SettingsRepository {
 	 * Returns the number of days mail log records are retained before cleanup.
 	 */
 	public function get_log_retention_days(): int {
-		return absint( $this->data['advanced']['log_retention_days'] ?? 30 );
+		$value = $this->data['advanced']['log_retention_days'] ?? 30;
+		return self::valid_retention_days( $value ) ? (int) $value : 30;
+	}
+
+	/**
+	 * Accepts only whole days between one day and ten years. Zero is not unlimited.
+	 *
+	 * @param mixed $value Submitted or stored value.
+	 */
+	public static function valid_retention_days( mixed $value ): bool {
+		return ( is_int( $value ) || is_string( $value ) )
+			&& 1 === preg_match( '/^[1-9][0-9]{0,3}$/D', (string) $value )
+			&& (int) $value <= 3650;
 	}
 
 	/**
 	 * Returns whether all plugin data should be removed on uninstall.
 	 */
 	public function get_delete_data_on_uninstall(): bool {
-		return (bool) ( $this->data['advanced']['delete_data_on_uninstall'] ?? false );
+		return true === ( $this->data['advanced']['delete_data_on_uninstall'] ?? false );
 	}
 
 	/**
@@ -231,6 +243,7 @@ final class SettingsRepository {
 	 *
 	 * @param array<string, mixed> $input Raw input.
 	 * @return array<string, mixed> Sanitized subset.
+	 * @throws \InvalidArgumentException When retention or deletion confirmation is invalid.
 	 */
 	private function sanitize( array $input ): array {
 		$output = array();
@@ -277,9 +290,20 @@ final class SettingsRepository {
 		}
 
 		if ( isset( $input['advanced'] ) && is_array( $input['advanced'] ) ) {
-			$adv                                      = $input['advanced'];
-			$output['advanced']['log_retention_days'] = absint( $adv['log_retention_days'] ?? 30 );
-			$output['advanced']['delete_data_on_uninstall'] = (bool) ( $adv['delete_data_on_uninstall'] ?? false );
+			$adv = $input['advanced'];
+			if ( array_key_exists( 'log_retention_days', $adv ) ) {
+				if ( ! self::valid_retention_days( $adv['log_retention_days'] ) ) {
+					throw new \InvalidArgumentException( 'Retention must be a whole number from 1 to 3650 days.' );
+				}
+				$output['advanced']['log_retention_days'] = (int) $adv['log_retention_days'];
+			}
+			if ( array_key_exists( 'delete_data_on_uninstall', $adv ) ) {
+				$delete = true === $adv['delete_data_on_uninstall'];
+				if ( $delete && ! $this->get_delete_data_on_uninstall() && true !== ( $adv['confirm_delete_data'] ?? false ) ) {
+					throw new \InvalidArgumentException( 'Explicit confirmation is required to enable uninstall deletion.' );
+				}
+				$output['advanced']['delete_data_on_uninstall'] = $delete;
+			}
 		}
 
 		return $output;

@@ -7,6 +7,23 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+- Add hourly retention scheduling, database overlap protection and safe cleanup
+  status; failed or full batches resume on later ticks.
+- Add capability/nonce-protected Data Controls for 1–3650 day retention and
+  separately confirmed uninstall deletion; preserve omitted advanced settings.
+- Share scheduled-hook ownership across activation, deactivation and both
+  uninstall modes; reject truthy non-boolean deletion flags and clean up status
+  during explicitly destructive uninstall.
+- Treat retention selection errors as failures rather than empty successful batches.
+
+### Added
+
+- Bounded, oldest-first mail retention repository that transactionally removes
+  expired mail logs with their related timeline events. Cutoff calculation,
+  scheduling and settings-driven execution remain pending.
+- Bounded diagnostic retention that deletes complete diagnostic-run groups and
+  independently expires health snapshots without inventing absent correlation.
+
 ## [0.1.0] - 2026-09-04
 
 First MVP release: configure a mail provider, send through it, see what happened,

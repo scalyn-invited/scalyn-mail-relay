@@ -1,6 +1,59 @@
 # Project Status
 
-## Handoff Snapshot
+## Current verified status — 2026-09-21
+
+The local baseline is established, **not approved for release**. Reviewed source
+is based on `origin/develop` merge `9224047`, refreshed on September 21, with
+local uncommitted Milestone 2 changes. Current remote CI was not inspected.
+
+Implemented: SMTP configuration/connection/test sending; terminal Accepted/Failed
+logs and timelines; SPF, MX, DKIM, DMARC and SMTP/TLS checks; credential-free
+context and isolated runner; capability-protected REST execution; grouped
+diagnostic persistence; HealthScorer and HealthScoreRepository; populated
+Diagnostics/Dashboard views; retained-data and opt-in destructive uninstall.
+Run Diagnostics is enabled. Claims below that these were missing describe the
+historical August handoff, not current code.
+
+September 17 local verification passed clean activation, SMTP acceptance with
+user-confirmed Inbox receipt, diagnostic persistence and score recalculation,
+UUID-correlated mail history, and isolated retain/delete/reactivation checks.
+PHPUnit passed 673 tests / 1347 assertions, with PHP lint and WPCS passing.
+Historical warning/CRLF failures below no longer describe this baseline.
+
+Important gaps remain: 100/100 can coexist with unknown DKIM; SPF record presence
+does not prove outbound-IP authorization; snapshots lack historical score input
+and run linkage; concurrent/partial diagnostic runs need hardening; timelines
+are terminal-event only and wizard source attribution is blank. Further
+scheduled monitoring, alerts, audit workflows, reporting, API providers and
+agency features remain roadmap work. Schema placeholders are not features.
+
+The local MariaDB 10.4.32 is below the required 10.6. Supported compatibility,
+packaged-candidate installation, live security/failure-path/accessibility checks,
+and Bernie's release review remain open. CI targets PHP 8.2/8.3 but is not a
+live WordPress/database matrix. Historical September 8 evidence describes a
+different environment, not fresh candidate certification.
+
+See [Milestone 1 completion](qa/2026-09-21-milestone-1-completion.md) for the
+baseline evidence and release gates. Milestone 2 tickets 1–2 now define and
+implement bounded transactional mail-log/timeline cleanup.
+Ticket 3 verifies partial-failure rollback and cross-process resumption. Ticket 4
+adds complete-run diagnostic cleanup and explicitly independent health-snapshot
+cleanup. Tickets 5–8 add hourly scheduling, database lock protection, cleanup
+status, validated Data Controls, explicit uninstall confirmation and shared
+lifecycle hooks. See [Milestone 2 completion evidence](qa/2026-09-21-milestone-2-completion.md).
+All Milestone 2 implementation tickets are complete locally; next is Milestone 3,
+audit trail. Final review and release approval remain outstanding.
+Follow [the checklist](IMPLEMENTATION-CHECKLIST.md).
+No release is authorized here.
+
+## Current Ownership
+
+As confirmed on 2026-09-16, Bernie is the sole project owner and developer for
+all modules, implementation, architecture, QA, review, and release decisions.
+Former team members are no longer assigned to the project. Historical handoff
+and module-owner references do not create ongoing approval dependencies.
+
+## Historical Handoff Snapshot — August 28
 
 - **Handoff date:** 2026-08-28
 - **Repository:** `scalyn-invited/scalyn-mail-relay`
@@ -10,7 +63,7 @@
 
 This snapshot describes merged `origin/develop` at the handoff commit above. Re-verify the repository and history before using it as current status later.
 
-## Completed Work
+## Historical Completed Work at Handoff
 
 - Core integration foundation and modular service wiring (`f9b834b`, `e7d402f`).
 - Dashboard and Setup Wizard framework (`fb2d484`).
@@ -25,7 +78,7 @@ This snapshot describes merged `origin/develop` at the handoff commit above. Re-
 - Diagnostics Admin UI foundation and state/accessibility coverage (`acf33ca`).
 - Diagnostics runner and repository registered in the shared container (`84e8cdd`).
 
-## First Vertical Slice
+## Historical First Vertical Slice
 
 The implemented mail vertical slice is:
 
@@ -35,7 +88,7 @@ Automated unit coverage exists across the wizard, SMTP provider, dispatcher, log
 
 Lifecycle terminology is **Generated**, **Prepared**, **Connected**, **Authenticated**, **Sent**, **Accepted**, **Failed**, and **Retried**. SMTP success is recorded as `Accepted`: the provider acknowledged the message, but inbox delivery is not guaranteed. `Delivered` requires reliable out-of-band provider/webhook evidence.
 
-## Diagnostics Foundation
+## Historical Diagnostics Foundation — Superseded
 
 The following exists on `develop`:
 
@@ -51,7 +104,7 @@ The following exists on `develop`:
 
 No concrete diagnostic check implementations are present. SPF, DKIM, DMARC, MX, and SMTP/TLS checks; credential-safe context construction; run orchestration/persistence; execution/read endpoints; REST integration; failure classification; health-score calculation; and populated UI/dashboard integration are not implemented.
 
-## Remaining MVP Work
+## Historical Post-Handoff MVP Update — September 8
 
 The planned 0.1.0 MVP product capabilities are implemented on `origin/develop`
 at `ed87103`. Work completed since the handoff snapshot includes:
@@ -69,8 +122,9 @@ at `ed87103`. Work completed since the handoff snapshot includes:
 - Release hardening for capabilities, inactive cron hooks, line endings,
   packaging boundaries, and provider/diagnostic regressions.
 
-No additional product feature is required for the 0.1.0 MVP. The remaining work
-is release validation and publication rather than feature implementation.
+This update considered the original 0.1.0 feature scope implemented. It is not
+release approval; the current verification gaps and owner decisions are listed
+in the September 21 completion record above.
 
 ### Live environment validation
 
@@ -121,7 +175,7 @@ The following are not core current-MVP dependencies and should remain separate u
 
 Foundation schema/placeholders for some later capabilities do not mean those features are implemented.
 
-## Quality Baseline
+## Historical Handoff Quality Baseline — Superseded
 
 - Requirements: WordPress 6.5+, PHP 8.2+, MySQL 8+ or MariaDB 10.6+.
 - CI runs Composer validation, PHP syntax checks, WordPress Coding Standards, and PHPUnit on PHP 8.2 and 8.3 for pushes to `develop` and pull requests to `develop` or `main`.

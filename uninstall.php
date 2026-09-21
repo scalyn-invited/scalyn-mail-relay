@@ -4,12 +4,12 @@
  *
  * Two modes:
  *
- *  1. Retain (default). Nothing is removed. Settings, tables, logs, diagnostics
+ *  1. Retain (default). Scheduled work stops. Settings, tables, logs, diagnostics
  *     and health scores survive an uninstall/reinstall cycle intact.
  *  2. Delete. Enabled only when advanced.delete_data_on_uninstall is true.
  *     Removes tables, options, capabilities, scheduled events and transients.
  *
- * In 0.1.0 the delete flag has no admin UI and is programmatic-only; see
+ * The Data Controls UI requires confirmation before enabling deletion; see
  * docs/UNINSTALL-POLICY.md. The default is false, so an operator who never
  * touches the option can never lose data by uninstalling.
  *
@@ -22,10 +22,13 @@
 
 defined( 'WP_UNINSTALL_PLUGIN' ) || exit;
 
+require_once __DIR__ . '/includes/Core/ScheduledHooks.php';
+\Scalyn\MailRelay\Core\ScheduledHooks::clear();
+
 $settings = get_option( 'scalyn_mail_relay_settings', array() );
 $delete   = is_array( $settings )
 	&& isset( $settings['advanced']['delete_data_on_uninstall'] )
-	&& true === (bool) $settings['advanced']['delete_data_on_uninstall'];
+	&& true === $settings['advanced']['delete_data_on_uninstall'];
 
 if ( ! $delete ) {
 	return;
@@ -49,7 +52,7 @@ foreach ( $owned_tables as $suffix ) {
 	$wpdb->query( "DROP TABLE IF EXISTS `{$table}`" );
 }
 
-foreach ( array( 'scalyn_mail_relay_settings', 'scalyn_mail_relay_db_version', 'scalyn_mail_relay_version' ) as $option ) {
+foreach ( array( 'scalyn_mail_relay_settings', 'scalyn_mail_relay_db_version', 'scalyn_mail_relay_version', 'scalyn_mail_relay_retention_status' ) as $option ) {
 	delete_option( $option );
 }
 
@@ -80,19 +83,6 @@ if ( is_readable( $scalyn_capabilities_file ) ) {
 			$scalyn_role->remove_cap( $scalyn_capability );
 		}
 	}
-}
-
-// Must stay in sync with Lifecycle::cron_hooks(). That method is private and the
-// plugin is not loaded here, so the list is repeated rather than shared. It is
-// the full set of hook names the plugin has ever scheduled, so events left by an
-// older install are cleared too.
-foreach ( array(
-	'scalyn_mail_relay_cleanup_logs',
-	'scalyn_mail_relay_run_daily_diagnostics',
-	'scalyn_mail_relay_generate_health_snapshot',
-	'scalyn_mail_relay_send_alerts',
-) as $hook ) {
-	wp_clear_scheduled_hook( $hook );
 }
 
 delete_transient( 'scalyn_mail_relay_health_cache' );
