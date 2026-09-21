@@ -20,6 +20,11 @@ picks up the post-MVP work.
 
 ### 1. Log retention is deferred; the dead cron event is unscheduled
 
+**Superseded in part on 2026-09-21 by [ADR-0003](0003-mail-retention-boundaries.md).**
+Bounded mail-log/timeline deletion now exists, but automatic scheduling,
+settings orchestration, diagnostics/health cleanup and Admin controls remain
+deferred. The historical 0.1.0 decision below explains why no inert cron shipped.
+
 `advanced.log_retention_days` (default 30) is defined and sanitized by
 `SettingsRepository` but is surfaced in no admin screen, and
 `Lifecycle::activate()` scheduled a daily

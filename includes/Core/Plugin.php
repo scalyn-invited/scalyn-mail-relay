@@ -9,7 +9,9 @@ namespace Scalyn\MailRelay\Core;
 
 use Scalyn\MailRelay\Admin\AdminMenu;
 use Scalyn\MailRelay\Database\DiagnosticRepository;
+use Scalyn\MailRelay\Database\DiagnosticRetentionRepository;
 use Scalyn\MailRelay\Database\HealthScoreRepository;
+use Scalyn\MailRelay\Database\RetentionStateRepository;
 use Scalyn\MailRelay\Diagnostics\DiagnosticCheckRegistry;
 use Scalyn\MailRelay\Diagnostics\DiagnosticContextBuilder;
 use Scalyn\MailRelay\Diagnostics\DiagnosticRunner;
@@ -21,6 +23,7 @@ use Scalyn\MailRelay\Diagnostics\Checks\SpfCheck;
 use Scalyn\MailRelay\Providers\Mail\SmtpTlsCheck;
 use Scalyn\MailRelay\Logging\MailEventSubscriber;
 use Scalyn\MailRelay\Logging\MailLogRepository;
+use Scalyn\MailRelay\Logging\MailRetentionRepository;
 use Scalyn\MailRelay\Logging\TimelineRepository;
 use Scalyn\MailRelay\Mail\FailureClassifier;
 use Scalyn\MailRelay\Mail\MailDispatcher;
@@ -115,6 +118,7 @@ final class Plugin {
 		);
 
 		$this->container->set( MailLogRepository::class, static fn(): MailLogRepository => new MailLogRepository() );
+		$this->container->set( MailRetentionRepository::class, static fn(): MailRetentionRepository => new MailRetentionRepository() );
 		$this->container->set( TimelineRepository::class, static fn(): TimelineRepository => new TimelineRepository() );
 		$this->container->set( FailureClassifier::class, static fn(): FailureClassifier => new FailureClassifier() );
 		$this->container->set(
@@ -129,6 +133,17 @@ final class Plugin {
 		$this->container->set( DiagnosticRunner::class, static fn(): DiagnosticRunner => new DiagnosticRunner() );
 		$this->container->set( DiagnosticContextBuilder::class, static fn(): DiagnosticContextBuilder => new DiagnosticContextBuilder() );
 		$this->container->set( DiagnosticRepository::class, static fn(): DiagnosticRepository => new DiagnosticRepository() );
+		$this->container->set( DiagnosticRetentionRepository::class, static fn(): DiagnosticRetentionRepository => new DiagnosticRetentionRepository() );
+		$this->container->set( RetentionStateRepository::class, static fn(): RetentionStateRepository => new RetentionStateRepository() );
+		$this->container->set(
+			RetentionService::class,
+			static fn( Container $c ): RetentionService => new RetentionService(
+				$c->get( SettingsRepository::class ),
+				$c->get( MailRetentionRepository::class ),
+				$c->get( DiagnosticRetentionRepository::class ),
+				$c->get( RetentionStateRepository::class )
+			)
+		);
 		$this->container->set( HealthScorer::class, static fn(): HealthScorer => new HealthScorer() );
 		$this->container->set( HealthScoreRepository::class, static fn(): HealthScoreRepository => new HealthScoreRepository() );
 		$this->container->set( DiagnosticsRunEndpoint::class, static fn(): DiagnosticsRunEndpoint => new DiagnosticsRunEndpoint() );
@@ -163,6 +178,7 @@ final class Plugin {
 		// Mail logging hooks run on every request (not only admin) because mail
 		// can be dispatched from frontend, REST, WP-CLI, and cron contexts.
 		$this->container->get( MailEventSubscriber::class )->register();
+		$this->container->get( RetentionService::class )->register();
 
 		// Register REST endpoints.
 		add_action( 'rest_api_init', array( $this->container->get( DiagnosticsRunEndpoint::class ), 'register' ) );

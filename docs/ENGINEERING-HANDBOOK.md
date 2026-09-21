@@ -16,13 +16,14 @@ Scalyn Mail Relay is not just an SMTP plugin. SMTP is only the transport layer.
 - Remediation
 - Agency Management
 
-## Team Ownership
+## Project Ownership
 
-- Kim: Core, architecture, integration, reviews, QA, releases
-- Saturn: SMTP, mail providers, PHPMailer, test email
-- Yaj: database, logging, diagnostics, health score, REST
-- Mikko: dashboard framework, setup wizard, reports, admin UI
+Bernie is the sole owner and developer for all modules, architecture, integration,
+reviews, QA, and releases. Former team assignments are historical and impose no
+review or approval dependency. Current repository code, tests, ADRs, and
+`AGENTS.md` take precedence over older external handbook assignments.
 
 ## AI Rule
 
-Use AI only inside your assigned module.
+AI assistance may work across modules needed for Bernie's requested task. Keep
+changes focused, preserve contracts and module boundaries, and follow `AGENTS.md`.

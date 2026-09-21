@@ -5,6 +5,12 @@ output, screenshots) against the release entry in `docs/releases/`.
 
 ## Evidence status
 
+September 21 reconciliation: checked entries below retain their original
+September 8 provenance. Newer local baseline evidence is consolidated in the
+[Milestone 1 completion record](qa/2026-09-21-milestone-1-completion.md), including
+SMTP, diagnostics/scoring, and real-database uninstall checks. These were not
+packaged-release tests and do not automatically close this release checklist.
+
 Last verified **2026-09-08** against `develop` @ `ed87103`, on PHP 8.2.12
 (Windows). A tick is evidence from that run, not a standing guarantee — re-run
 the checks against the actual release candidate before tagging.
@@ -105,7 +111,7 @@ The live run re-confirms them against a real database.
 
 - [ ] SMTP connection test against a real server: success path
 - [ ] Connection test against a wrong port / wrong host: fails safely, no credential leakage in the message
-- [ ] Test email delivered; mail log and timeline rows written with matching `message_uuid`
+- [ ] Test email accepted; mail log and timeline rows written with matching `message_uuid`; record recipient-confirmed receipt separately (never infer delivery from SMTP success)
 - [ ] Diagnostics run completes; SPF, MX, DKIM, DMARC and SMTP/TLS all return a result — *(unit-covered for registration: `DiagnosticsServiceWiringTest` asserts all five checks are in the registry. Real DNS and a real SMTP host are not)*
 - [ ] Health score computes and persists
 - [ ] A failing check renders its evidence and recommended action in the UI
@@ -152,8 +158,8 @@ unzip -l scalyn-mail-relay-*.zip | grep -E "tests/|docs/|\.github/|phpunit|phpcs
 ## 9. Documentation
 
 - [x] `CHANGELOG.md` updated with the real change set for this version — `## [0.1.0] - 2026-09-04`, covering Core, Mail transport, Logging, Diagnostics, Admin, Security, known limitations and release hardening
-- [x] Known limitations still accurate in `README.md` and ADR-0002 — the three limitations (retention inert, uninstall UI programmatic-only, multisite unsupported) match across both
-- [x] Any behaviour change reflected in the affected module README — **N/A**: no module carries a behaviour-documenting README. `docs/api/`, `docs/qa/` and `docs/releases/` hold only the foundation-directory placeholder
+- [x] Historical baseline limitations were recorded in ADR-0002. Milestone 2 supersedes inert retention and programmatic-only uninstall controls; see ADR-0005 and current README. Multisite remains unsupported.
+- [x] Any behaviour change reflected in the affected module README — historical September 8 assessment. Verification reports now exist in `docs/qa/`; consult Project Status and the Milestone 1 completion record for subsequent evidence and limitations.
 
 ## 10. Release
 

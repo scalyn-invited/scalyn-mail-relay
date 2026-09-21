@@ -129,6 +129,7 @@ if ( ! function_exists( 'wp_schedule_event' ) ) {
 	 * @param string $hook
 	 */
 	function wp_schedule_event( int $timestamp, string $recurrence, string $hook ): bool {
+		$GLOBALS['_test_wp_recurrence'][ $hook ] = $recurrence;
 		$GLOBALS['_test_wp_cron'][ $hook ] = $timestamp;
 		return true;
 	}
@@ -645,6 +646,18 @@ if ( ! function_exists( 'add_action' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_get_schedule' ) ) {
+	function wp_get_schedule( string $hook ): string|false {
+		return isset( $GLOBALS['_test_wp_cron'][ $hook ] ) ? ( $GLOBALS['_test_wp_recurrence'][ $hook ] ?? 'daily' ) : false;
+	}
+}
+
+if ( ! function_exists( 'current_datetime' ) ) {
+	function current_datetime(): DateTimeImmutable {
+		return new DateTimeImmutable( $GLOBALS['_test_current_time'] ?? 'now', new DateTimeZone( $GLOBALS['_test_timezone'] ?? 'UTC' ) );
+	}
+}
+
 if ( ! function_exists( 'current_time' ) ) {
 	/**
 	 * Returns the current time in MySQL datetime format.
@@ -761,6 +774,15 @@ class WpdbStub {
 	/** Recorded raw query() calls, in call order. */
 	public array $queries = array();
 
+	/** Optional FIFO results for query(); empty means simulated success (1). */
+	public array $query_returns = array();
+
+	/** Values returned by get_col(). */
+	public array $get_col_return = array();
+
+	/** Optional FIFO column-result sets; empty falls back to get_col_return. */
+	public array $get_col_returns = array();
+
 	/** Value returned by get_var(). Set per-test to simulate existing/absent rows. */
 	public mixed $get_var_return = null;
 
@@ -801,11 +823,11 @@ class WpdbStub {
 	 * DROP TABLE statements.
 	 *
 	 * @param string $query The SQL statement.
-	 * @return int Simulated rows affected.
+	 * @return int|false Simulated rows affected or failure.
 	 */
-	public function query( string $query ): int {
+	public function query( string $query ): int|false {
 		$this->queries[] = $query;
-		return 1;
+		return array() !== $this->query_returns ? array_shift( $this->query_returns ) : 1;
 	}
 
 	public function prepare( string $query, mixed ...$args ): string {
@@ -869,6 +891,11 @@ class WpdbStub {
 	 */
 	public function get_var( string $query ): mixed {
 		return $this->get_var_return;
+	}
+
+	/** Returns the configured column values regardless of the query. */
+	public function get_col( string $query ): array {
+		return array() !== $this->get_col_returns ? array_shift( $this->get_col_returns ) : $this->get_col_return;
 	}
 
 	/**

@@ -20,12 +20,10 @@ Do not rely on tickets, prompts, branch names, or historical descriptions withou
 
 The plugin is a WordPress modular monolith with explicit contracts and a shared, lazy service container. Keep provider-specific behavior behind `ProviderInterface`; keep persistence behind repositories; keep Admin code dependent on approved services/read models rather than direct table or transport access.
 
-- **Bernie — Lead Developer / WordPress UI Engineer:** project and integration decisions, `admin/Pages/`, `admin/views/`, `admin/Components/`, `assets/`, pull-request coordination/review, and merge decisions.
-- **Saturn — Mail Transport Engineer:** `includes/Mail/` and `includes/Providers/`; SMTP/API transport, PHPMailer/provider behavior, authentication/connectivity, SMTP/TLS diagnostics, and normalized transport failures.
-- **Yaj — Backend Platform Engineer:** `includes/Database/`, `includes/Logging/`, `includes/Diagnostics/`, and `includes/Rest/`; repositories, migrations, logs/timeline, DNS diagnostics, scoring, REST, retention/history.
-- **Kim — Outgoing Lead Developer / Solution Architect:** previous owner of the completed foundation and this handoff; no continuing assignment.
+- **Bernie — Sole Project Owner and Developer:** owns every module, architecture, implementation, UI, transport, backend, testing, review, integration, and release decisions.
+- **Former team:** Kim, Saturn, Yaj, and Mikko have no continuing assignments or required review responsibilities. Names in historical documents and source comments describe past contributions, not current ownership.
 
-One developer should normally own one ticket, one branch, one primary module, and one pull request. Do not casually edit another owner's module. Agree on contracts first for cross-module work, keep changes narrowly scoped, and request review from every affected owner. Bernie decides integration and architecture questions after handoff.
+Use one focused ticket, branch, and pull request per change. Cross-module work is permitted when required by the requested outcome; identify affected contracts and preserve module boundaries. Bernie makes architecture and integration decisions. Do not wait for former team members or request their approval.
 
 ## Development Workflow
 
@@ -71,8 +69,8 @@ Work is ready when its user outcome and acceptance criteria are clear; owner, mo
 
 ## Definition of Done
 
-Work is done when implementation and tests satisfy the acceptance criteria; lint, WPCS, PHPUnit, and diff checks have been run with results reported; security/privacy, accessibility, migration, retention, and lifecycle effects are addressed; documentation is updated where behavior changed; and the pull request has appropriate owner and lead review.
+Work is done when implementation and tests satisfy the acceptance criteria; lint, WPCS, PHPUnit, and diff checks have been run with results reported; security/privacy, accessibility, migration, retention, and lifecycle effects are addressed; documentation is updated where behavior changed; and Bernie has reviewed the change and validation evidence. No former team review is required; existing repository protection rules still apply.
 
 ## Architecture Changes
 
-Changes to shared interfaces, the service container, database schema, REST contracts, security or capability models, lifecycle terminology, provider architecture, or dependencies require deliberate review by Bernie and affected module owners. Record durable architectural decisions in `docs/adr/`; do not redesign the architecture incidentally inside a feature.
+Changes to shared interfaces, the service container, database schema, REST contracts, security or capability models, lifecycle terminology, provider architecture, or dependencies require deliberate review by Bernie as sole owner. Record durable architectural decisions in `docs/adr/`; do not redesign the architecture incidentally inside a feature.

@@ -10,21 +10,34 @@ Scalyn Mail Relay is a WordPress Email Operations Platform focused on delivery, 
 - MySQL 8+ or MariaDB 10.6+
 - Single-site WordPress. **Multisite is not supported in 0.1.0.**
 
-The WordPress and PHP minimums are enforced at activation and are verified in CI
-against PHP 8.2 and 8.3.
+The WordPress and PHP minimums are enforced at activation. CI runs checks on
+PHP 8.2 and 8.3; it is not a live WordPress/database compatibility matrix.
+
+## Current implementation status
+
+SMTP sending, manual DNS/SMTP diagnostics, persisted health scoring, and
+terminal-event logging and hourly bounded retention are implemented. Scheduled monitoring,
+alerts, API providers, and agency management remain roadmap work. See
+[Project Status](docs/PROJECT_STATUS.md) and the
+[Milestone 1 evidence](docs/qa/2026-09-21-milestone-1-completion.md).
+The local baseline is verified, not release-certified. Provider acceptance is
+not confirmed inbox delivery, and a high health score does not prove full
+authentication coverage or deliverability.
 
 ## Known limitations in 0.1.0
 
 Recorded with rationale in
 [ADR-0002](docs/adr/0002-mvp-release-hardening-accepted-risks.md).
 
-- **Log retention is not enforced.** The `log_retention_days` setting is stored
-  but no purge job runs, so mail logs, timeline events, diagnostic results and
-  health scores accumulate without bound. On a high-volume site, prune these
-  tables manually until retention ships.
-- **Destructive uninstall has no admin UI.** Data is retained on uninstall by
-  default; opting into deletion requires setting the option programmatically.
-  See [UNINSTALL-POLICY.md](docs/UNINSTALL-POLICY.md).
+- **Retention depends on WP-Cron.** Mail Relay → Data Controls configures 1–3650
+  days (default 30) and shows cleanup status. Hourly ticks remove up to 100 mail
+  aggregates, 100 complete diagnostic runs and 100 health snapshots. Large
+  backlogs drain over later ticks. Low-traffic sites need server-triggered WP-Cron.
+  Orphan timelines, alerts and audit history are outside this policy.
+- **Uninstall retains data by default.** Data Controls requires separate explicit
+  confirmation to enable permanent deletion. Deactivation always retains data.
+  See [UNINSTALL-POLICY.md](docs/UNINSTALL-POLICY.md) and
+  [Milestone 2 evidence](docs/qa/2026-09-21-milestone-2-completion.md).
 - **Multisite is unsupported.** Uninstall only removes data for the site that
   runs it.
 
@@ -54,10 +67,12 @@ its verification steps.
 Never commit directly to `main` or `develop`.
 
 ## Module ownership
-- `includes/Core` — Lead Developer / Solution Architect
-- `includes/Mail`, `includes/Providers` — Mail Transport Engineer
-- `includes/Database`, `includes/Logging`, `includes/Diagnostics`, `includes/Rest` — Backend Platform Engineer
-- `admin`, `assets` — WordPress UI Engineer
+
+Bernie is the sole project owner and developer across Core, Mail, Providers,
+Database, Logging, Diagnostics, REST, Admin, assets, and future modules. Former
+team members have no continuing assignments or required review responsibilities.
+Module boundaries remain architectural boundaries; cross-module work is allowed
+within a focused task. See `AGENTS.md` for current engineering guidance.
 
 ## First vertical slice
 1. Configure provider.

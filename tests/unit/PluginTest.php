@@ -7,12 +7,14 @@ use Scalyn\MailRelay\Core\Plugin;
 use Scalyn\MailRelay\Core\ProviderRegistry;
 use Scalyn\MailRelay\Core\SettingsRepository;
 use Scalyn\MailRelay\Database\DiagnosticRepository;
+use Scalyn\MailRelay\Database\DiagnosticRetentionRepository;
 use Scalyn\MailRelay\Diagnostics\DiagnosticCheckRegistry;
 use Scalyn\MailRelay\Diagnostics\DiagnosticRunner;
 use Scalyn\MailRelay\Diagnostics\Checks\MxCheck;
 use Scalyn\MailRelay\Diagnostics\Checks\SpfCheck;
 use Scalyn\MailRelay\Logging\MailEventSubscriber;
 use Scalyn\MailRelay\Logging\MailLogRepository;
+use Scalyn\MailRelay\Logging\MailRetentionRepository;
 use Scalyn\MailRelay\Logging\TimelineRepository;
 use Scalyn\MailRelay\Mail\MailDispatcher;
 
@@ -68,6 +70,10 @@ final class PluginTest extends TestCase {
 		$this->assertTrue( $this->booted_container()->has( MailLogRepository::class ) );
 	}
 
+	public function test_mail_retention_repository_is_registered_in_container(): void {
+		$this->assertTrue( $this->booted_container()->has( MailRetentionRepository::class ) );
+	}
+
 	public function test_timeline_repository_is_registered_in_container(): void {
 		$this->assertTrue( $this->booted_container()->has( TimelineRepository::class ) );
 	}
@@ -78,6 +84,10 @@ final class PluginTest extends TestCase {
 
 	public function test_diagnostic_repository_is_registered_in_container(): void {
 		$this->assertTrue( $this->booted_container()->has( DiagnosticRepository::class ) );
+	}
+
+	public function test_diagnostic_retention_repository_is_registered_in_container(): void {
+		$this->assertTrue( $this->booted_container()->has( DiagnosticRetentionRepository::class ) );
 	}
 
 	public function test_diagnostic_check_registry_is_registered_in_container(): void {
@@ -158,6 +168,12 @@ final class PluginTest extends TestCase {
 		$this->assertSame( $container->get( MailLogRepository::class ), $container->get( MailLogRepository::class ) );
 	}
 
+	public function test_repeated_resolution_of_mail_retention_repository_returns_same_instance(): void {
+		$container = $this->booted_container();
+
+		$this->assertSame( $container->get( MailRetentionRepository::class ), $container->get( MailRetentionRepository::class ) );
+	}
+
 	public function test_repeated_resolution_of_timeline_repository_returns_same_instance(): void {
 		$container = $this->booted_container();
 
@@ -174,6 +190,12 @@ final class PluginTest extends TestCase {
 		$container = $this->booted_container();
 
 		$this->assertSame( $container->get( DiagnosticRepository::class ), $container->get( DiagnosticRepository::class ) );
+	}
+
+	public function test_repeated_resolution_of_diagnostic_retention_repository_returns_same_instance(): void {
+		$container = $this->booted_container();
+
+		$this->assertSame( $container->get( DiagnosticRetentionRepository::class ), $container->get( DiagnosticRetentionRepository::class ) );
 	}
 
 	public function test_repeated_resolution_of_diagnostic_check_registry_returns_same_instance(): void {

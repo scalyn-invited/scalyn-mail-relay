@@ -9,7 +9,7 @@ use Scalyn\MailRelay\Core\Lifecycle;
  *
  *  - environment gating on PHP/WordPress baselines,
  *  - capability grants to the Administrator role,
- *  - that no recurring cron event is registered in the 0.1.0 MVP,
+	 *  - that retention is scheduled after activation,
  *  - that stale events from an earlier install are cleared,
  *  - that deactivation never destroys data.
  */
@@ -79,13 +79,12 @@ final class LifecycleTest extends TestCase {
 	// Scheduled events
 	// -------------------------------------------------------------------------
 
-	public function test_activation_schedules_no_recurring_events(): void {
+	public function test_activation_schedules_retention_only(): void {
 		Lifecycle::activate();
 
 		$this->assertSame(
-			array(),
-			$GLOBALS['_test_wp_cron'],
-			'0.1.0 implements no cron handlers, so it must not register cron events.'
+			array( 'scalyn_mail_relay_cleanup_logs' ),
+			array_keys( $GLOBALS['_test_wp_cron'] )
 		);
 	}
 
@@ -98,7 +97,8 @@ final class LifecycleTest extends TestCase {
 
 		Lifecycle::activate();
 
-		$this->assertSame( array(), $GLOBALS['_test_wp_cron'] );
+		$this->assertSame( array( 'scalyn_mail_relay_cleanup_logs' ), array_keys( $GLOBALS['_test_wp_cron'] ) );
+		$this->assertGreaterThan( time(), $GLOBALS['_test_wp_cron']['scalyn_mail_relay_cleanup_logs'] );
 	}
 
 	public function test_deactivation_clears_every_owned_cron_hook(): void {

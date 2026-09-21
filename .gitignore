@@ -15,3 +15,4 @@ Thumbs.db
 .phpunit.cache/
 coverage/
 .claude/
+/docs/Scalyn Mail Relay Implementation docs/

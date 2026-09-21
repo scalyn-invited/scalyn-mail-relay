@@ -48,6 +48,34 @@ final class SettingsRepositoryTest extends TestCase {
 		$this->assertFalse( $repo->get_delete_data_on_uninstall() );
 	}
 
+	public function test_retention_input_is_strict_and_partial_saves_preserve_policy(): void {
+		$repo = new SettingsRepository();
+		$repo->save( array( 'advanced' => array( 'log_retention_days' => 90, 'delete_data_on_uninstall' => true, 'confirm_delete_data' => true ) ) );
+		$repo->save( array( 'advanced' => array( 'log_retention_days' => 60 ) ) );
+		$this->assertTrue( $repo->get_delete_data_on_uninstall() );
+		$repo->save( array( 'advanced' => array( 'delete_data_on_uninstall' => false ) ) );
+		$this->assertSame( 60, $repo->get_log_retention_days() );
+		foreach ( array( 0, -30, 1.5, true, array(), '3651', '30days' ) as $value ) {
+			try {
+				$repo->save( array( 'advanced' => array( 'log_retention_days' => $value ) ) );
+				$this->fail( 'Invalid days accepted.' );
+			} catch ( InvalidArgumentException $e ) {
+				$this->assertSame( 60, $repo->get_log_retention_days() );
+			}
+		}
+	}
+
+	public function test_enabling_delete_without_confirmation_is_rejected(): void {
+		$this->expectException( InvalidArgumentException::class );
+		( new SettingsRepository() )->save( array( 'advanced' => array( 'delete_data_on_uninstall' => true ) ) );
+	}
+
+	public function test_invalid_stored_policy_defaults_safely(): void {
+		$GLOBALS['_test_wp_options'][SettingsRepository::OPTION_KEY] = array( 'advanced' => array( 'log_retention_days' => -10, 'delete_data_on_uninstall' => 'true' ) );
+		$this->assertSame( 30, ( new SettingsRepository() )->get_log_retention_days() );
+		$this->assertFalse( ( new SettingsRepository() )->get_delete_data_on_uninstall() );
+	}
+
 	public function test_test_email_defaults_to_not_accepted(): void {
 		$repo = new SettingsRepository();
 
