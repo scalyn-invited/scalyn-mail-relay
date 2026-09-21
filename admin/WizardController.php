@@ -8,6 +8,9 @@
 namespace Scalyn\MailRelay\Admin;
 
 use Scalyn\MailRelay\Core\Capabilities;
+use Scalyn\MailRelay\Core\HookNames;
+use Scalyn\MailRelay\Audit\AuditEvent;
+use Scalyn\MailRelay\Providers\ConnectionResult;
 use Scalyn\MailRelay\Core\Plugin;
 use Scalyn\MailRelay\Core\ProviderRegistry;
 use Scalyn\MailRelay\Core\SettingsRepository;
@@ -204,12 +207,15 @@ final class WizardController {
 		}
 
 		check_admin_referer( 'scalyn_wizard_step4' );
+		$audit_uuid = wp_generate_uuid4();
+		do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'provider_verification', 'started', $audit_uuid ) );
 
 		$settings    = $this->get_settings();
 		$registry    = $this->get_registry();
 		$provider_id = $settings->get_active_provider_id();
 
 		if ( '' === $provider_id || ! $registry->has( $provider_id ) ) {
+			do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'provider_verification', 'failed', $audit_uuid ) );
 			set_transient(
 				$this->transient_key( 'conn' ),
 				array(
@@ -224,7 +230,12 @@ final class WizardController {
 
 		$provider = $registry->get( $provider_id );
 		$config   = $settings->get_provider_config( $provider_id );
-		$result   = $provider->test_connection( $config );
+		try {
+			$result = $provider->test_connection( $config );
+		} catch ( \Throwable $error ) {
+			$result = new ConnectionResult( false, __( 'The connection test could not complete. Check your provider configuration.', 'scalyn-mail-relay' ) );
+		}
+		do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'provider_verification', $result->success ? 'verified' : 'failed', $audit_uuid ) );
 
 		// A successful connection test verifies the provider. WizardPage clamps
 		// navigation to step 4 until the provider is verified, so without this
@@ -307,7 +318,9 @@ final class WizardController {
 		);
 
 		$dispatcher = $this->get_dispatcher();
-		$result     = $dispatcher->dispatch( $message );
+		do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'test_email', 'started', $message->uuid ) );
+		$result = $dispatcher->dispatch( $message );
+		do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'test_email', $result->success ? 'accepted' : 'failed', $message->uuid ) );
 
 		// Persist test-email completion separately from connection verification so
 		// the Dashboard can represent the setup steps accurately.

@@ -10,6 +10,7 @@ namespace Scalyn\MailRelay\Core;
 use Scalyn\MailRelay\Database\DiagnosticRetentionRepository;
 use Scalyn\MailRelay\Database\RetentionStateRepository;
 use Scalyn\MailRelay\Logging\MailRetentionRepository;
+use Scalyn\MailRelay\Audit\AuditRepository;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -25,12 +26,14 @@ final class RetentionService {
 	 * @param MailRetentionRepository       $mail Mail aggregates.
 	 * @param DiagnosticRetentionRepository $diagnostics Diagnostic histories.
 	 * @param RetentionStateRepository      $state Coordination and status.
+	 * @param AuditRepository               $audit Audit history retention.
 	 */
 	public function __construct(
 		private SettingsRepository $settings,
 		private MailRetentionRepository $mail,
 		private DiagnosticRetentionRepository $diagnostics,
-		private RetentionStateRepository $state
+		private RetentionStateRepository $state,
+		private AuditRepository $audit
 	) {}
 
 	/** Registers the listener on frontend, admin and cron requests. */
@@ -70,7 +73,9 @@ final class RetentionService {
 			$diagnostics               = $this->diagnostics->delete_expired_batch( $cutoff, self::BATCH_SIZE );
 			$status['diagnostic_rows'] = $diagnostics->deleted_diagnostic_rows;
 			$status['health_scores']   = $diagnostics->deleted_health_scores;
-			$status['state']           = max( $mail->selected_messages, $diagnostics->selected_runs, $diagnostics->selected_health_scores ) >= self::BATCH_SIZE ? 'more_pending' : 'complete';
+			$this->state->save( $status );
+			$status['audit_rows']      = $this->audit->delete_expired_batch( $cutoff );
+			$status['state']           = max( $mail->selected_messages, $diagnostics->selected_runs, $diagnostics->selected_health_scores, $status['audit_rows'] ) >= self::BATCH_SIZE ? 'more_pending' : 'complete';
 			$status['last_success_at'] = time();
 		} catch ( \Throwable $error ) {
 			// Exception details may contain credentials or SQL. Store only a fixed state.

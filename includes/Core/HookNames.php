@@ -24,6 +24,9 @@ defined( 'ABSPATH' ) || exit;
  */
 final class HookNames {
 
+	/** Arguments: ( \Scalyn\MailRelay\Audit\AuditEvent $event ). No raw data allowed. */
+	public const AUDIT_EVENT = 'scalyn_mail_relay_audit_event';
+
 	/**
 	 * Fired when a MailMessage has been validated and is ready for transport,
 	 * before the provider send() call is made.

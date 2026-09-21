@@ -59,6 +59,38 @@ final class WizardTestProvider implements ProviderInterface {
 
 final class WizardControllerTest extends TestCase {
 
+	public function test_verification_audit_records_correlated_outcomes_without_response(): void {
+		$events = array();
+		$GLOBALS['_test_wp_actions'][\Scalyn\MailRelay\Core\HookNames::AUDIT_EVENT] = static function($event) use (&$events) { $events[] = $event; };
+		$GLOBALS['_test_wp_options'][SettingsRepository::OPTION_KEY] = array('provider'=>array('active'=>'smtp'));
+		$this->provider->connection_result = new ConnectionResult(false, 'private-provider-response');
+		$this->post_step(4);
+		$this->run_handle();
+		$this->assertSame(array('started','failed'), array_column($events,'outcome'));
+		$this->assertSame($events[0]->correlation_id, $events[1]->correlation_id);
+		$this->assertStringNotContainsString('private', json_encode($events));
+	}
+
+	public function test_test_email_audit_records_acceptance_without_recipient_or_body(): void {
+		$events = array();
+		$GLOBALS['_test_wp_actions'][\Scalyn\MailRelay\Core\HookNames::AUDIT_EVENT] = static function($event) use (&$events) { $events[] = $event; };
+		$GLOBALS['_test_wp_options'][SettingsRepository::OPTION_KEY] = array('provider'=>array('active'=>'smtp'),'smtp'=>array('from_email'=>'from@example.com'));
+		$this->post_step(5, array('test_recipient'=>'recipient@example.com'));
+		$this->run_handle();
+		$this->assertSame(array('started','accepted'), array_column($events,'outcome'));
+		$this->assertSame($this->provider->last_sent_message->uuid, $events[1]->correlation_id);
+		$this->assertStringNotContainsString('example.com', json_encode($events));
+		$this->assertStringNotContainsString('subject', json_encode($events));
+	}
+
+	public function test_denied_verification_has_no_audit_operation(): void {
+		$events = array();
+		$GLOBALS['_test_wp_actions'][\Scalyn\MailRelay\Core\HookNames::AUDIT_EVENT] = static function($event) use (&$events) { $events[] = $event; };
+		$this->post_step(4);
+		$GLOBALS['_test_wp_nonce_valid'] = false;
+		try { $this->run_handle(); } catch (RuntimeException $error) { $this->assertSame(array(),$events); }
+	}
+
 	private WizardTestProvider $provider;
 	private ProviderRegistry $registry;
 

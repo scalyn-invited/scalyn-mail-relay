@@ -16,7 +16,7 @@ PHP 8.2 and 8.3; it is not a live WordPress/database compatibility matrix.
 ## Current implementation status
 
 SMTP sending, manual DNS/SMTP diagnostics, persisted health scoring, and
-terminal-event logging and hourly bounded retention are implemented. Scheduled monitoring,
+terminal-event logging, administrative audit history and hourly bounded retention are implemented. Scheduled monitoring,
 alerts, API providers, and agency management remain roadmap work. See
 [Project Status](docs/PROJECT_STATUS.md) and the
 [Milestone 1 evidence](docs/qa/2026-09-21-milestone-1-completion.md).
@@ -31,9 +31,14 @@ Recorded with rationale in
 
 - **Retention depends on WP-Cron.** Mail Relay → Data Controls configures 1–3650
   days (default 30) and shows cleanup status. Hourly ticks remove up to 100 mail
-  aggregates, 100 complete diagnostic runs and 100 health snapshots. Large
+  aggregates, 100 complete diagnostic runs, 100 health snapshots and 100 audit rows. Large
   backlogs drain over later ticks. Low-traffic sites need server-triggered WP-Cron.
-  Orphan timelines, alerts and audit history are outside this policy.
+  Orphan timelines and alerts are outside this policy. Audit records expire
+  individually, so parts of a correlated operation can expire at different times.
+- **Audit history is not a tamper-proof ledger.** Mail Relay → Audit History
+  requires settings-management permission. It records user IDs, execution context,
+  fixed outcomes, UUIDs and changed field names, not values or message content.
+  Recording failures or interruptions can leave incomplete trails.
 - **Uninstall retains data by default.** Data Controls requires separate explicit
   confirmation to enable permanent deletion. Deactivation always retains data.
   See [UNINSTALL-POLICY.md](docs/UNINSTALL-POLICY.md) and

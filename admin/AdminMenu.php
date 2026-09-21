@@ -9,6 +9,8 @@ namespace Scalyn\MailRelay\Admin;
 
 use Scalyn\MailRelay\Admin\Pages\DashboardPage;
 use Scalyn\MailRelay\Admin\Pages\DataControlsPage;
+use Scalyn\MailRelay\Admin\Pages\AuditPage;
+use Scalyn\MailRelay\Audit\AuditRepository;
 use Scalyn\MailRelay\Core\SettingsRepository;
 use Scalyn\MailRelay\Database\RetentionStateRepository;
 use Scalyn\MailRelay\Admin\Pages\DiagnosticsPage;
@@ -116,6 +118,14 @@ final class AdminMenu {
 			'scalyn-mail-relay-data-controls',
 			array( $this, 'render_data_controls' )
 		);
+		add_submenu_page(
+			'scalyn-mail-relay',
+			__( 'Audit History — Scalyn Mail Relay', 'scalyn-mail-relay' ),
+			__( 'Audit History', 'scalyn-mail-relay' ),
+			Capabilities::MANAGE_SETTINGS,
+			'scalyn-mail-relay-audit',
+			array( $this, 'render_audit' )
+		);
 	}
 
 	/**
@@ -168,6 +178,11 @@ final class AdminMenu {
 	public function render_data_controls(): void {
 		$container = Plugin::instance()->container();
 		( new DataControlsPage( $container->get( SettingsRepository::class ), $container->get( RetentionStateRepository::class ) ) )->render();
+	}
+
+	/** Renders the bounded audit history view. */
+	public function render_audit(): void {
+		( new AuditPage( Plugin::instance()->container()->get( AuditRepository::class ) ) )->render();
 	}
 
 	/**

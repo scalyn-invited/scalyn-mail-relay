@@ -90,6 +90,9 @@ if ( ! function_exists( 'update_option' ) ) {
 	 * @param mixed  $autoload
 	 */
 	function update_option( string $option, $value, $autoload = null ): bool {
+		if ( ! empty( $GLOBALS['_test_wp_option_write_failures'][ $option ] ) ) {
+			return false;
+		}
 		$GLOBALS['_test_wp_options'][ $option ] = $value;
 		return true;
 	}
@@ -211,7 +214,7 @@ if ( ! function_exists( 'absint' ) ) {
 
 if ( ! function_exists( 'is_admin' ) ) {
 	function is_admin(): bool {
-		return false;
+		return ! empty( $GLOBALS['_test_is_admin'] );
 	}
 }
 
@@ -312,9 +315,10 @@ if ( ! function_exists( 'get_current_user_id' ) ) {
 }
 
 if ( ! function_exists( 'wp_generate_uuid4' ) ) {
-	/** Returns a deterministic UUID-shaped string for tests. */
+	/** Returns a valid UUID-shaped value, matching the WordPress contract. */
 	function wp_generate_uuid4(): string {
-		return 'test-uuid-4-' . substr( md5( (string) mt_rand() ), 0, 8 );
+		$hex = bin2hex( random_bytes( 16 ) );
+		return substr( $hex, 0, 8 ) . '-' . substr( $hex, 8, 4 ) . '-4' . substr( $hex, 13, 3 ) . '-8' . substr( $hex, 17, 3 ) . '-' . substr( $hex, 20, 12 );
 	}
 }
 
@@ -649,6 +653,12 @@ if ( ! function_exists( 'add_action' ) ) {
 if ( ! function_exists( 'wp_get_schedule' ) ) {
 	function wp_get_schedule( string $hook ): string|false {
 		return isset( $GLOBALS['_test_wp_cron'][ $hook ] ) ? ( $GLOBALS['_test_wp_recurrence'][ $hook ] ?? 'daily' ) : false;
+	}
+}
+
+if ( ! function_exists( 'wp_doing_cron' ) ) {
+	function wp_doing_cron(): bool {
+		return ! empty( $GLOBALS['_test_doing_cron'] );
 	}
 }
 

@@ -8,6 +8,8 @@
 namespace Scalyn\MailRelay\Core;
 
 use Scalyn\MailRelay\Admin\AdminMenu;
+use Scalyn\MailRelay\Audit\AuditRepository;
+use Scalyn\MailRelay\Audit\AuditRecorder;
 use Scalyn\MailRelay\Database\DiagnosticRepository;
 use Scalyn\MailRelay\Database\DiagnosticRetentionRepository;
 use Scalyn\MailRelay\Database\HealthScoreRepository;
@@ -106,6 +108,8 @@ final class Plugin {
 	 * Registers core services in the container.
 	 */
 	private function register_services(): void {
+		$this->container->set( AuditRepository::class, static fn(): AuditRepository => new AuditRepository() );
+		$this->container->set( AuditRecorder::class, static fn( Container $c ): AuditRecorder => new AuditRecorder( $c->get( AuditRepository::class ) ) );
 		$this->container->set( AdminMenu::class, static fn(): AdminMenu => new AdminMenu() );
 		$this->container->set( SettingsRepository::class, static fn(): SettingsRepository => new SettingsRepository() );
 		$this->container->set( ProviderRegistry::class, static fn(): ProviderRegistry => new ProviderRegistry() );
@@ -141,7 +145,8 @@ final class Plugin {
 				$c->get( SettingsRepository::class ),
 				$c->get( MailRetentionRepository::class ),
 				$c->get( DiagnosticRetentionRepository::class ),
-				$c->get( RetentionStateRepository::class )
+				$c->get( RetentionStateRepository::class ),
+				$c->get( AuditRepository::class )
 			)
 		);
 		$this->container->set( HealthScorer::class, static fn(): HealthScorer => new HealthScorer() );
@@ -178,6 +183,7 @@ final class Plugin {
 		// Mail logging hooks run on every request (not only admin) because mail
 		// can be dispatched from frontend, REST, WP-CLI, and cron contexts.
 		$this->container->get( MailEventSubscriber::class )->register();
+		$this->container->get( AuditRecorder::class )->register();
 		$this->container->get( RetentionService::class )->register();
 
 		// Register REST endpoints.

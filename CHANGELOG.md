@@ -7,6 +7,14 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+- Add runtime actor/source attribution, capability-protected Audit History with
+  50-row cursor pagination, privacy-safe read models and 100-row audit expiry
+  batches under the existing Data Controls retention policy.
+
+- Add an allowlisted audit event contract and append-only repository, with
+  failure-isolated capture of configuration/retention changes, wizard verification,
+  test-email acceptance/failure, and correlated diagnostic run outcomes.
+
 - Add hourly retention scheduling, database overlap protection and safe cleanup
   status; failed or full batches resume on later ticks.
 - Add capability/nonce-protected Data Controls for 1–3650 day retention and

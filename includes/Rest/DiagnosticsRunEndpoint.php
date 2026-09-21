@@ -8,6 +8,8 @@
 namespace Scalyn\MailRelay\Rest;
 
 use Scalyn\MailRelay\Core\Capabilities;
+use Scalyn\MailRelay\Core\HookNames;
+use Scalyn\MailRelay\Audit\AuditEvent;
 use Scalyn\MailRelay\Core\Plugin;
 use Scalyn\MailRelay\Core\SettingsRepository;
 use Scalyn\MailRelay\Database\DiagnosticRepository;
@@ -73,6 +75,8 @@ final class DiagnosticsRunEndpoint {
 	 */
 	public function handle_request(): WP_REST_Response {
 		$container = Plugin::instance()->container();
+		$run_uuid  = wp_generate_uuid4();
+		do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'diagnostic_run', 'started', $run_uuid ) );
 
 		try {
 			$runner        = $container->get( DiagnosticRunner::class );
@@ -95,9 +99,6 @@ final class DiagnosticsRunEndpoint {
 			$checks        = $registry->get_all();
 			$check_results = $runner->run( array_values( $checks ), $context );
 
-			// Generate a UUID for this diagnostic run.
-			$run_uuid = wp_generate_uuid4();
-
 			// Persist each check result to the database.
 			foreach ( $check_results as $check_result ) {
 				$repo->persist_result(
@@ -118,6 +119,7 @@ final class DiagnosticsRunEndpoint {
 				$score_repo->persist( $health_score_result );
 			}
 
+			do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'diagnostic_run', 'completed', $run_uuid ) );
 			return new WP_REST_Response(
 				array(
 					'success'      => true,
@@ -126,7 +128,8 @@ final class DiagnosticsRunEndpoint {
 				),
 				200
 			);
-		} catch ( \Exception $e ) {
+		} catch ( \Throwable $e ) {
+			do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'diagnostic_run', 'failed', $run_uuid ) );
 			return new WP_REST_Response(
 				array(
 					'success' => false,

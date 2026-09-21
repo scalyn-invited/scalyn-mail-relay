@@ -48,13 +48,13 @@ Outcome: operational data has an enforced, understandable lifecycle.
 
 Outcome: important administrative actions are traceable.
 
-- [ ] Define an allowlisted audit-event contract and repository.
-- [ ] Record configuration changes, provider verification, test sends, diagnostic runs, and retention changes.
-- [ ] Identify actors and distinguish manual actions from scheduled operations.
-- [ ] Exclude credentials, tokens, message bodies, and sensitive request payloads.
-- [ ] Add a capability-protected, paginated audit view.
-- [ ] Add audit retention and tests for expiry behavior.
-- [ ] Completion gate: important administrative actions can be traced without exposing sensitive data.
+- [x] Define an allowlisted audit-event contract and repository. See [ADR-0006](adr/0006-audit-event-foundation.md).
+- [x] Record configuration changes, provider verification, test sends, diagnostic runs, and retention changes. See [tickets 1–2 verification](qa/2026-09-21-audit-foundation.md).
+- [x] Identify actors and distinguish manual actions from scheduled operations. Runtime-captured IDs and execution context; legacy attribution remains unknown.
+- [x] Exclude credentials, tokens, message bodies, and sensitive request payloads. Allowlisted writes and read projections; no IP, user agent, recipient or setting values.
+- [x] Add a capability-protected, paginated audit view. Mail Relay → Audit History, 50 records per cursor page.
+- [x] Add audit retention and tests for expiry behavior. Existing Data Controls policy, transactional batches of 100; see [ADR-0007](adr/0007-audit-attribution-history-retention.md).
+- [x] Completion gate: important administrative actions can be traced without exposing sensitive data. See [Milestone 3 verification](qa/2026-09-21-milestone-3-completion.md). Bernie's review and release QA remain outstanding.
 
 ## 4. Scheduled health monitoring
 
