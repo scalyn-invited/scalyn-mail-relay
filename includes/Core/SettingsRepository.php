@@ -7,6 +7,8 @@
 
 namespace Scalyn\MailRelay\Core;
 
+use Scalyn\MailRelay\Audit\AuditEvent;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -230,8 +232,30 @@ final class SettingsRepository {
 	 */
 	public function save( array $new_settings ): bool {
 		$sanitized  = $this->sanitize( $new_settings );
+		$before     = $this->data;
 		$this->data = array_replace_recursive( $this->data, $sanitized );
-		return update_option( self::OPTION_KEY, $this->data );
+		$saved      = update_option( self::OPTION_KEY, $this->data );
+		if ( ! $saved ) {
+			$this->data = $before;
+		}
+		if ( $saved ) {
+			$changes = array();
+			foreach ( AuditEvent::FIELDS as $field ) {
+				list( $group, $key ) = explode( '.', $field );
+				if ( ( $before[ $group ][ $key ] ?? null ) !== ( $this->data[ $group ][ $key ] ?? null ) ) {
+					$action = match ( $field ) {
+						'advanced.log_retention_days' => 'retention_changed',
+						'advanced.delete_data_on_uninstall' => 'uninstall_policy_changed',
+						default => 'settings_changed',
+					};
+					$changes[ $action ][] = $field;
+				}
+			}
+			foreach ( $changes as $action => $fields ) {
+				do_action( HookNames::AUDIT_EVENT, new AuditEvent( $action, 'changed', '', $fields ) );
+			}
+		}
+		return $saved;
 	}
 
 	/**

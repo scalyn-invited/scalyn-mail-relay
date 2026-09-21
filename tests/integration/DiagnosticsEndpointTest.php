@@ -19,6 +19,29 @@ use Scalyn\MailRelay\Rest\DiagnosticsRunEndpoint;
  */
 final class DiagnosticsEndpointTest extends TestCase {
 
+	public function test_diagnostic_audit_records_one_run_without_evidence_payload(): void {
+		$this->boot_plugin();
+		$this->install_context_spy();
+		$events = array();
+		$GLOBALS['_test_wp_actions'][\Scalyn\MailRelay\Core\HookNames::AUDIT_EVENT] = static function($event) use (&$events) { $events[] = $event; };
+		(new DiagnosticsRunEndpoint())->handle_request();
+		$this->assertSame(array('started','completed'), array_column($events,'outcome'));
+		$this->assertSame($events[0]->correlation_id,$events[1]->correlation_id);
+		$this->assertStringNotContainsString('raw_result',json_encode($events));
+	}
+
+	public function test_failed_diagnostics_records_failure_with_same_run_uuid(): void {
+		$this->boot_plugin();
+		$this->install_context_spy();
+		$GLOBALS['wpdb'] = new WpdbStub();
+		$GLOBALS['wpdb']->return_false_on_insert = true;
+		$events = array();
+		$GLOBALS['_test_wp_actions'][\Scalyn\MailRelay\Core\HookNames::AUDIT_EVENT] = static function($event) use (&$events) { $events[] = $event; };
+		(new DiagnosticsRunEndpoint())->handle_request();
+		$this->assertSame(array('started','failed'), array_column($events,'outcome'));
+		$this->assertSame($events[0]->correlation_id,$events[1]->correlation_id);
+	}
+
 	protected function setUp(): void {
 		$GLOBALS['_test_current_user_can']       = array();
 		$GLOBALS['_test_wp_options']             = array();

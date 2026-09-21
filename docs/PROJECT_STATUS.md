@@ -2,9 +2,16 @@
 
 ## Current verified status — 2026-09-21
 
+Milestone 2 is merged in `513d02e` (PR #44). All Milestone 3 implementation tickets
+are implemented locally on `feature/m3-audit-foundation`: audit capture,
+actor/source attribution, protected paginated history and bounded expiry.
+See [Milestone 3 verification](qa/2026-09-21-milestone-3-completion.md).
+Next is Milestone 4, scheduled health monitoring. Older
+baseline descriptions below are retained as historical verification context.
+
 The local baseline is established, **not approved for release**. Reviewed source
-is based on `origin/develop` merge `9224047`, refreshed on September 21, with
-local uncommitted Milestone 2 changes. Current remote CI was not inspected.
+is based on `origin/develop` merge `513d02e`, with local uncommitted Milestone 3
+changes. Remote CI has not run for these uncommitted changes.
 
 Implemented: SMTP configuration/connection/test sending; terminal Accepted/Failed
 logs and timelines; SPF, MX, DKIM, DMARC and SMTP/TLS checks; credential-free
@@ -24,7 +31,7 @@ Important gaps remain: 100/100 can coexist with unknown DKIM; SPF record presenc
 does not prove outbound-IP authorization; snapshots lack historical score input
 and run linkage; concurrent/partial diagnostic runs need hardening; timelines
 are terminal-event only and wizard source attribution is blank. Further
-scheduled monitoring, alerts, audit workflows, reporting, API providers and
+scheduled monitoring, alerts, reporting, API providers and
 agency features remain roadmap work. Schema placeholders are not features.
 
 The local MariaDB 10.4.32 is below the required 10.6. Supported compatibility,
@@ -41,8 +48,8 @@ adds complete-run diagnostic cleanup and explicitly independent health-snapshot
 cleanup. Tickets 5–8 add hourly scheduling, database lock protection, cleanup
 status, validated Data Controls, explicit uninstall confirmation and shared
 lifecycle hooks. See [Milestone 2 completion evidence](qa/2026-09-21-milestone-2-completion.md).
-All Milestone 2 implementation tickets are complete locally; next is Milestone 3,
-audit trail. Final review and release approval remain outstanding.
+Milestone 2 is merged and Milestone 3 is implemented locally.
+Final review and release approval remain outstanding.
 Follow [the checklist](IMPLEMENTATION-CHECKLIST.md).
 No release is authorized here.
 

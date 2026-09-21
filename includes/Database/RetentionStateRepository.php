@@ -61,7 +61,7 @@ final class RetentionStateRepository {
 	 */
 	private function normalize( array $status ): array {
 		$safe = array( 'state' => in_array( $status['state'] ?? '', array( 'running', 'complete', 'more_pending', 'failed' ), true ) ? $status['state'] : 'never' );
-		foreach ( array( 'started_at', 'finished_at', 'last_success_at', 'mail_logs', 'timeline_events', 'diagnostic_rows', 'health_scores' ) as $key ) {
+		foreach ( array( 'started_at', 'finished_at', 'last_success_at', 'mail_logs', 'timeline_events', 'diagnostic_rows', 'health_scores', 'audit_rows' ) as $key ) {
 			$safe[ $key ] = isset( $status[ $key ] ) && is_numeric( $status[ $key ] ) ? max( 0, (int) $status[ $key ] ) : 0;
 		}
 		return $safe;

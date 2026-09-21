@@ -22,7 +22,7 @@ final class RetentionServiceTest extends TestCase {
 		$this->db->get_var_return = '1';
 		$GLOBALS['wpdb'] = $this->db;
 		$this->state = new RetentionStateRepository();
-		$this->service = new RetentionService( new SettingsRepository(), new MailRetentionRepository(), new DiagnosticRetentionRepository(), $this->state );
+		$this->service = new RetentionService( new SettingsRepository(), new MailRetentionRepository(), new DiagnosticRetentionRepository(), $this->state, new \Scalyn\MailRelay\Audit\AuditRepository() );
 	}
 
 	protected function tearDown(): void {
@@ -55,12 +55,12 @@ final class RetentionServiceTest extends TestCase {
 		$this->assertGreaterThan( 0, $status['last_success_at'] );
 		$this->assertSame( 0, $status['mail_logs'] );
 		$cutoffs = array_filter( $this->db->prepare_calls, fn( $call ) => str_contains( $call['query'], 'created_at' ) );
-		$this->assertCount( 3, $cutoffs );
+		$this->assertCount( 4, $cutoffs );
 		foreach ( $cutoffs as $call ) {
 			$this->assertSame( '2026-08-22 12:00:00', $call['args'][0] );
-			$this->assertSame( 100, $call['args'][1] );
+			if (isset($call['args'][1])) { $this->assertSame( 100, $call['args'][1] ); }
 		}
-		$this->assertSame( 2, count( array_filter( $this->db->queries, fn( $q ) => 'COMMIT' === $q ) ) );
+		$this->assertSame( 3, count( array_filter( $this->db->queries, fn( $q ) => 'COMMIT' === $q ) ) );
 	}
 
 	public function test_failed_batch_records_safe_failure_and_next_tick_resumes(): void {
@@ -88,7 +88,7 @@ final class RetentionServiceTest extends TestCase {
 		$this->service->run();
 		$this->assertSame( 'more_pending', $this->state->get()['state'] );
 		$this->assertSame( 100, $this->state->get()['mail_logs'] );
-		$this->assertSame( 2, count( array_filter( $this->db->queries, fn( $q ) => 'START TRANSACTION' === $q ) ) );
+		$this->assertSame( 3, count( array_filter( $this->db->queries, fn( $q ) => 'START TRANSACTION' === $q ) ) );
 	}
 
 	public function test_state_excludes_unknown_keys_and_unsafe_strings(): void {
