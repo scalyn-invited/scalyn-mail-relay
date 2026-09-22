@@ -154,7 +154,9 @@ final class DkimCheck implements DiagnosticCheckInterface {
 		return new DiagnosticResult(
 			status: 'pass',
 			severity: 'low',
-			message: sprintf( 'A valid DKIM record was found for selector "%s" on "%s".', $selector, $domain ),
+			message: sprintf( 'A DKIM record with a non-empty public-key value was found for selector "%s" on "%s". Message signatures have not been verified.', $selector, $domain ),
+			impact: 'DNS publication alone does not prove the key is usable, that the provider signs outgoing messages, or that a receiving server will verify their signatures.',
+			recommended_action: 'Verify provider-side DKIM signing and the actual message signing domain and selector. Entering a selector here does not enable signing; use receiver authentication results to confirm DKIM passes.',
 			evidence: $dkim,
 			raw: array( 'record' => $dkim )
 		);

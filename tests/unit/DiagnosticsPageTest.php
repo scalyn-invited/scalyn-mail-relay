@@ -18,6 +18,14 @@ use Scalyn\MailRelay\Providers\ValidationResult;
  * Covers the capability gate plus configured and not-configured B1 states.
  */
 final class DiagnosticsPageTest extends TestCase {
+	public function test_monitoring_panel_and_dkim_form_are_not_on_diagnostics(): void {
+		$this->grant_run_diagnostics();
+		$GLOBALS['_test_current_user_can'][Capabilities::MANAGE_SETTINGS]=true;
+		$html=$this->render_and_capture();
+		$this->assertStringNotContainsString('Scheduled health monitoring',$html);
+		$this->assertStringNotContainsString('name="dkim_selector"',$html);
+		$this->assertStringContainsString('Configure DKIM in Settings',$html);
+	}
 
 	protected function setUp(): void {
 		$GLOBALS['_test_current_user_can'] = array();
@@ -395,7 +403,7 @@ final class DiagnosticsPageTest extends TestCase {
 
 		// When data exists, health score is displayed in the StatusBadge (e.g., "81/100").
 		// The duplicate large-text display was removed to avoid redundancy (issue #19).
-		$this->assertStringContainsString( 'Health Score', $output );
+		$this->assertStringContainsString( 'Configuration Score', $output );
 		$this->assertStringContainsString( 'scalyn-badge', $output );
 	}
 
@@ -425,6 +433,7 @@ final class DiagnosticsPageTest extends TestCase {
 		$this->assertStringContainsString( 'Not evaluated', $output );
 		$this->assertStringContainsString( 'Operational reliability', $output );
 		$this->assertStringContainsString( 'Health score based on: Operational reliability.', $output );
+		$this->assertStringContainsString( 'Message authentication and delivery: not verified', $output );
 		$this->assertStringNotContainsString( 'based on the results of all diagnostic checks', $output );
 		// The five check cards are still Unknown; the health card is the only healthy badge.
 		$this->assertSame( 5, substr_count( $output, 'scalyn-badge--unknown' ) );

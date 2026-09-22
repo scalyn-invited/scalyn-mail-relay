@@ -108,6 +108,10 @@ final class Plugin {
 	 * Registers core services in the container.
 	 */
 	private function register_services(): void {
+		$this->container->set( \Scalyn\MailRelay\Alerts\AlertRepository::class, static fn(): \Scalyn\MailRelay\Alerts\AlertRepository => new \Scalyn\MailRelay\Alerts\AlertRepository() );
+		$this->container->set( \Scalyn\MailRelay\Alerts\ObservationRepository::class, static fn(): \Scalyn\MailRelay\Alerts\ObservationRepository => new \Scalyn\MailRelay\Alerts\ObservationRepository() );
+		$this->container->set( \Scalyn\MailRelay\Alerts\WebhookChannel::class, static fn(): \Scalyn\MailRelay\Alerts\WebhookChannel => new \Scalyn\MailRelay\Alerts\WebhookChannel() );
+		$this->container->set( \Scalyn\MailRelay\Alerts\AlertService::class, static fn( Container $c ): \Scalyn\MailRelay\Alerts\AlertService => new \Scalyn\MailRelay\Alerts\AlertService( $c->get( \Scalyn\MailRelay\Alerts\AlertRepository::class ), $c->get( \Scalyn\MailRelay\Alerts\ObservationRepository::class ), $c->get( \Scalyn\MailRelay\Alerts\WebhookChannel::class ) ) );
 		$this->container->set( AuditRepository::class, static fn(): AuditRepository => new AuditRepository() );
 		$this->container->set( AuditRecorder::class, static fn( Container $c ): AuditRecorder => new AuditRecorder( $c->get( AuditRepository::class ) ) );
 		$this->container->set( AdminMenu::class, static fn(): AdminMenu => new AdminMenu() );
@@ -191,6 +195,8 @@ final class Plugin {
 		$this->container->get( AuditRecorder::class )->register();
 		$this->container->get( RetentionService::class )->register();
 		$this->container->get( DiagnosticSchedule::class )->register();
+		$this->container->get( \Scalyn\MailRelay\Alerts\AlertService::class )->register();
+		add_action( 'admin_init', array( \Scalyn\MailRelay\Database\Migrator::class, 'maybe_upgrade' ) );
 
 		// Register REST endpoints.
 		add_action( 'rest_api_init', array( $this->container->get( DiagnosticsRunEndpoint::class ), 'register' ) );

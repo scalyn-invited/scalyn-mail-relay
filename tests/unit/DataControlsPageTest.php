@@ -7,6 +7,30 @@ use Scalyn\MailRelay\Core\SettingsRepository;
 use Scalyn\MailRelay\Database\RetentionStateRepository;
 
 final class DataControlsPageTest extends TestCase {
+	public function test_settings_page_contains_dkim_and_separate_forms(): void {
+		$html=$this->render();
+		$this->assertStringContainsString('<h1>Settings</h1>',$html);
+		$this->assertStringContainsString('DKIM configuration',$html);
+		$this->assertSame(2,substr_count($html,'<form '));
+		$this->assertStringNotContainsString('Scheduled health monitoring',$html);
+	}
+	public function test_dkim_save_does_not_change_data_controls(): void {
+		$GLOBALS['_test_wp_options'][SettingsRepository::OPTION_KEY]=['advanced'=>['log_retention_days'=>60,'diagnostic_schedule'=>'hourly','delete_data_on_uninstall'=>true]];
+		$_SERVER['REQUEST_METHOD']='POST';
+		$_POST=['scalyn_dkim_settings'=>'1','dkim_selector'=>'selector1'];
+		$this->assertStringContainsString('DKIM selector saved',$this->render());
+		$settings=new SettingsRepository();
+		$this->assertSame('selector1',$settings->get_dkim_selector());
+		$this->assertSame(60,$settings->get_log_retention_days());
+		$this->assertSame('hourly',$settings->get_diagnostic_schedule());
+		$this->assertTrue($settings->get_delete_data_on_uninstall());
+	}
+	public function test_data_controls_save_does_not_clear_dkim(): void {
+		$GLOBALS['_test_wp_options'][SettingsRepository::OPTION_KEY]=['advanced'=>['dkim_selector'=>'selector1']];
+		$_SERVER['REQUEST_METHOD']='POST';$_POST=['retention_days'=>'45'];
+		$this->assertStringContainsString('Data controls saved',$this->render());
+		$this->assertSame('selector1',(new SettingsRepository())->get_dkim_selector());
+	}
 	protected function setUp(): void {
 		$GLOBALS['_test_wp_options'] = array();
 		$GLOBALS['_test_wp_cron'] = array();

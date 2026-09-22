@@ -67,18 +67,19 @@ $setup_steps = array(
 	<p><?php esc_html_e( 'Displayed health snapshot:', 'scalyn-mail-relay' ); ?> <?php echo esc_html( $score_freshness ); ?></p>
 	<p><?php esc_html_e( 'Evidence is stale after the configured cadence plus five minutes, or 24 hours plus five minutes when monitoring is disabled.', 'scalyn-mail-relay' ); ?></p>
 	<p class="scalyn-lead"><?php esc_html_e( 'Email delivery, diagnostics, monitoring and remediation.', 'scalyn-mail-relay' ); ?></p>
+	<?php \Scalyn\MailRelay\Admin\Components\VerificationScope::render(); ?>
 
 	<div class="scalyn-grid">
 
 		<section class="scalyn-card" aria-labelledby="scalyn-health-heading">
-			<h2 id="scalyn-health-heading"><?php esc_html_e( 'Email Health', 'scalyn-mail-relay' ); ?></h2>
+			<h2 id="scalyn-health-heading"><?php esc_html_e( 'Email Health — configuration score', 'scalyn-mail-relay' ); ?></h2>
 			<?php if ( null === $health_score ) : ?>
 				<strong class="scalyn-score" aria-label="<?php esc_attr_e( 'Health score not yet assessed', 'scalyn-mail-relay' ); ?>">—</strong>
 				<?php StatusBadge::render( 'unknown', $health_ui_label ); ?>
 				<p class="scalyn-card__note"><?php esc_html_e( 'Run the initial diagnostics after configuring a provider to generate your first health score.', 'scalyn-mail-relay' ); ?></p>
 			<?php else : ?>
 				<?php /* translators: %d is the numeric health score out of 100 */ ?>
-				<strong class="scalyn-score" aria-label="<?php echo esc_attr( sprintf( __( 'Health score: %d out of 100', 'scalyn-mail-relay' ), $health_score ) ); ?>"><?php echo esc_html( $health_score ); ?></strong>
+				<strong class="scalyn-score" aria-label="<?php echo esc_attr( sprintf( __( 'Configuration score: %d out of 100; authentication and delivery not verified', 'scalyn-mail-relay' ), $health_score ) ); ?>"><?php echo esc_html( $health_score ); ?></strong>
 				<?php StatusBadge::render( $health_ui_status, $health_ui_label ); ?>
 				<?php HealthScoreBreakdown::render( $health_components, $health_summary ); ?>
 			<?php endif; ?>

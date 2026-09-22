@@ -31,6 +31,6 @@ defined( 'ABSPATH' ) || exit;
 		<p><?php esc_html_e( 'Traffic-triggered WP-Cron is disabled on this site. Verify that a server cron job calls WordPress cron.', 'scalyn-mail-relay' ); ?></p>
 	<?php endif; ?>
 	<?php if ( current_user_can( \Scalyn\MailRelay\Core\Capabilities::MANAGE_SETTINGS ) ) : ?>
-		<p><a href="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-data-controls' ) ); ?>"><?php esc_html_e( 'Configure monitoring in Data Controls', 'scalyn-mail-relay' ); ?></a></p>
+		<p><a href="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-data-controls' ) ); ?>"><?php esc_html_e( 'Configure monitoring in Settings', 'scalyn-mail-relay' ); ?></a></p>
 	<?php endif; ?>
 </section>

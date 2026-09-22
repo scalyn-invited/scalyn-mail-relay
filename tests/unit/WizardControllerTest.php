@@ -552,6 +552,8 @@ final class WizardControllerTest extends TestCase {
 
 		$result = get_transient( 'scalyn_wizard_email_1' );
 		$this->assertStringNotContainsStringIgnoringCase( 'delivered', $result['message'] );
+		$this->assertStringContainsString( 'does not confirm recipient delivery or SPF/DKIM authentication', $result['message'] );
+		$this->assertStringContainsString( 'bounce reports', $result['message'] );
 	}
 
 	public function test_step5_failure_result_is_normalized(): void {

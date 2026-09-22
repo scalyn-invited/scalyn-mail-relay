@@ -43,7 +43,6 @@ final class DiagnosticsPage {
 		}
 
 		$provider_configured = $this->is_provider_configured();
-		$monitoring          = \Scalyn\MailRelay\Admin\MonitoringStatusPresenter::load();
 		$wizard_url          = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 
 		// Wire the "Run Diagnostics" button to the REST endpoint.

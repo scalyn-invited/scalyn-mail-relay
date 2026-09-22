@@ -17,7 +17,7 @@
 defined( 'ABSPATH' ) || exit;
 
 define( 'SCALYN_MAIL_RELAY_VERSION', '0.1.0' );
-define( 'SCALYN_MAIL_RELAY_DB_VERSION', '0.1.0' );
+define( 'SCALYN_MAIL_RELAY_DB_VERSION', '0.2.0' );
 define( 'SCALYN_MAIL_RELAY_FILE', __FILE__ );
 define( 'SCALYN_MAIL_RELAY_PATH', plugin_dir_path( __FILE__ ) );
 define( 'SCALYN_MAIL_RELAY_URL', plugin_dir_url( __FILE__ ) );

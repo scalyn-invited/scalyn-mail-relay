@@ -148,7 +148,9 @@ final class DmarcCheck implements DiagnosticCheckInterface {
 		return new DiagnosticResult(
 			status: 'pass',
 			severity: 'low',
-			message: sprintf( 'A valid, enforcing DMARC record ("p=%s") was found for "%s".', $policy, $domain ),
+			message: sprintf( 'A DMARC record with an enforcing policy ("p=%s") was found for "%s". Message authentication and alignment have not been verified.', $policy, $domain ),
+			impact: 'An enforcing policy does not prove legitimate messages pass SPF or DKIM alignment. It may cause unauthenticated messages to be rejected.',
+			recommended_action: 'Confirm SPF or DKIM authentication and alignment for actual messages using receiver results or DMARC reports. Publishing this policy alone does not authenticate email.',
 			evidence: $dmarc,
 			raw: array( 'record' => $dmarc )
 		);

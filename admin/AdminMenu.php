@@ -112,8 +112,8 @@ final class AdminMenu {
 		);
 		add_submenu_page(
 			'scalyn-mail-relay',
-			__( 'Data Controls — Scalyn Mail Relay', 'scalyn-mail-relay' ),
-			__( 'Data Controls', 'scalyn-mail-relay' ),
+			__( 'Settings — Scalyn Mail Relay', 'scalyn-mail-relay' ),
+			__( 'Settings', 'scalyn-mail-relay' ),
 			Capabilities::MANAGE_SETTINGS,
 			'scalyn-mail-relay-data-controls',
 			array( $this, 'render_data_controls' )
@@ -126,6 +126,7 @@ final class AdminMenu {
 			'scalyn-mail-relay-audit',
 			array( $this, 'render_audit' )
 		);
+		add_submenu_page( 'scalyn-mail-relay', __( 'Alerts & Recovery', 'scalyn-mail-relay' ), __( 'Alerts & Recovery', 'scalyn-mail-relay' ), Capabilities::MANAGE_SETTINGS, 'scalyn-mail-relay-alerts', array( $this, 'render_alerts' ) );
 	}
 
 	/**
@@ -183,6 +184,12 @@ final class AdminMenu {
 	/** Renders the bounded audit history view. */
 	public function render_audit(): void {
 		( new AuditPage( Plugin::instance()->container()->get( AuditRepository::class ) ) )->render();
+	}
+
+	/** Renders protected alert settings and history through shared services. */
+	public function render_alerts(): void {
+		$container = Plugin::instance()->container();
+		( new \Scalyn\MailRelay\Admin\Pages\AlertsPage( $container->get( \Scalyn\MailRelay\Alerts\AlertRepository::class ), $container->get( \Scalyn\MailRelay\Alerts\WebhookChannel::class ) ) )->render();
 	}
 
 	/**

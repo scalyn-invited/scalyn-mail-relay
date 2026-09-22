@@ -29,6 +29,10 @@ use Scalyn\MailRelay\Logging\MailLogRepository;
  *  - No raw UUID is echoed without format validation.
  */
 final class DashboardPageTest extends TestCase {
+	public function test_scheduled_monitoring_panel_remains_on_dashboard(): void {
+		$this->grant_view_dashboard();
+		$this->assertStringContainsString('Scheduled health monitoring',$this->render_and_capture());
+	}
 
 	private WpdbStub $wpdb;
 
@@ -639,7 +643,8 @@ final class DashboardPageTest extends TestCase {
 		$output = $this->render_and_capture();
 
 		$this->assertStringContainsString( 'scalyn-badge--unknown', $output );
-		$this->assertStringNotContainsString( '/100', $output );
+		$this->assertStringContainsString( 'aria-label="Health score not yet assessed">—</strong>', $output );
+		$this->assertStringNotContainsString( 'aria-label="Configuration score: 100', $output );
 	}
 
 	public function test_email_health_explains_which_components_have_evidence(): void {
@@ -652,6 +657,7 @@ final class DashboardPageTest extends TestCase {
 		$this->assertStringContainsString( 'DNS &amp; authentication', $output );
 		$this->assertStringContainsString( 'Not evaluated', $output );
 		$this->assertStringContainsString( 'Health score based on: Operational reliability.', $output );
+		$this->assertStringContainsString( 'Message authentication and delivery: not verified', $output );
 		$this->assertStringNotContainsString( 'based on SPF, DKIM, DMARC configuration', $output );
 	}
 

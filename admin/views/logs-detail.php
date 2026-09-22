@@ -190,7 +190,7 @@ $status_labels = array(
 
 	<?php if ( isset( $log_status ) && 'accepted' === $log_status ) : ?>
 		<p class="description scalyn-log-note">
-			<?php esc_html_e( 'Accepted means the configured provider acknowledged the message. Accepted does not guarantee inbox delivery.', 'scalyn-mail-relay' ); ?>
+			<?php esc_html_e( 'Accepted means the configured provider acknowledged the message. Accepted does not guarantee inbox delivery. The recipient server may reject it later; check provider delivery logs and bounce reports. Later bounces are not automatically reflected in this status.', 'scalyn-mail-relay' ); ?>
 		</p>
 	<?php endif; ?>
 </div>

@@ -25,7 +25,7 @@ final class LifecycleTest extends TestCase {
 
 		// Migrator::migrate() returns early when the stored DB version already
 		// matches the target, which keeps activation free of dbDelta().
-		$GLOBALS['_test_wp_options']['scalyn_mail_relay_db_version'] = '0.1.0';
+		$GLOBALS['_test_wp_options']['scalyn_mail_relay_db_version'] = SCALYN_MAIL_RELAY_DB_VERSION;
 	}
 
 	protected function tearDown(): void {
@@ -79,11 +79,11 @@ final class LifecycleTest extends TestCase {
 	// Scheduled events
 	// -------------------------------------------------------------------------
 
-	public function test_activation_schedules_retention_only(): void {
+	public function test_activation_schedules_retention_and_alert_evaluation(): void {
 		Lifecycle::activate();
 
 		$this->assertSame(
-			array( 'scalyn_mail_relay_cleanup_logs' ),
+			array( 'scalyn_mail_relay_cleanup_logs', 'scalyn_mail_relay_send_alerts' ),
 			array_keys( $GLOBALS['_test_wp_cron'] )
 		);
 	}
@@ -97,7 +97,7 @@ final class LifecycleTest extends TestCase {
 
 		Lifecycle::activate();
 
-		$this->assertSame( array( 'scalyn_mail_relay_cleanup_logs' ), array_keys( $GLOBALS['_test_wp_cron'] ) );
+		$this->assertSame( array( 'scalyn_mail_relay_cleanup_logs', 'scalyn_mail_relay_send_alerts' ), array_keys( $GLOBALS['_test_wp_cron'] ) );
 		$this->assertGreaterThan( time(), $GLOBALS['_test_wp_cron']['scalyn_mail_relay_cleanup_logs'] );
 	}
 

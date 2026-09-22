@@ -46,7 +46,7 @@ final class DiagnosticContextBuilder {
 	 * @param SettingsRepository $settings        Plugin settings.
 	 * @param string             $fallback_domain Domain used when no valid From address is
 	 *                                            configured (typically the site host).
-	 * @return DiagnosticContext Context whose $settings contain only host, port, and encryption.
+	 * @return DiagnosticContext Context containing host, port, encryption and optional public DKIM selector.
 	 */
 	public function build( SettingsRepository $settings, string $fallback_domain ): DiagnosticContext {
 		$smtp = $settings->get_smtp_config();
@@ -61,6 +61,9 @@ final class DiagnosticContextBuilder {
 		$safe['host']       = trim( (string) ( $safe['host'] ?? '' ) );
 		$safe['port']       = absint( $safe['port'] ?? 0 );
 		$safe['encryption'] = (string) ( $safe['encryption'] ?? 'tls' );
+		if ( '' !== $settings->get_dkim_selector() ) {
+			$safe['dkim_selector'] = $settings->get_dkim_selector();
+		}
 
 		$domain = self::domain_from_email( (string) ( $smtp['from_email'] ?? '' ) );
 

@@ -14,7 +14,7 @@ use Scalyn\MailRelay\Database\RetentionStateRepository;
 
 defined( 'ABSPATH' ) || exit;
 
-/** Capability and nonce protected data controls. No direct table access. */
+/** Settings page; retains its historical class and URL for compatibility. */
 final class DataControlsPage {
 
 	/**
@@ -28,12 +28,14 @@ final class DataControlsPage {
 	/** Validates a POST and renders escaped, credential-free settings and status. */
 	public function render(): void {
 		if ( ! current_user_can( Capabilities::MANAGE_SETTINGS ) ) {
-			wp_die( esc_html__( 'You do not have permission to manage data controls.', 'scalyn-mail-relay' ) );
+			wp_die( esc_html__( 'You do not have permission to manage settings.', 'scalyn-mail-relay' ) );
 		}
 		$notice = '';
 		$error  = false;
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Routing only; each form checks its own nonce before saving.
+		$is_dkim_form = isset( $_POST['scalyn_dkim_settings'] );
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.ValidatedSanitizedInput.MissingUnslash -- Server request method only.
-		if ( 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) {
+		if ( 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? '' ) && ! $is_dkim_form ) {
 			check_admin_referer( 'scalyn_retention_settings' );
 			$days      = isset( $_POST['retention_days'] ) && is_string( $_POST['retention_days'] ) ? sanitize_text_field( wp_unslash( $_POST['retention_days'] ) ) : '';
 			$delete    = isset( $_POST['delete_on_uninstall'] ) && '1' === $_POST['delete_on_uninstall'];
@@ -68,12 +70,13 @@ final class DataControlsPage {
 				$notice         = $error ? __( 'Settings or scheduling could not be applied. Check the saved values and try again.', 'scalyn-mail-relay' ) : __( 'Data controls saved. Retention changes apply to the next scheduled cleanup.', 'scalyn-mail-relay' );
 			}
 		}
-		$days    = $this->settings->get_log_retention_days();
-		$cadence = $this->settings->get_diagnostic_schedule();
-		$delete  = $this->settings->get_delete_data_on_uninstall();
-		$status  = $this->state->get();
-		$next    = wp_next_scheduled( ScheduledHooks::CLEANUP );
-		$labels  = array(
+		$days      = $this->settings->get_log_retention_days();
+		$cadence   = $this->settings->get_diagnostic_schedule();
+		$delete    = $this->settings->get_delete_data_on_uninstall();
+		$status    = $this->state->get();
+		$next      = wp_next_scheduled( ScheduledHooks::CLEANUP );
+		$dkim_form = new \Scalyn\MailRelay\Admin\Components\DkimSettingsForm( $this->settings );
+		$labels    = array(
 			'never'        => __( 'No cleanup has run yet.', 'scalyn-mail-relay' ),
 			'running'      => __( 'Cleanup started; completion has not been recorded. An interrupted run resumes on a later tick.', 'scalyn-mail-relay' ),
 			'complete'     => __( 'Last batch completed.', 'scalyn-mail-relay' ),

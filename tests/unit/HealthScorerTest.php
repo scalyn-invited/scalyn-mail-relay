@@ -58,6 +58,8 @@ final class HealthScorerTest extends TestCase {
 		$result = $this->make_scorer()->score( $rows, array() );
 
 		$this->assertSame( 100, $result->dns_score );
+		$this->assertStringContainsString( '2 of 2 stored DNS/transport checks', $result->summary );
+		$this->assertStringContainsString( 'not verified, even at 100/100', $result->summary );
 	}
 
 	public function test_all_failing_dns_checks_score_0(): void {
@@ -91,6 +93,7 @@ final class HealthScorerTest extends TestCase {
 		$result = $this->make_scorer()->score( $rows, array() );
 
 		$this->assertSame( 100, $result->dns_score );
+		$this->assertStringContainsString( '1 of 3 stored DNS/transport checks', $result->summary );
 	}
 
 	// -------------------------------------------------------------------------

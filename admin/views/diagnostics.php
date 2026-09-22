@@ -45,11 +45,14 @@ defined( 'ABSPATH' ) || exit;
 ?>
 <div class="wrap scalyn-mail-relay">
 	<h1><?php esc_html_e( 'Diagnostics', 'scalyn-mail-relay' ); ?></h1>
-	<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/monitoring-status.php'; ?>
+	<?php if ( current_user_can( \Scalyn\MailRelay\Core\Capabilities::MANAGE_SETTINGS ) ) : ?>
+		<p><a href="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-data-controls#scalyn-dkim-heading' ) ); ?>"><?php esc_html_e( 'Configure DKIM in Settings', 'scalyn-mail-relay' ); ?></a></p>
+	<?php endif; ?>
 	<p><?php esc_html_e( 'Displayed diagnostic results:', 'scalyn-mail-relay' ); ?> <?php echo esc_html( $results_freshness ); ?></p>
 	<p><?php esc_html_e( 'Displayed health snapshot:', 'scalyn-mail-relay' ); ?> <?php echo esc_html( $score_freshness ); ?></p>
 	<p><?php esc_html_e( 'Results and the latest retained health snapshot may come from different runs. Evidence is stale after the configured cadence plus five minutes, or 24 hours plus five minutes when monitoring is disabled.', 'scalyn-mail-relay' ); ?></p>
-	<p class="scalyn-lead"><?php esc_html_e( 'Email deliverability health checks and remediation guidance.', 'scalyn-mail-relay' ); ?></p>
+	<p class="scalyn-lead"><?php esc_html_e( 'Email configuration checks and remediation guidance.', 'scalyn-mail-relay' ); ?></p>
+	<?php \Scalyn\MailRelay\Admin\Components\VerificationScope::render(); ?>
 
 	<?php if ( $provider_configured ) : ?>
 		<!-- Run Diagnostics Action (Header) -->
@@ -109,7 +112,7 @@ defined( 'ABSPATH' ) || exit;
 		<!-- DNS Validation Checks -->
 		<section class="scalyn-diagnostics-section" aria-labelledby="scalyn-diagnostics-dns-heading">
 			<h2 id="scalyn-diagnostics-dns-heading" class="scalyn-diagnostics-section__title"><?php esc_html_e( 'DNS Configuration', 'scalyn-mail-relay' ); ?></h2>
-			<p class="scalyn-diagnostics-section__description"><?php esc_html_e( 'Verify SPF, DKIM, DMARC, and MX records to ensure email deliverability.', 'scalyn-mail-relay' ); ?></p>
+			<p class="scalyn-diagnostics-section__description"><?php esc_html_e( 'Inspect SPF, DKIM, DMARC, and MX DNS records. A passing record check does not verify message authentication or delivery.', 'scalyn-mail-relay' ); ?></p>
 
 			<div class="scalyn-diagnostics-grid">
 
@@ -268,12 +271,12 @@ defined( 'ABSPATH' ) || exit;
 			<div class="scalyn-diagnostics-grid">
 				<?php
 				DiagnosticResultCard::render(
-					__( 'Health Score', 'scalyn-mail-relay' ),
+					__( 'Configuration Score', 'scalyn-mail-relay' ),
 					$health_ui_status,
 					$health_ui_label,
 					function () use ( $health_score, $health_components, $health_summary ) {
 						if ( null === $health_score ) {
-							echo '<p class="scalyn-card__note">' . esc_html__( 'Run diagnostics to generate your email health score. It combines DNS authentication checks (SPF, DKIM, DMARC, MX), the SMTP/TLS provider check, and recent delivery results.', 'scalyn-mail-relay' ) . '</p>';
+							echo '<p class="scalyn-card__note">' . esc_html__( 'Run diagnostics to generate a configuration score. It combines limited DNS-record checks, SMTP/TLS connectivity and recent submission outcomes, not recipient delivery results.', 'scalyn-mail-relay' ) . '</p>';
 							return;
 						}
 
