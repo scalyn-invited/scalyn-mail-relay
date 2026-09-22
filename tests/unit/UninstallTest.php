@@ -21,6 +21,7 @@ final class UninstallTest extends TestCase {
 		'wp_scalyn_diagnostics',
 		'wp_scalyn_health_scores',
 		'wp_scalyn_alerts',
+		'wp_scalyn_alert_notifications',
 		'wp_scalyn_audit_logs',
 	);
 
@@ -59,6 +60,7 @@ final class UninstallTest extends TestCase {
 			'scalyn_mail_relay_version'    => '0.1.0',
 			'scalyn_mail_relay_retention_status' => array( 'state' => 'complete' ),
 			'scalyn_mail_relay_diagnostic_run_status' => array( 'latest' => null ),
+			'scalyn_mail_relay_alert_status' => array( 'state' => 'completed', 'at' => 100000 ),
 			'unrelated_plugin_option'      => 'keep me',
 		);
 	}

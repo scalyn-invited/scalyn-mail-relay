@@ -10,7 +10,7 @@ defined( 'ABSPATH' ) || exit;
 <div class="wrap">
 	<h1><?php esc_html_e( 'Audit History', 'scalyn-mail-relay' ); ?></h1>
 	<p><?php esc_html_e( 'Administrative activity, newest records first. Times use the site timezone. User IDs refer to WordPress accounts; deleted accounts retain their numeric ID. Unknown means attribution was not recorded. Manual, REST, scheduled, CLI and application describe execution context, not proof of human intent.', 'scalyn-mail-relay' ); ?></p>
-	<p><?php esc_html_e( 'Accepted means the provider acknowledged a test email, not confirmed delivery. Completed diagnostics may contain failed checks. A started operation without a result may have been interrupted or its audit write may have failed. Audit history follows the Data Controls retention period; individual expired records are removed, so part of a correlated operation may expire before another part.', 'scalyn-mail-relay' ); ?></p>
+	<p><?php esc_html_e( 'Accepted means the provider acknowledged a test email, not confirmed delivery. Completed diagnostics may contain failed checks. A started operation without a result may have been interrupted or its audit write may have failed. Audit history follows the retention period configured in Settings; individual expired records are removed, so part of a correlated operation may expire before another part.', 'scalyn-mail-relay' ); ?></p>
 	<?php if ( $error ) : ?>
 		<div class="notice notice-error" role="status"><p><?php esc_html_e( 'Audit history is unavailable. Check database availability and try again.', 'scalyn-mail-relay' ); ?></p></div>
 	<?php else : ?>

@@ -8,7 +8,8 @@
 defined( 'ABSPATH' ) || exit;
 ?>
 <div class="wrap">
-	<h1><?php esc_html_e( 'Data Controls', 'scalyn-mail-relay' ); ?></h1>
+	<h1><?php esc_html_e( 'Settings', 'scalyn-mail-relay' ); ?></h1>
+	<?php $dkim_form->render(); ?>
 	<?php if ( '' !== $notice ) : ?>
 		<div class="notice <?php echo $error ? 'notice-error' : 'notice-success'; ?>" role="status"><p><?php echo esc_html( $notice ); ?></p></div>
 	<?php endif; ?>
@@ -17,7 +18,7 @@ defined( 'ABSPATH' ) || exit;
 		<h2><?php esc_html_e( 'Operational history retention', 'scalyn-mail-relay' ); ?></h2>
 		<p><label for="retention-days"><?php esc_html_e( 'Keep history for this many days', 'scalyn-mail-relay' ); ?></label></p>
 		<input id="retention-days" name="retention_days" type="number" min="1" max="3650" step="1" required value="<?php echo esc_attr( (string) $days ); ?>" aria-describedby="retention-help" />
-		<p id="retention-help"><?php esc_html_e( 'Choose 1–3650 days (default 30). This applies to email logs with their entire timelines, complete diagnostic runs, health snapshots and audit history. Cleanup runs hourly in batches of up to 100 messages, 100 diagnostic runs, 100 snapshots and 100 audit rows. Records exactly at the cutoff remain. A diagnostic run remains until all its results expire. Audit records expire individually, including actor attribution. Existing orphan timeline rows and alerts are outside this policy.', 'scalyn-mail-relay' ); ?></p>
+		<p id="retention-help"><?php esc_html_e( 'Choose 1–3650 days (default 30). This applies to email logs with their entire timelines, complete diagnostic runs, health snapshots and audit history. Cleanup runs hourly in batches of up to 100 messages, 100 diagnostic runs, 100 snapshots and 100 audit rows. Records exactly at the cutoff remain. A diagnostic run remains until all its results expire. Audit records expire individually, including actor attribution. Each five-minute alert tick also expires up to 100 resolved incidents and their notifications together, measured from resolution. Active incidents and existing orphan timeline rows are retained.', 'scalyn-mail-relay' ); ?></p>
 		<p><?php esc_html_e( 'Reducing the period makes older history eligible for permanent deletion at the next cleanup. Increasing it cannot restore deleted history. Export or back up history before reducing the period.', 'scalyn-mail-relay' ); ?></p>
 		<h2><?php esc_html_e( 'Scheduled diagnostics', 'scalyn-mail-relay' ); ?></h2>
 		<p><label for="diagnostic-schedule"><?php esc_html_e( 'Run diagnostics automatically', 'scalyn-mail-relay' ); ?></label></p>

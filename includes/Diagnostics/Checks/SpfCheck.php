@@ -134,7 +134,9 @@ final class SpfCheck implements DiagnosticCheckInterface {
 		return new DiagnosticResult(
 			status: 'pass',
 			severity: 'low',
-			message: sprintf( 'A valid SPF record was found for "%s".', $domain ),
+			message: sprintf( 'An SPF record was found for "%s" with a recognized terminal mechanism. Sending-IP authorization has not been evaluated.', $domain ),
+			impact: 'This is a basic DNS-record check, not an SPF authentication result. It does not evaluate the actual outbound IP, envelope sender, include chains, or lookup limits.',
+			recommended_action: 'Confirm the actual outbound IP and envelope-sender domain with your mail provider, then verify SPF for that sending identity. A receiver can reject a message even when this record check passes.',
 			evidence: $spf,
 			raw: array( 'record' => $spf )
 		);

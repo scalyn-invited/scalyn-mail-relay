@@ -76,6 +76,8 @@ final class SettingsRepository {
 			'from_email' => '',
 		),
 		'advanced' => array(
+			'dkim_selector'            => '',
+			'alert_webhook_enabled'    => false,
 			'diagnostic_schedule'      => 'disabled',
 			'log_retention_days'       => 30,
 			'delete_data_on_uninstall' => false,
@@ -213,6 +215,26 @@ final class SettingsRepository {
 		return in_array( $value, self::DIAGNOSTIC_SCHEDULES, true ) ? $value : 'disabled';
 	}
 
+	/** Returns strict opt-in; endpoint credentials live only in server configuration. */
+	public function get_alert_webhook_enabled(): bool {
+		return true === ( $this->data['advanced']['alert_webhook_enabled'] ?? false );
+	}
+
+	/** Returns only a validated, explicitly configured public DNS selector. */
+	public function get_dkim_selector(): string {
+		$value = $this->data['advanced']['dkim_selector'] ?? '';
+		return self::valid_dkim_selector( $value ) ? trim( $value ) : '';
+	}
+
+	/**
+	 * Validates the single-label selector supported by the DKIM check; blank clears it.
+	 *
+	 * @param mixed $value Submitted selector, never a public/private key.
+	 */
+	public static function valid_dkim_selector( mixed $value ): bool {
+		return is_string( $value ) && ( '' === trim( $value ) || 1 === preg_match( '/^[A-Za-z0-9](?:[A-Za-z0-9_-]{0,61}[A-Za-z0-9])?$/D', trim( $value ) ) );
+	}
+
 	/**
 	 * Accepts only whole days between one day and ten years. Zero is not unlimited.
 	 *
@@ -323,6 +345,18 @@ final class SettingsRepository {
 
 		if ( isset( $input['advanced'] ) && is_array( $input['advanced'] ) ) {
 			$adv = $input['advanced'];
+			if ( array_key_exists( 'dkim_selector', $adv ) ) {
+				if ( ! self::valid_dkim_selector( $adv['dkim_selector'] ) ) {
+					throw new \InvalidArgumentException( 'Invalid DKIM selector.' );
+				}
+				$output['advanced']['dkim_selector'] = trim( $adv['dkim_selector'] );
+			}
+			if ( array_key_exists( 'alert_webhook_enabled', $adv ) ) {
+				if ( ! is_bool( $adv['alert_webhook_enabled'] ) ) {
+					throw new \InvalidArgumentException( 'Invalid webhook enable setting.' );
+				}
+				$output['advanced']['alert_webhook_enabled'] = $adv['alert_webhook_enabled'];
+			}
 			if ( array_key_exists( 'diagnostic_schedule', $adv ) ) {
 				if ( ! in_array( $adv['diagnostic_schedule'], self::DIAGNOSTIC_SCHEDULES, true ) ) {
 					throw new \InvalidArgumentException( 'Invalid diagnostic schedule.' );

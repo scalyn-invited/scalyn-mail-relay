@@ -730,6 +730,7 @@ final class LogsPageTest extends TestCase {
 		$output = $this->render_and_capture();
 
 		$this->assertStringContainsString( 'does not guarantee inbox delivery', $output );
+		$this->assertStringContainsString( 'Later bounces are not automatically reflected in this status', $output );
 	}
 
 	public function test_accepted_disclaimer_is_absent_for_failed_timeline(): void {

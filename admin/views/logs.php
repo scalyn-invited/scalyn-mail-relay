@@ -200,7 +200,7 @@ $next_page_url     = add_query_arg( $next_page_args, $logs_base_url );
 		</div>
 
 		<p class="description scalyn-log-note">
-			<?php esc_html_e( 'Accepted means the configured provider acknowledged the message. Accepted does not guarantee inbox delivery.', 'scalyn-mail-relay' ); ?>
+			<?php esc_html_e( 'Accepted means the configured provider acknowledged the message. Accepted does not guarantee inbox delivery. The recipient server may reject it later; check provider delivery logs and bounce reports. Later bounces are not automatically reflected in this status.', 'scalyn-mail-relay' ); ?>
 		</p>
 
 	<?php endif; ?>

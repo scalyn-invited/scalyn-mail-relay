@@ -329,7 +329,7 @@ final class WizardController {
 		}
 
 		$safe_message = $result->success
-			? __( 'The configured SMTP server accepted the test email. Check your inbox to confirm receipt.', 'scalyn-mail-relay' )
+			? __( 'The configured SMTP server accepted the test email. This does not confirm recipient delivery or SPF/DKIM authentication. Check your inbox to confirm receipt; if missing, check Spam/Junk and provider delivery logs or bounce reports.', 'scalyn-mail-relay' )
 			: (string) ( $result->response_message ?? __( 'The test email could not be sent. Check your SMTP configuration.', 'scalyn-mail-relay' ) );
 
 		// @security Store only normalized boolean and safe message string.

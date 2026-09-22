@@ -72,13 +72,13 @@ Outcome: diagnostics run unattended and monitoring freshness is visible.
 
 Outcome: actionable incidents surface without repeated notification noise.
 
-- [ ] Define incident rules for repeated send failures, monitoring failures, and health degradation.
-- [ ] Implement alert persistence, deduplication, cooldowns, and resolution.
-- [ ] Add an independent webhook notification channel with protected configuration.
-- [ ] Track notification attempts and handle channel failures safely.
-- [ ] Add recovery notifications and an alert history/view.
-- [ ] Record relevant alert actions in the audit trail.
-- [ ] Completion gate: an incident creates an actionable alert, repeated observations are deduplicated, and recovery is recorded.
+- [x] Define incident rules for repeated send failures, monitoring failures, and health degradation.
+- [x] Implement alert persistence, deduplication, cooldowns, and resolution.
+- [x] Add an independent webhook notification channel with protected configuration.
+- [x] Track notification attempts and handle channel failures safely.
+- [x] Add recovery notifications and an alert history/view.
+- [x] Record relevant alert actions in the audit trail.
+- [x] Completion gate: an incident creates an actionable alert, repeated observations are deduplicated, and recovery is recorded. See [Milestone 5 evidence](qa/2026-09-22-milestone-5-completion.md) and [operator guide](ALERTS-AND-RECOVERY.md). Bernie's review and production receiver verification remain outstanding; no receiver or OS scheduler was provisioned.
 
 ## 6. Operational dashboard and reporting
 

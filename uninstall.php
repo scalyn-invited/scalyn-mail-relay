@@ -42,6 +42,7 @@ $owned_tables = array(
 	'scalyn_diagnostics',
 	'scalyn_health_scores',
 	'scalyn_alerts',
+	'scalyn_alert_notifications',
 	'scalyn_audit_logs',
 );
 
@@ -52,7 +53,7 @@ foreach ( $owned_tables as $suffix ) {
 	$wpdb->query( "DROP TABLE IF EXISTS `{$table}`" );
 }
 
-foreach ( array( 'scalyn_mail_relay_settings', 'scalyn_mail_relay_db_version', 'scalyn_mail_relay_version', 'scalyn_mail_relay_retention_status', 'scalyn_mail_relay_diagnostic_run_status' ) as $option ) {
+foreach ( array( 'scalyn_mail_relay_settings', 'scalyn_mail_relay_db_version', 'scalyn_mail_relay_version', 'scalyn_mail_relay_retention_status', 'scalyn_mail_relay_diagnostic_run_status', 'scalyn_mail_relay_alert_status' ) as $option ) {
 	delete_option( $option );
 }
 

@@ -98,7 +98,7 @@ final class HealthScorer {
 			provider_score: $provider_score,
 			failure_score: $failure_score,
 			security_score: null,
-			summary: self::build_summary( array_keys( $components ) )
+			summary: self::build_summary( array_keys( $components ), $diagnostic_rows )
 		);
 	}
 
@@ -154,11 +154,16 @@ final class HealthScorer {
 	 * rather than an opaque number.
 	 *
 	 * @param string[] $included_labels Human-readable labels of components with evidence.
+	 * @param array    $rows Persisted check results for this run.
 	 */
-	private static function build_summary( array $included_labels ): string {
-		$parts   = array();
-		$parts[] = 'Health score based on: ' . implode( ', ', $included_labels ) . '.';
-		$parts[] = 'Security posture and WordPress/system health are not yet evaluated by this version and are excluded, not scored as zero.';
+	private static function build_summary( array $included_labels, array $rows ): string {
+		$parts    = array();
+		$parts[]  = 'Health score based on: ' . implode( ', ', $included_labels ) . '.';
+		$parts[]  = 'Security posture and WordPress/system health are not yet evaluated by this version and are excluded, not scored as zero.';
+		$eligible = array_filter( $rows, static fn( $row ) => in_array( $row['check_type'] ?? '', array( 'dns', 'smtp' ), true ) );
+		$counted  = array_filter( $eligible, static fn( $row ) => isset( self::STATUS_POINTS[ $row['status'] ?? '' ] ) );
+		$parts[]  = sprintf( '%d of %d stored DNS/transport checks contributed to this score; unknown and error results are excluded.', count( $counted ), count( $eligible ) );
+		$parts[]  = 'Configuration evidence only: DNS & authentication means limited DNS-record checks, and operational reliability means provider submission acceptance. Outbound-IP SPF authorization, message DKIM signatures, DMARC alignment and recipient delivery are not verified, even at 100/100.';
 
 		return implode( ' ', $parts );
 	}

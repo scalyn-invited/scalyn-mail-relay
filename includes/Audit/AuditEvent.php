@@ -19,9 +19,11 @@ final readonly class AuditEvent {
 	 */
 	public AuditActor $actor;
 
-	public const FIELDS = array( 'provider.active', 'smtp.host', 'smtp.port', 'smtp.encryption', 'smtp.username', 'smtp.password', 'smtp.from_name', 'smtp.from_email', 'advanced.log_retention_days', 'advanced.delete_data_on_uninstall', 'advanced.diagnostic_schedule' );
+	public const FIELDS = array( 'provider.active', 'smtp.host', 'smtp.port', 'smtp.encryption', 'smtp.username', 'smtp.password', 'smtp.from_name', 'smtp.from_email', 'advanced.log_retention_days', 'advanced.delete_data_on_uninstall', 'advanced.diagnostic_schedule', 'advanced.alert_webhook_enabled', 'advanced.dkim_selector' );
 
 	private const OUTCOMES = array(
+		'alert_incident'           => array( 'opened', 'resolved' ),
+		'alert_notification'       => array( 'sent', 'failed', 'skipped', 'retry' ),
 		'settings_changed'         => array( 'changed' ),
 		'retention_changed'        => array( 'changed' ),
 		'uninstall_policy_changed' => array( 'changed' ),

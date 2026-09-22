@@ -1,4 +1,24 @@
 <?php
+
+// Filter support for custom cron schedules. Kept separate from action assertions.
+function submit_button(string $text='Save Changes'):void {echo '<p><button type="submit">'.esc_html($text).'</button></p>';}
+function checked(mixed $checked, mixed $current=true, bool $display=true):string {
+	$value=(string)$checked===(string)$current ? ' checked="checked"' : '';
+	if($display) echo $value;
+	return $value;
+}
+function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): bool {
+	$GLOBALS['_test_wp_filters'][$hook][$priority][] = [$callback,$accepted_args];
+	return true;
+}
+function apply_filters( string $hook, mixed $value, mixed ...$args ): mixed {
+	$groups=$GLOBALS['_test_wp_filters'][$hook] ?? [];
+	ksort($groups);
+	foreach($groups as $callbacks) foreach($callbacks as [$callback,$accepted]) {
+		$value=$callback(...array_slice([$value,...$args],0,$accepted));
+	}
+	return $value;
+}
 /**
  * Minimal WordPress function stubs for PHPUnit unit tests.
  *
