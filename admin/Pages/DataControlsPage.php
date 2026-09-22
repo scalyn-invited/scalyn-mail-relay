@@ -38,7 +38,11 @@ final class DataControlsPage {
 			$days      = isset( $_POST['retention_days'] ) && is_string( $_POST['retention_days'] ) ? sanitize_text_field( wp_unslash( $_POST['retention_days'] ) ) : '';
 			$delete    = isset( $_POST['delete_on_uninstall'] ) && '1' === $_POST['delete_on_uninstall'];
 			$confirmed = isset( $_POST['confirm_delete'] ) && '1' === $_POST['confirm_delete'];
-			if ( ! SettingsRepository::valid_retention_days( $days ) ) {
+			$cadence   = isset( $_POST['diagnostic_schedule'] ) ? ( is_string( $_POST['diagnostic_schedule'] ) ? sanitize_text_field( wp_unslash( $_POST['diagnostic_schedule'] ) ) : '' ) : $this->settings->get_diagnostic_schedule();
+			if ( ! in_array( $cadence, SettingsRepository::DIAGNOSTIC_SCHEDULES, true ) ) {
+				$notice = __( 'Choose a valid diagnostic schedule. No settings were changed.', 'scalyn-mail-relay' );
+				$error  = true;
+			} elseif ( ! SettingsRepository::valid_retention_days( $days ) ) {
 				$notice = __( 'Enter a whole number from 1 to 3650 days. No settings were changed.', 'scalyn-mail-relay' );
 				$error  = true;
 			} elseif ( $delete && ! $this->settings->get_delete_data_on_uninstall() && ! $confirmed ) {
@@ -49,22 +53,27 @@ final class DataControlsPage {
 					array(
 						'advanced' => array(
 							'log_retention_days'       => (int) $days,
+							'diagnostic_schedule'      => $cadence,
 							'delete_data_on_uninstall' => $delete,
 							'confirm_delete_data'      => $confirmed,
 						),
 					)
 				);
-				$fresh          = new SettingsRepository();
-				$error          = $fresh->get_log_retention_days() !== (int) $days || $fresh->get_delete_data_on_uninstall() !== $delete;
+				$fresh = new SettingsRepository();
+				$error = $fresh->get_log_retention_days() !== (int) $days || $fresh->get_delete_data_on_uninstall() !== $delete || $fresh->get_diagnostic_schedule() !== $cadence;
+				if ( ! $error ) {
+					$error = ! \Scalyn\MailRelay\Core\DiagnosticSchedule::reconcile();
+				}
 				$this->settings = $fresh;
-				$notice         = $error ? __( 'Settings could not be saved. Try again.', 'scalyn-mail-relay' ) : __( 'Data controls saved. Retention changes apply to the next scheduled cleanup.', 'scalyn-mail-relay' );
+				$notice         = $error ? __( 'Settings or scheduling could not be applied. Check the saved values and try again.', 'scalyn-mail-relay' ) : __( 'Data controls saved. Retention changes apply to the next scheduled cleanup.', 'scalyn-mail-relay' );
 			}
 		}
-		$days   = $this->settings->get_log_retention_days();
-		$delete = $this->settings->get_delete_data_on_uninstall();
-		$status = $this->state->get();
-		$next   = wp_next_scheduled( ScheduledHooks::CLEANUP );
-		$labels = array(
+		$days    = $this->settings->get_log_retention_days();
+		$cadence = $this->settings->get_diagnostic_schedule();
+		$delete  = $this->settings->get_delete_data_on_uninstall();
+		$status  = $this->state->get();
+		$next    = wp_next_scheduled( ScheduledHooks::CLEANUP );
+		$labels  = array(
 			'never'        => __( 'No cleanup has run yet.', 'scalyn-mail-relay' ),
 			'running'      => __( 'Cleanup started; completion has not been recorded. An interrupted run resumes on a later tick.', 'scalyn-mail-relay' ),
 			'complete'     => __( 'Last batch completed.', 'scalyn-mail-relay' ),

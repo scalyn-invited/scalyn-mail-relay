@@ -43,6 +43,7 @@ final class DiagnosticsPage {
 		}
 
 		$provider_configured = $this->is_provider_configured();
+		$monitoring          = \Scalyn\MailRelay\Admin\MonitoringStatusPresenter::load();
 		$wizard_url          = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 
 		// Wire the "Run Diagnostics" button to the REST endpoint.
@@ -65,6 +66,9 @@ final class DiagnosticsPage {
 		$health_ui_label   = $health['label'];
 		$health_components = $health['components'];
 		$health_summary    = $health['summary'];
+		$cadence           = $container->get( SettingsRepository::class )->get_diagnostic_schedule();
+		$score_freshness   = \Scalyn\MailRelay\Admin\MonitoringStatusPresenter::evidence( $health['created_at'], $cadence, time() );
+		$results_freshness = \Scalyn\MailRelay\Admin\MonitoringStatusPresenter::evidence( $run_data['results'][0]['created_at'] ?? null, $cadence, time() );
 
 		// Fetch and classify recent mail failures.
 		$recent_failures = $this->get_recent_failures( $mail_log_repo, $classifier );

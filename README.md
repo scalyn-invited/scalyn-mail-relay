@@ -16,8 +16,13 @@ PHP 8.2 and 8.3; it is not a live WordPress/database compatibility matrix.
 ## Current implementation status
 
 SMTP sending, manual DNS/SMTP diagnostics, persisted health scoring, and
-terminal-event logging, administrative audit history and hourly bounded retention are implemented. Scheduled monitoring,
-alerts, API providers, and agency management remain roadmap work. See
+terminal-event logging, administrative audit history and hourly bounded retention are implemented.
+Opt-in scheduled diagnostic execution is available in Data Controls; monitoring
+freshness/status is displayed on Dashboard and Diagnostics. Backend execution status
+records UTC start/finish times and fixed failure stages, separately for scheduled
+runs. Complete diagnostic runs and their
+computed health snapshots now publish atomically (requires InnoDB tables).
+Alerts, API providers, and agency management remain roadmap work. See
 [Project Status](docs/PROJECT_STATUS.md) and the
 [Milestone 1 evidence](docs/qa/2026-09-21-milestone-1-completion.md).
 The local baseline is verified, not release-certified. Provider acceptance is
@@ -28,6 +33,12 @@ authentication coverage or deliverability.
 
 Recorded with rationale in
 [ADR-0002](docs/adr/0002-mvp-release-hardening-accepted-risks.md).
+
+- **Scheduled diagnostics are opt-in.** Data Controls offers disabled (default),
+  hourly, twice daily and daily. One run per tick, no overlap/backfill, at most
+  20 checks and a 20-second cooperative check budget. Active network calls cannot
+  be interrupted. WP-Cron requires traffic or a server trigger. Independent
+  alerting remains planned; see [monitoring operations](docs/MONITORING-OPERATIONS.md).
 
 - **Retention depends on WP-Cron.** Mail Relay → Data Controls configures 1–3650
   days (default 30) and shows cleanup status. Hourly ticks remove up to 100 mail

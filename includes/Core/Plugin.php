@@ -135,6 +135,10 @@ final class Plugin {
 
 		$this->container->set( DiagnosticCheckRegistry::class, static fn(): DiagnosticCheckRegistry => new DiagnosticCheckRegistry() );
 		$this->container->set( DiagnosticRunner::class, static fn(): DiagnosticRunner => new DiagnosticRunner() );
+		$this->container->set( \Scalyn\MailRelay\Database\DiagnosticRunStateRepository::class, static fn(): \Scalyn\MailRelay\Database\DiagnosticRunStateRepository => new \Scalyn\MailRelay\Database\DiagnosticRunStateRepository() );
+		$this->container->set( DiagnosticSchedule::class, static fn(): DiagnosticSchedule => new DiagnosticSchedule() );
+		$this->container->set( \Scalyn\MailRelay\Database\DiagnosticRunLock::class, static fn(): \Scalyn\MailRelay\Database\DiagnosticRunLock => new \Scalyn\MailRelay\Database\DiagnosticRunLock() );
+		$this->container->set( \Scalyn\MailRelay\Diagnostics\DiagnosticRunService::class, static fn( Container $c ): \Scalyn\MailRelay\Diagnostics\DiagnosticRunService => new \Scalyn\MailRelay\Diagnostics\DiagnosticRunService( $c, $c->get( \Scalyn\MailRelay\Database\DiagnosticRunLock::class ) ) );
 		$this->container->set( DiagnosticContextBuilder::class, static fn(): DiagnosticContextBuilder => new DiagnosticContextBuilder() );
 		$this->container->set( DiagnosticRepository::class, static fn(): DiagnosticRepository => new DiagnosticRepository() );
 		$this->container->set( DiagnosticRetentionRepository::class, static fn(): DiagnosticRetentionRepository => new DiagnosticRetentionRepository() );
@@ -151,6 +155,7 @@ final class Plugin {
 		);
 		$this->container->set( HealthScorer::class, static fn(): HealthScorer => new HealthScorer() );
 		$this->container->set( HealthScoreRepository::class, static fn(): HealthScoreRepository => new HealthScoreRepository() );
+		$this->container->set( \Scalyn\MailRelay\Database\DiagnosticPublicationRepository::class, static fn( Container $c ): \Scalyn\MailRelay\Database\DiagnosticPublicationRepository => new \Scalyn\MailRelay\Database\DiagnosticPublicationRepository( $c->get( DiagnosticRepository::class ), $c->get( HealthScoreRepository::class ), $c->get( HealthScorer::class ), $c->get( MailLogRepository::class ) ) );
 		$this->container->set( DiagnosticsRunEndpoint::class, static fn(): DiagnosticsRunEndpoint => new DiagnosticsRunEndpoint() );
 
 		// Register core diagnostic checks.
@@ -185,6 +190,7 @@ final class Plugin {
 		$this->container->get( MailEventSubscriber::class )->register();
 		$this->container->get( AuditRecorder::class )->register();
 		$this->container->get( RetentionService::class )->register();
+		$this->container->get( DiagnosticSchedule::class )->register();
 
 		// Register REST endpoints.
 		add_action( 'rest_api_init', array( $this->container->get( DiagnosticsRunEndpoint::class ), 'register' ) );

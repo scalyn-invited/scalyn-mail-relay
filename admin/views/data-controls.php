@@ -19,6 +19,21 @@ defined( 'ABSPATH' ) || exit;
 		<input id="retention-days" name="retention_days" type="number" min="1" max="3650" step="1" required value="<?php echo esc_attr( (string) $days ); ?>" aria-describedby="retention-help" />
 		<p id="retention-help"><?php esc_html_e( 'Choose 1–3650 days (default 30). This applies to email logs with their entire timelines, complete diagnostic runs, health snapshots and audit history. Cleanup runs hourly in batches of up to 100 messages, 100 diagnostic runs, 100 snapshots and 100 audit rows. Records exactly at the cutoff remain. A diagnostic run remains until all its results expire. Audit records expire individually, including actor attribution. Existing orphan timeline rows and alerts are outside this policy.', 'scalyn-mail-relay' ); ?></p>
 		<p><?php esc_html_e( 'Reducing the period makes older history eligible for permanent deletion at the next cleanup. Increasing it cannot restore deleted history. Export or back up history before reducing the period.', 'scalyn-mail-relay' ); ?></p>
+		<h2><?php esc_html_e( 'Scheduled diagnostics', 'scalyn-mail-relay' ); ?></h2>
+		<p><label for="diagnostic-schedule"><?php esc_html_e( 'Run diagnostics automatically', 'scalyn-mail-relay' ); ?></label></p>
+		<select id="diagnostic-schedule" name="diagnostic_schedule" aria-describedby="diagnostic-schedule-help">
+			<?php
+			foreach ( array(
+				'disabled'   => __( 'Disabled', 'scalyn-mail-relay' ),
+				'hourly'     => __( 'Hourly', 'scalyn-mail-relay' ),
+				'twicedaily' => __( 'Twice daily', 'scalyn-mail-relay' ),
+				'daily'      => __( 'Daily', 'scalyn-mail-relay' ),
+			) as $value => $label ) :
+				?>
+				<option value="<?php echo esc_attr( $value ); ?>" <?php echo $cadence === $value ? 'selected' : ''; ?>><?php echo esc_html( $label ); ?></option>
+			<?php endforeach; ?>
+		</select>
+		<p id="diagnostic-schedule-help"><?php esc_html_e( 'Off by default. Each tick attempts one run; overlapping manual or scheduled runs are skipped without catch-up. Checks perform DNS and SMTP connectivity probes, not test-email sending. A run allows at most 20 checks and a 20-second cooperative execution budget; an active network call cannot be forcibly interrupted. WP-Cron depends on site traffic; low-traffic sites need server-triggered cron. Changing cadence starts a new interval.', 'scalyn-mail-relay' ); ?></p>
 		<h2><?php esc_html_e( 'Uninstall policy', 'scalyn-mail-relay' ); ?></h2>
 		<p><label><input type="checkbox" name="delete_on_uninstall" value="1" <?php echo $delete ? 'checked' : ''; ?> aria-describedby="uninstall-help" /> <?php esc_html_e( 'Delete all plugin data when the plugin is uninstalled', 'scalyn-mail-relay' ); ?></label></p>
 		<p id="uninstall-help"><?php esc_html_e( 'Default: retain data. Deactivation always preserves data and stops scheduled work. If enabled, uninstall permanently removes all plugin tables, settings, credentials, logs, timelines, diagnostics, health snapshots, alerts, audit history and plugin capabilities for this site. Recovery requires a backup. Multisite lifecycle is not supported.', 'scalyn-mail-relay' ); ?></p>

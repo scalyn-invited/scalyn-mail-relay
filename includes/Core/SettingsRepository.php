@@ -56,7 +56,8 @@ defined( 'ABSPATH' ) || exit;
  */
 final class SettingsRepository {
 
-	public const OPTION_KEY = 'scalyn_mail_relay_settings';
+	public const OPTION_KEY           = 'scalyn_mail_relay_settings';
+	public const DIAGNOSTIC_SCHEDULES = array( 'disabled', 'hourly', 'twicedaily', 'daily' );
 
 	private const DEFAULTS = array(
 		'provider' => array(
@@ -75,6 +76,7 @@ final class SettingsRepository {
 			'from_email' => '',
 		),
 		'advanced' => array(
+			'diagnostic_schedule'      => 'disabled',
 			'log_retention_days'       => 30,
 			'delete_data_on_uninstall' => false,
 		),
@@ -205,6 +207,12 @@ final class SettingsRepository {
 		return self::valid_retention_days( $value ) ? (int) $value : 30;
 	}
 
+	/** Returns the validated opt-in monitoring cadence. */
+	public function get_diagnostic_schedule(): string {
+		$value = $this->data['advanced']['diagnostic_schedule'] ?? 'disabled';
+		return in_array( $value, self::DIAGNOSTIC_SCHEDULES, true ) ? $value : 'disabled';
+	}
+
 	/**
 	 * Accepts only whole days between one day and ten years. Zero is not unlimited.
 	 *
@@ -315,6 +323,12 @@ final class SettingsRepository {
 
 		if ( isset( $input['advanced'] ) && is_array( $input['advanced'] ) ) {
 			$adv = $input['advanced'];
+			if ( array_key_exists( 'diagnostic_schedule', $adv ) ) {
+				if ( ! in_array( $adv['diagnostic_schedule'], self::DIAGNOSTIC_SCHEDULES, true ) ) {
+					throw new \InvalidArgumentException( 'Invalid diagnostic schedule.' );
+				}
+				$output['advanced']['diagnostic_schedule'] = $adv['diagnostic_schedule'];
+			}
 			if ( array_key_exists( 'log_retention_days', $adv ) ) {
 				if ( ! self::valid_retention_days( $adv['log_retention_days'] ) ) {
 					throw new \InvalidArgumentException( 'Retention must be a whole number from 1 to 3650 days.' );

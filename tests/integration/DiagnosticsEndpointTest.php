@@ -35,6 +35,7 @@ final class DiagnosticsEndpointTest extends TestCase {
 		$this->install_context_spy();
 		$GLOBALS['wpdb'] = new WpdbStub();
 		$GLOBALS['wpdb']->return_false_on_insert = true;
+		$GLOBALS['wpdb']->get_var_return = '1';
 		$events = array();
 		$GLOBALS['_test_wp_actions'][\Scalyn\MailRelay\Core\HookNames::AUDIT_EVENT] = static function($event) use (&$events) { $events[] = $event; };
 		(new DiagnosticsRunEndpoint())->handle_request();
@@ -43,6 +44,7 @@ final class DiagnosticsEndpointTest extends TestCase {
 	}
 
 	protected function setUp(): void {
+		$GLOBALS['_test_wp_option_write_failures'] = array();
 		$GLOBALS['_test_current_user_can']       = array();
 		$GLOBALS['_test_wp_options']             = array();
 		$GLOBALS['_test_wp_actions']             = array();
@@ -53,6 +55,7 @@ final class DiagnosticsEndpointTest extends TestCase {
 	}
 
 	protected function tearDown(): void {
+		$GLOBALS['_test_wp_option_write_failures'] = array();
 		$this->reset_plugin_singleton();
 	}
 
@@ -61,33 +64,142 @@ final class DiagnosticsEndpointTest extends TestCase {
 		$property->setValue( null, null );
 	}
 
-	private function setup_wpdb_mock(): void {
-		global $wpdb;
-		$self = $this;
-		$wpdb = new class( $self ) {
-			public $prefix = 'wp_';
-			private $parent;
+	public function test_busy_run_returns_conflict_without_executing_checks(): void {
+		$this->boot_plugin();
+		$spy = $this->install_context_spy();
+		$GLOBALS['wpdb'] = new WpdbStub();
+		$GLOBALS['wpdb']->get_var_return = '0';
+		$response = (new DiagnosticsRunEndpoint())->handle_request();
+		$this->assertSame(409, $response->get_status());
+		$this->assertNull($spy->context);
+		$this->assertArrayNotHasKey(\Scalyn\MailRelay\Database\DiagnosticRunStateRepository::OPTION_KEY,$GLOBALS['_test_wp_options']);
+	}
 
-			public function __construct( $parent ) {
-				$this->parent = $parent;
-			}
+	public function test_completed_state_tracks_the_published_uuid(): void {
+		$this->boot_plugin();
+		$this->install_context_spy();
+		$response=(new DiagnosticsRunEndpoint())->handle_request();
+		$state=(new \Scalyn\MailRelay\Database\DiagnosticRunStateRepository())->get();
+		$this->assertSame('completed',$state['latest']['state']);
+		$this->assertSame($response->get_data()['results'][0]['diagnostic_uuid'],$state['latest']['uuid']);
+		$this->assertSame($state['latest'],$state['last_success']);
+	}
 
-			public function prepare( string $query, ...$args ) {
-				return $query;
-			}
+	public function test_context_failure_records_only_fixed_failure_code(): void {
+		$GLOBALS['_test_wp_options'][SettingsRepository::OPTION_KEY]=array('smtp'=>'private-secret');
+		$this->boot_plugin();
+		$this->install_context_spy();
+		$response=(new DiagnosticsRunEndpoint())->handle_request();
+		$this->assertSame(500,$response->get_status());
+		$state=(new \Scalyn\MailRelay\Database\DiagnosticRunStateRepository())->get();
+		$this->assertSame('context_failed',$state['latest']['failure_code']);
+		$this->assertStringNotContainsString('private-secret',json_encode($state).json_encode($response->get_data()));
+	}
 
-			public function insert( string $table, array $data, $format = null ) {
-				return 1;
-			}
+	public function test_check_budget_failure_has_terminal_state_without_publication(): void {
+		$this->boot_plugin();
+		$this->install_context_spy();
+		$registry=Plugin::instance()->container()->get(DiagnosticCheckRegistry::class);
+		foreach(range(1,21) as $id){
+			$registry->register(new class((string)$id) implements DiagnosticCheckInterface {
+				public function __construct(private string $id){}
+				public function get_id(): string{return $this->id;}
+				public function get_category(): string{return 'dns';}
+				public function run(DiagnosticContext $context): DiagnosticResult{throw new RuntimeException('Must not execute');}
+			});
+		}
+		$this->assertSame(500,(new DiagnosticsRunEndpoint())->handle_request()->get_status());
+		$state=(new \Scalyn\MailRelay\Database\DiagnosticRunStateRepository())->get();
+		$this->assertSame('checks_failed',$state['latest']['failure_code']);
+		$this->assertGreaterThanOrEqual($state['latest']['started_at'],$state['latest']['finished_at']);
+		$this->assertSame(array(),$GLOBALS['wpdb']->queries);
+	}
 
-			public function get_var( string $sql ) {
-				return null;
-			}
+	public function test_start_status_failure_prevents_checks(): void {
+		$this->boot_plugin();
+		$spy=$this->install_context_spy();
+		$GLOBALS['_test_wp_option_write_failures'][\Scalyn\MailRelay\Database\DiagnosticRunStateRepository::OPTION_KEY]=true;
+		$this->assertSame(503,(new DiagnosticsRunEndpoint())->handle_request()->get_status());
+		$this->assertNull($spy->context);
+		$this->assertSame(array(),$GLOBALS['wpdb']->queries);
+	}
 
-			public function get_results( string $sql, string $output = 'OBJECT' ) {
-				return array();
+	public function test_terminal_status_failure_does_not_relabel_committed_results(): void {
+		$this->boot_plugin();
+		$this->install_context_spy();
+		$GLOBALS['_test_wp_actions'][\Scalyn\MailRelay\Core\HookNames::AUDIT_EVENT]=static function($event) {
+			if ($event->outcome==='started') {
+				$GLOBALS['_test_wp_option_write_failures'][\Scalyn\MailRelay\Database\DiagnosticRunStateRepository::OPTION_KEY]=true;
 			}
 		};
+		$this->assertSame(200,(new DiagnosticsRunEndpoint())->handle_request()->get_status());
+		$state=(new \Scalyn\MailRelay\Database\DiagnosticRunStateRepository())->get();
+		$this->assertSame('running',$state['latest']['state']);
+		$this->assertNull($state['last_success']);
+		$this->assertSame('COMMIT',end($GLOBALS['wpdb']->queries));
+	}
+
+	public function test_throwing_check_is_published_as_error_alongside_remaining_checks(): void {
+		$this->boot_plugin();
+		$this->install_context_spy();
+		Plugin::instance()->container()->get(DiagnosticCheckRegistry::class)->register(
+			new class implements DiagnosticCheckInterface {
+				public function get_id(): string { return 'spf_record'; }
+				public function get_category(): string { return 'dns'; }
+				public function run(DiagnosticContext $context): DiagnosticResult { throw new RuntimeException('private-secret'); }
+			}
+		);
+		$response = (new DiagnosticsRunEndpoint())->handle_request();
+		$this->assertSame(200,$response->get_status());
+		$rows = $response->get_data()['results'];
+		$this->assertCount(5,$rows);
+		$this->assertSame(1,count(array_filter($rows,static fn($row)=>$row['status']==='error')));
+		$this->assertStringNotContainsString('private-secret',json_encode($response->get_data()));
+		$this->assertSame(array('START TRANSACTION','COMMIT'),$GLOBALS['wpdb']->queries);
+	}
+
+	public function test_failed_run_releases_lock_and_retry_reads_its_own_uuid(): void {
+		$this->boot_plugin();
+		$this->install_context_spy();
+		$db = new PublicationWpdbStub();
+		$db->get_var_return = '1';
+		$GLOBALS['wpdb'] = $db;
+		$db->return_false_on_insert = true;
+		$this->assertSame(500, (new DiagnosticsRunEndpoint())->handle_request()->get_status());
+		$failed=(new \Scalyn\MailRelay\Database\DiagnosticRunStateRepository())->get()['latest'];
+		$this->assertSame('failed',$failed['state']);
+		$this->assertSame('publication_failed',$failed['failure_code']);
+		$db->return_false_on_insert = false;
+		$this->assertSame(200, (new DiagnosticsRunEndpoint())->handle_request()->get_status());
+		$reads = array_values(array_filter($db->prepare_calls, static fn($call) => str_contains($call['query'],'WHERE diagnostic_uuid =')));
+		$inserts = array_values(array_filter($db->inserts, static fn($call) => str_ends_with($call['table'],'scalyn_diagnostics')));
+		$this->assertNotEmpty($reads);
+		$this->assertSame(end($inserts)['data']['diagnostic_uuid'],end($reads)['args'][0]);
+		$releases = array_filter($db->prepare_calls, static fn($call) => str_contains($call['query'],'RELEASE_LOCK'));
+		$this->assertCount(2,$releases);
+	}
+
+	public function test_scheduled_adapter_uses_the_same_checks_and_audit_context(): void {
+		$this->boot_plugin();
+		$spy = $this->install_context_spy();
+		(new SettingsRepository())->save(array('advanced'=>array('diagnostic_schedule'=>'daily')));
+		$GLOBALS['_test_doing_cron'] = true;
+		$events = array();
+		$GLOBALS['_test_wp_actions'][\Scalyn\MailRelay\Core\HookNames::AUDIT_EVENT] = static function($event) use (&$events) { $events[] = $event; };
+		try {
+			(new \Scalyn\MailRelay\Core\DiagnosticSchedule())->run();
+			$this->assertNotNull($spy->context);
+			$this->assertSame(array('started','completed'), array_column($events,'outcome'));
+			$this->assertSame('scheduled', $events[0]->actor->source);
+			$this->assertSame(0, $events[0]->actor->user_id);
+		} finally {
+			$GLOBALS['_test_doing_cron'] = false;
+		}
+	}
+
+	private function setup_wpdb_mock(): void {
+		$GLOBALS['wpdb'] = new PublicationWpdbStub();
+		$GLOBALS['wpdb']->get_var_return = '1';
 	}
 
 	public function test_endpoint_is_registered(): void {

@@ -132,6 +132,7 @@ if ( ! function_exists( 'wp_schedule_event' ) ) {
 	 * @param string $hook
 	 */
 	function wp_schedule_event( int $timestamp, string $recurrence, string $hook ): bool {
+		if (!empty($GLOBALS['_test_wp_schedule_failure'])) { return false; }
 		$GLOBALS['_test_wp_recurrence'][ $hook ] = $recurrence;
 		$GLOBALS['_test_wp_cron'][ $hook ] = $timestamp;
 		return true;
@@ -660,6 +661,10 @@ if ( ! function_exists( 'wp_doing_cron' ) ) {
 	function wp_doing_cron(): bool {
 		return ! empty( $GLOBALS['_test_doing_cron'] );
 	}
+}
+
+if ( ! function_exists( 'wp_timezone' ) ) {
+	function wp_timezone(): DateTimeZone { return new DateTimeZone($GLOBALS['_test_timezone'] ?? 'UTC'); }
 }
 
 if ( ! function_exists( 'current_datetime' ) ) {

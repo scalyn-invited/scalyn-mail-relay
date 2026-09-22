@@ -40,6 +40,7 @@ final class DashboardPage {
 		}
 
 		$container           = Plugin::instance()->container();
+		$monitoring          = \Scalyn\MailRelay\Admin\MonitoringStatusPresenter::load();
 		$settings            = $container->get( SettingsRepository::class );
 		$provider_configured = $this->is_provider_configured();
 		$provider_verified   = $provider_configured && $settings->is_provider_verified();
@@ -69,6 +70,7 @@ final class DashboardPage {
 		$health_components         = $health['components'];
 		$health_summary            = $health['summary'];
 		$has_completed_diagnostics = null !== $health['created_at'];
+		$score_freshness           = \Scalyn\MailRelay\Admin\MonitoringStatusPresenter::evidence( $health['created_at'], $settings->get_diagnostic_schedule(), time() );
 
 		// Wire the "Run Diagnostics" button to the REST endpoint.
 		$diagnostics_run_url = rest_url( 'scalyn-mail-relay/v1/diagnostics/run' );

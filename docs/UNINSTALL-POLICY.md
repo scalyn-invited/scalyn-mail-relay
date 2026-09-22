@@ -4,7 +4,7 @@
 
 Deactivation and uninstall stop all plugin-owned scheduled work. Unless deletion
 was explicitly enabled, settings, credentials, custom tables, mail history,
-diagnostics, health snapshots, cleanup status and capabilities remain available
+diagnostics, health snapshots, cleanup/execution status and capabilities remain available
 after reinstalling. Uninstall does not run a final retention cleanup.
 
 ## Explicit deletion
@@ -27,7 +27,8 @@ When enabled, uninstall removes only this site's owned data:
 - Tables: `scalyn_mail_logs`, `scalyn_mail_timeline`, `scalyn_diagnostics`,
   `scalyn_health_scores`, `scalyn_alerts`, `scalyn_audit_logs`.
 - Options: `scalyn_mail_relay_settings`, `scalyn_mail_relay_db_version`,
-  `scalyn_mail_relay_version`, `scalyn_mail_relay_retention_status`.
+  `scalyn_mail_relay_version`, `scalyn_mail_relay_retention_status`,
+  `scalyn_mail_relay_diagnostic_run_status`.
 - Plugin capabilities from all roles, current/historical owned cron events,
   `scalyn_mail_relay_health_cache` and `scalyn_mail_relay_diagnostics_cache`.
 
@@ -42,6 +43,10 @@ uninstall policy controls all owned data when the plugin is removed. Retention
 defaults to 30 days and accepts 1–3650 whole days in Data Controls. Reducing the
 period makes existing older history eligible for the next tick. Increasing it
 cannot recover removed data. WP-Cron requires traffic or a server scheduler.
+
+Diagnostic execution status is bounded control metadata, not history: its five
+slots are replaced by later runs and are not expired by the history cutoff.
+Pointers can outlive their diagnostic evidence; they do not retain that evidence.
 
 ## Scope and verification
 
