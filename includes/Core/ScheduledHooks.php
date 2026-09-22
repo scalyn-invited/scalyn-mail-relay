@@ -12,7 +12,8 @@ defined( 'ABSPATH' ) || exit;
 /** Single source of truth for current and historical scheduled hooks. */
 final class ScheduledHooks {
 
-	public const CLEANUP = 'scalyn_mail_relay_cleanup_logs';
+	public const CLEANUP     = 'scalyn_mail_relay_cleanup_logs';
+	public const DIAGNOSTICS = 'scalyn_mail_relay_run_daily_diagnostics';
 
 	/**
 	 * Lists every hook ever scheduled by the plugin.
@@ -20,7 +21,7 @@ final class ScheduledHooks {
 	 * @return string[] Owned hook names.
 	 */
 	public static function all(): array {
-		return array( self::CLEANUP, 'scalyn_mail_relay_run_daily_diagnostics', 'scalyn_mail_relay_generate_health_snapshot', 'scalyn_mail_relay_send_alerts' );
+		return array( self::CLEANUP, self::DIAGNOSTICS, 'scalyn_mail_relay_generate_health_snapshot', 'scalyn_mail_relay_send_alerts' );
 	}
 
 	/** Clears scheduled work without deleting operational data. */

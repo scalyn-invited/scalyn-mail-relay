@@ -60,13 +60,13 @@ Outcome: important administrative actions are traceable.
 
 Outcome: diagnostics run unattended and monitoring freshness is visible.
 
-- [ ] Extract shared orchestration for manual REST requests and scheduled runs.
-- [ ] Add configurable scheduling, overlap protection, and bounded execution.
-- [ ] Preserve isolated check failures, grouped results, and consistent health snapshots.
-- [ ] Record run timestamps and safe execution-failure information.
-- [ ] Show stale results, overdue runs, and failed monitoring in the UI.
-- [ ] Verify low-traffic WP-Cron behavior and document operational scheduling requirements.
-- [ ] Completion gate: unattended runs persist consistent results and overdue or failed monitoring is clearly reported.
+- [x] Extract shared orchestration for manual REST requests and scheduled runs. Shared DiagnosticRunService and own-UUID scoring reads.
+- [x] Add configurable scheduling, overlap protection, and bounded execution. Opt-in Data Controls cadence, shared lock, check-count and cooperative time limits; see [ADR-0008](adr/0008-shared-diagnostic-orchestration-and-scheduling.md) and [tickets 1–2 evidence](qa/2026-09-21-monitoring-foundation.md). Owner review remains outstanding.
+- [x] Preserve isolated check failures, grouped results, and consistent health snapshots. InnoDB atomic publication, shared UUID/time and rollback/retry; see [ticket 3 verification](qa/2026-09-21-atomic-diagnostic-publication.md) and [ADR-0009](adr/0009-atomic-diagnostic-publication.md). Owner review remains outstanding.
+- [x] Record run timestamps and safe execution-failure information. Bounded status repository, UTC timestamps, fixed failure stages, separate scheduled freshness and conservative unconfirmed completion; see [ticket 4 evidence](qa/2026-09-21-diagnostic-execution-status.md) and [ADR-0010](adr/0010-diagnostic-execution-status.md).
+- [x] Show stale results, overdue runs, and failed monitoring in the UI. Dashboard/Diagnostics panels separate schedule, execution and retained-evidence freshness.
+- [x] Verify low-traffic WP-Cron behavior and document operational scheduling requirements. Real isolated cron entry-point test; see [operations guide](MONITORING-OPERATIONS.md).
+- [x] Completion gate: unattended runs persist consistent results and overdue or failed monitoring is clearly reported. See [Milestone 4 evidence](qa/2026-09-22-milestone-4-completion.md). Owner review and release QA remain outstanding.
 
 ## 5. Alerts and recovery notifications
 

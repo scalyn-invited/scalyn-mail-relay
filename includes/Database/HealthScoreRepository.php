@@ -34,10 +34,12 @@ final class HealthScoreRepository {
 	 * Persists a health score snapshot as one row in scalyn_health_scores.
 	 *
 	 * @param HealthScoreResult $result The score to persist.
+	 * @param string|null       $run_uuid Optional diagnostic run UUID for new correlated snapshots.
+	 * @param string|null       $created_at Shared publication timestamp.
 	 * @throws \RuntimeException When the DB write fails. Message is a fixed safe string
 	 *                           with no SQL, last_error, or credential content.
 	 */
-	public function persist( HealthScoreResult $result ): void {
+	public function persist( HealthScoreResult $result, ?string $run_uuid = null, ?string $created_at = null ): void {
 		global $wpdb;
 
 		$table = $wpdb->prefix . 'scalyn_health_scores';
@@ -46,7 +48,7 @@ final class HealthScoreRepository {
 		$inserted = $wpdb->insert(
 			$table,
 			array(
-				'score_uuid'           => wp_generate_uuid4(),
+				'score_uuid'           => $run_uuid ?? wp_generate_uuid4(),
 				'overall_score'        => $result->overall_score,
 				'deliverability_score' => null,
 				'dns_score'            => $result->dns_score,
@@ -54,10 +56,10 @@ final class HealthScoreRepository {
 				'failure_score'        => $result->failure_score,
 				'security_score'       => $result->security_score,
 				'summary'              => $result->summary,
-				'created_at'           => current_time( 'mysql' ),
+				'created_at'           => $created_at ?? current_time( 'mysql' ),
 			)
 		);
-		if ( false === $inserted ) {
+		if ( 1 !== $inserted ) {
 			// Fixed safe message: $wpdb->last_error and SQL are deliberately excluded.
 			throw new \RuntimeException( 'Health score insert failed.' );
 		}

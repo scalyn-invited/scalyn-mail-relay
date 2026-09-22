@@ -63,6 +63,9 @@ $setup_steps = array(
 ?>
 <div class="wrap scalyn-mail-relay">
 	<h1><?php esc_html_e( 'Scalyn Mail Relay', 'scalyn-mail-relay' ); ?></h1>
+	<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/monitoring-status.php'; ?>
+	<p><?php esc_html_e( 'Displayed health snapshot:', 'scalyn-mail-relay' ); ?> <?php echo esc_html( $score_freshness ); ?></p>
+	<p><?php esc_html_e( 'Evidence is stale after the configured cadence plus five minutes, or 24 hours plus five minutes when monitoring is disabled.', 'scalyn-mail-relay' ); ?></p>
 	<p class="scalyn-lead"><?php esc_html_e( 'Email delivery, diagnostics, monitoring and remediation.', 'scalyn-mail-relay' ); ?></p>
 
 	<div class="scalyn-grid">

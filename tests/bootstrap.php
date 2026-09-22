@@ -17,6 +17,7 @@ define( 'OBJECT', 'OBJECT' );
 define( 'ARRAY_A', 'ARRAY_A' );
 
 require_once __DIR__ . '/fixtures/wordpress/wp-stubs.php';
+require_once __DIR__ . '/fixtures/wordpress/PublicationWpdbStub.php';
 
 // Load PHPMailer stub classes before any provider code runs.
 // PhpMailerLoader::load() checks class_exists() first and skips the

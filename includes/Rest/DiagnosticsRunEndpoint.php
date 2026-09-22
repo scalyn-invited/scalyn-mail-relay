@@ -8,18 +8,7 @@
 namespace Scalyn\MailRelay\Rest;
 
 use Scalyn\MailRelay\Core\Capabilities;
-use Scalyn\MailRelay\Core\HookNames;
-use Scalyn\MailRelay\Audit\AuditEvent;
 use Scalyn\MailRelay\Core\Plugin;
-use Scalyn\MailRelay\Core\SettingsRepository;
-use Scalyn\MailRelay\Database\DiagnosticRepository;
-use Scalyn\MailRelay\Database\HealthScoreRepository;
-use Scalyn\MailRelay\Diagnostics\DiagnosticCheckRegistry;
-use Scalyn\MailRelay\Diagnostics\DiagnosticContextBuilder;
-use Scalyn\MailRelay\Diagnostics\DiagnosticRunner;
-use Scalyn\MailRelay\Diagnostics\HealthScorer;
-use Scalyn\MailRelay\Logging\MailLogRepository;
-use WP_REST_Request;
 use WP_REST_Response;
 
 defined( 'ABSPATH' ) || exit;
@@ -37,7 +26,7 @@ defined( 'ABSPATH' ) || exit;
  *   'message': string (on error)
  * }
  *
- * Ownership: Kim / REST.
+ * Ownership: Bernie.
  */
 final class DiagnosticsRunEndpoint {
 
@@ -74,69 +63,9 @@ final class DiagnosticsRunEndpoint {
 	 * @return WP_REST_Response The response containing diagnostic results or error.
 	 */
 	public function handle_request(): WP_REST_Response {
-		$container = Plugin::instance()->container();
-		$run_uuid  = wp_generate_uuid4();
-		do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'diagnostic_run', 'started', $run_uuid ) );
-
-		try {
-			$runner        = $container->get( DiagnosticRunner::class );
-			$registry      = $container->get( DiagnosticCheckRegistry::class );
-			$repo          = $container->get( DiagnosticRepository::class );
-			$mail_log_repo = $container->get( MailLogRepository::class );
-			$scorer        = $container->get( HealthScorer::class );
-			$score_repo    = $container->get( HealthScoreRepository::class );
-
-			// Build the context through the credential-safe builder: it exposes only
-			// host/port/encryption to checks (never username/password) and targets
-			// the sending domain from the From address, falling back to the site host.
-			$site_host = wp_parse_url( home_url(), PHP_URL_HOST );
-			$context   = $container->get( DiagnosticContextBuilder::class )->build(
-				$container->get( SettingsRepository::class ),
-				is_string( $site_host ) && '' !== $site_host ? $site_host : 'localhost'
-			);
-
-			// Execute all registered diagnostic checks and collect results.
-			$checks        = $registry->get_all();
-			$check_results = $runner->run( array_values( $checks ), $context );
-
-			// Persist each check result to the database.
-			foreach ( $check_results as $check_result ) {
-				$repo->persist_result(
-					$run_uuid,
-					$check_result['category'],
-					$check_result['id'],
-					$check_result['result']
-				);
-			}
-
-			// Compute health score from diagnostic results and recent mail history.
-			$run_data            = $repo->find_latest_run();
-			$mail_status_counts  = $mail_log_repo->count_recent_by_status();
-			$health_score_result = $scorer->score( $run_data['results'], $mail_status_counts );
-
-			// Persist health score if computed.
-			if ( null !== $health_score_result ) {
-				$score_repo->persist( $health_score_result );
-			}
-
-			do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'diagnostic_run', 'completed', $run_uuid ) );
-			return new WP_REST_Response(
-				array(
-					'success'      => true,
-					'results'      => $run_data['results'],
-					'health_score' => $health_score_result ? $health_score_result->overall_score : null,
-				),
-				200
-			);
-		} catch ( \Throwable $e ) {
-			do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'diagnostic_run', 'failed', $run_uuid ) );
-			return new WP_REST_Response(
-				array(
-					'success' => false,
-					'message' => __( 'An error occurred while running diagnostics.', 'scalyn-mail-relay' ),
-				),
-				500
-			);
-		}
+		$result = Plugin::instance()->container()->get( \Scalyn\MailRelay\Diagnostics\DiagnosticRunService::class )->run();
+		$status = $result['status'];
+		unset( $result['status'] );
+		return new WP_REST_Response( $result, $status );
 	}
 }

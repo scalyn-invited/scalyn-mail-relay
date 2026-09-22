@@ -28,6 +28,17 @@ defined( 'ABSPATH' ) || exit;
  */
 final class DiagnosticRunner {
 
+	/** Creates a runner with an optional monotonic clock for deterministic testing.
+	 *
+	 * @param \Closure|null $clock Seconds from a monotonic clock.
+	 */
+	public function __construct( private ?\Closure $clock = null ) {}
+
+	/** Reads elapsed time without depending on wall-clock changes. */
+	private function now(): float {
+		return $this->clock ? ( $this->clock )() : hrtime( true ) / 1e9;
+	}
+
 	/**
 	 * Runs every supplied check against the given context.
 	 *
@@ -38,11 +49,19 @@ final class DiagnosticRunner {
 	 * @param DiagnosticCheckInterface[] $checks  Checks to execute, in order.
 	 * @param DiagnosticContext          $context Shared execution context.
 	 * @return array<int, array{id: string, category: string, result: DiagnosticResult}>
+	 * @throws \RuntimeException When the check count or cooperative time budget is exceeded.
 	 */
 	public function run( array $checks, DiagnosticContext $context ): array {
-		$results = array();
+		if ( count( $checks ) > 20 ) {
+			throw new \RuntimeException( 'Diagnostic check limit exceeded.' );
+		}
+		$deadline = $this->now() + 20;
+		$results  = array();
 
 		foreach ( $checks as $check ) {
+			if ( $this->now() >= $deadline ) {
+				throw new \RuntimeException( 'Diagnostic execution budget exceeded.' );
+			}
 			if ( ! $check instanceof DiagnosticCheckInterface ) {
 				continue;
 			}
@@ -54,6 +73,9 @@ final class DiagnosticRunner {
 			);
 		}
 
+		if ( $this->now() >= $deadline ) {
+			throw new \RuntimeException( 'Diagnostic execution budget exceeded.' );
+		}
 		return $results;
 	}
 

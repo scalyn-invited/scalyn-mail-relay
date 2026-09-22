@@ -68,4 +68,14 @@ final class DataControlsPageTest extends TestCase {
 		$this->assertStringNotContainsString( 'secret-value', $html );
 		$this->assertStringContainsString( 'scalyn-mail-relay-data-controls', $html );
 	}
+
+	public function test_schedule_can_be_saved_and_invalid_cadence_changes_nothing(): void {
+		$_SERVER['REQUEST_METHOD'] = 'POST';
+		$_POST = array('retention_days'=>'30','diagnostic_schedule'=>'hourly');
+		$this->assertStringContainsString('Data controls saved', $this->render());
+		$this->assertSame('hourly', wp_get_schedule(\Scalyn\MailRelay\Core\ScheduledHooks::DIAGNOSTICS));
+		$_POST['diagnostic_schedule'] = array('invalid');
+		$this->assertStringContainsString('No settings were changed', $this->render());
+		$this->assertSame('hourly',(new SettingsRepository())->get_diagnostic_schedule());
+	}
 }

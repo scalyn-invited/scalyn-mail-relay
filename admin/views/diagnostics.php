@@ -45,6 +45,10 @@ defined( 'ABSPATH' ) || exit;
 ?>
 <div class="wrap scalyn-mail-relay">
 	<h1><?php esc_html_e( 'Diagnostics', 'scalyn-mail-relay' ); ?></h1>
+	<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/monitoring-status.php'; ?>
+	<p><?php esc_html_e( 'Displayed diagnostic results:', 'scalyn-mail-relay' ); ?> <?php echo esc_html( $results_freshness ); ?></p>
+	<p><?php esc_html_e( 'Displayed health snapshot:', 'scalyn-mail-relay' ); ?> <?php echo esc_html( $score_freshness ); ?></p>
+	<p><?php esc_html_e( 'Results and the latest retained health snapshot may come from different runs. Evidence is stale after the configured cadence plus five minutes, or 24 hours plus five minutes when monitoring is disabled.', 'scalyn-mail-relay' ); ?></p>
 	<p class="scalyn-lead"><?php esc_html_e( 'Email deliverability health checks and remediation guidance.', 'scalyn-mail-relay' ); ?></p>
 
 	<?php if ( $provider_configured ) : ?>

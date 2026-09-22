@@ -7,6 +7,19 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+- Show overdue schedules, stale evidence, safe execution failures and unconfirmed
+  completion on Dashboard and Diagnostics; document and verify low-traffic cron.
+
+- Persist bounded diagnostic execution status with UTC timestamps, safe failure
+  stages, separate scheduled freshness and completion-unconfirmed recovery.
+
+- Publish diagnostic groups and their health snapshot in one InnoDB transaction,
+  with shared run UUID/time, isolated error results and rollback on partial failure.
+
+- Extract shared manual/scheduled diagnostic orchestration; add opt-in hourly,
+  twice-daily or daily scheduling in Data Controls, shared overlap exclusion and
+  bounded check execution. Read scoring inputs by the current run UUID.
+
 - Add runtime actor/source attribution, capability-protected Audit History with
   50-row cursor pagination, privacy-safe read models and 100-row audit expiry
   batches under the existing Data Controls retention policy.

@@ -2,6 +2,21 @@
 
 ## Current verified status — 2026-09-21
 
+Update — 2026-09-22: all Milestone 4 implementation tickets are complete locally.
+Dashboard/Diagnostics now show monitoring failures, overdue schedules and separate
+evidence freshness. Real isolated WP-Cron verification passed. See
+[Milestone 4 completion](qa/2026-09-22-milestone-4-completion.md).
+Next is Milestone 5 (alerts), not started. The notes below retain earlier context.
+
+Milestone 3 is merged in 8b12a65 (PR #45). Milestone 4 tickets 1–4 are implemented
+locally on feature/m4-monitoring-orchestration: shared runs, opt-in cadence,
+overlap protection, cooperative bounds and atomic diagnostic/health publication.
+See [foundation verification](qa/2026-09-21-monitoring-foundation.md) and
+[publication verification](qa/2026-09-21-atomic-diagnostic-publication.md).
+Ticket 4 adds [durable execution status](qa/2026-09-21-diagnostic-execution-status.md).
+Next is ticket 5: stale, overdue and failed monitoring UI. The following
+Milestone 3 paragraph records its earlier pre-merge validation context.
+
 Milestone 2 is merged in `513d02e` (PR #44). All Milestone 3 implementation tickets
 are implemented locally on `feature/m3-audit-foundation`: audit capture,
 actor/source attribution, protected paginated history and bounded expiry.

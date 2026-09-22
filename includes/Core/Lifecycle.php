@@ -29,6 +29,7 @@ final class Lifecycle {
 		self::grant_capabilities();
 		ScheduledHooks::clear();
 		RetentionService::ensure_scheduled();
+		DiagnosticSchedule::reconcile();
 		update_option( 'scalyn_mail_relay_version', SCALYN_MAIL_RELAY_VERSION, false );
 	}
 

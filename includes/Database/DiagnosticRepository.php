@@ -49,10 +49,11 @@ final class DiagnosticRepository {
 	 * @param string           $check_type      The check's category (DiagnosticCheckInterface::get_category()).
 	 * @param string           $check_name      The check's identifier (DiagnosticCheckInterface::get_id()).
 	 * @param DiagnosticResult $result          The normalized result to persist.
+	 * @param string|null      $created_at      Shared publication timestamp, or current site time.
 	 * @throws \RuntimeException When the DB write fails. Message is a fixed safe string
 	 *                           with no SQL, last_error, or credential content.
 	 */
-	public function persist_result( string $diagnostic_uuid, string $check_type, string $check_name, DiagnosticResult $result ): void {
+	public function persist_result( string $diagnostic_uuid, string $check_type, string $check_name, DiagnosticResult $result, ?string $created_at = null ): void {
 		global $wpdb;
 
 		$table = $wpdb->prefix . 'scalyn_diagnostics';
@@ -76,10 +77,10 @@ final class DiagnosticRepository {
 				'result_message'     => $result->message,
 				'recommended_action' => $result->recommended_action,
 				'raw_result'         => wp_json_encode( $raw_payload ),
-				'created_at'         => current_time( 'mysql' ),
+				'created_at'         => $created_at ?? current_time( 'mysql' ),
 			)
 		);
-		if ( false === $inserted ) {
+		if ( 1 !== $inserted ) {
 			// Fixed safe message: $wpdb->last_error and SQL are deliberately excluded.
 			throw new \RuntimeException( 'Diagnostic result insert failed.' );
 		}

@@ -15,6 +15,24 @@ use Scalyn\MailRelay\Diagnostics\DiagnosticRunner;
  */
 final class DiagnosticRunnerTest extends TestCase {
 
+	public function test_budget_stops_before_starting_another_check(): void {
+		$times = array(0.0, 0.0, 20.0);
+		$runner = new DiagnosticRunner(static function() use (&$times): float { return array_shift($times); });
+		$check = new class implements DiagnosticCheckInterface {
+			public int $calls = 0;
+			public function get_id(): string { return 'budget'; }
+			public function get_category(): string { return 'dns'; }
+			public function run(DiagnosticContext $context): DiagnosticResult { ++$this->calls; return new DiagnosticResult('pass','low','OK'); }
+		};
+		try {
+			$runner->run(array($check,$check), $this->make_context());
+			$this->fail('Expected elapsed budget rejection');
+		} catch (RuntimeException $error) {
+			$this->assertSame('Diagnostic execution budget exceeded.', $error->getMessage());
+			$this->assertSame(1, $check->calls);
+		}
+	}
+
 	private function make_context(): DiagnosticContext {
 		return new DiagnosticContext( 'example.com', array() );
 	}

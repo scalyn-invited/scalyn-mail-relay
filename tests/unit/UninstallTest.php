@@ -58,6 +58,7 @@ final class UninstallTest extends TestCase {
 			'scalyn_mail_relay_db_version' => '0.1.0',
 			'scalyn_mail_relay_version'    => '0.1.0',
 			'scalyn_mail_relay_retention_status' => array( 'state' => 'complete' ),
+			'scalyn_mail_relay_diagnostic_run_status' => array( 'latest' => null ),
 			'unrelated_plugin_option'      => 'keep me',
 		);
 	}
@@ -101,6 +102,7 @@ final class UninstallTest extends TestCase {
 		$this->assertArrayHasKey( 'scalyn_mail_relay_settings', $GLOBALS['_test_wp_options'] );
 		$this->assertArrayHasKey( 'scalyn_mail_relay_db_version', $GLOBALS['_test_wp_options'] );
 		$this->assertArrayHasKey( 'scalyn_mail_relay_retention_status', $GLOBALS['_test_wp_options'] );
+		$this->assertArrayHasKey( 'scalyn_mail_relay_diagnostic_run_status', $GLOBALS['_test_wp_options'] );
 		$this->assertTrue( $this->administrator()->has_cap( Capabilities::VIEW_DASHBOARD ) );
 		$this->assertArrayHasKey( 'scalyn_mail_relay_health_cache', $GLOBALS['_test_wp_transients'] );
 		$this->assertSame( \Scalyn\MailRelay\Core\ScheduledHooks::all(), $GLOBALS['_test_wp_cleared_hooks'] );
@@ -153,6 +155,7 @@ final class UninstallTest extends TestCase {
 		$this->assertArrayNotHasKey( 'scalyn_mail_relay_db_version', $GLOBALS['_test_wp_options'] );
 		$this->assertArrayNotHasKey( 'scalyn_mail_relay_version', $GLOBALS['_test_wp_options'] );
 		$this->assertArrayNotHasKey( 'scalyn_mail_relay_retention_status', $GLOBALS['_test_wp_options'] );
+		$this->assertArrayNotHasKey( 'scalyn_mail_relay_diagnostic_run_status', $GLOBALS['_test_wp_options'] );
 		$this->assertSame( 'keep me', $GLOBALS['_test_wp_options']['unrelated_plugin_option'] );
 	}
 
