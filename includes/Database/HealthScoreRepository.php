@@ -31,6 +31,29 @@ final class HealthScoreRepository {
 	public const MAX_PAGE_SIZE = 250;
 
 	/**
+	 * Reads the latest retained configuration score in a reporting period.
+	 *
+	 * @param \Scalyn\MailRelay\Reporting\ReportPeriod $period Site-local boundaries.
+	 * @return array|null Safe score fields and evidence reference; never summary text.
+	 * @throws \RuntimeException When reading fails.
+	 */
+	public function report_latest( \Scalyn\MailRelay\Reporting\ReportPeriod $period ): ?array {
+		global $wpdb;
+		$sql = $wpdb->prepare(
+			'SELECT id, score_uuid, overall_score, dns_score, provider_score, failure_score, security_score, created_at FROM %i WHERE created_at >= %s AND created_at < %s ORDER BY created_at DESC, id DESC LIMIT 1',
+			$wpdb->prefix . 'scalyn_health_scores',
+			$period->start,
+			$period->end
+		);
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared -- Prepared bounded repository read; evidence is not cached.
+		$row = $wpdb->get_row( $sql, ARRAY_A );
+		if ( ! empty( $wpdb->last_error ) ) {
+			throw new \RuntimeException( 'Reporting data unavailable.' );
+		}
+		return $row;
+	}
+
+	/**
 	 * Returns site-wide daily configuration-score trends, never provider attribution.
 	 *
 	 * Missing days are absent, not zero. Null scores do not contribute to averages.

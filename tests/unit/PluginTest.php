@@ -58,6 +58,13 @@ final class PluginTest extends TestCase {
 		$this->assertTrue( $this->booted_container()->has( SettingsRepository::class ) );
 	}
 
+	public function test_report_snapshot_service_is_shared_and_resolves_without_database_reads(): void {
+		$container = $this->booted_container();
+		$service = $container->get( \Scalyn\MailRelay\Database\ReportSnapshotRepository::class );
+		$this->assertInstanceOf( \Scalyn\MailRelay\Database\ReportSnapshotRepository::class, $service );
+		$this->assertSame( $service, $container->get( \Scalyn\MailRelay\Database\ReportSnapshotRepository::class ) );
+	}
+
 	public function test_mail_dispatcher_is_registered_in_container(): void {
 		$this->assertTrue( $this->booted_container()->has( MailDispatcher::class ) );
 	}

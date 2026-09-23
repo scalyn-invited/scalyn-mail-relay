@@ -43,6 +43,38 @@ final class DiagnosticRepository {
 	public const MAX_PAGE_SIZE = 250;
 
 	/**
+	 * Reads the latest retained run selected by its newest row in the period.
+	 *
+	 * Rejects oversized or boundary-spanning runs rather than exporting partial findings.
+	 * Free-text messages and raw evidence are deliberately excluded.
+	 *
+	 * @param \Scalyn\MailRelay\Reporting\ReportPeriod $period Site-local boundaries.
+	 * @return array Safe finding metadata with row and run references.
+	 * @throws \RuntimeException When reading fails or the run is incomplete for the window.
+	 */
+	public function report_findings( \Scalyn\MailRelay\Reporting\ReportPeriod $period ): array {
+		global $wpdb;
+		$sql = $wpdb->prepare(
+			'SELECT id, diagnostic_uuid, check_type, check_name, status, severity, score, created_at FROM %i WHERE diagnostic_uuid = (SELECT diagnostic_uuid FROM %i WHERE created_at >= %s AND created_at < %s ORDER BY created_at DESC, id DESC LIMIT 1) ORDER BY created_at ASC, id ASC LIMIT 251',
+			$wpdb->prefix . 'scalyn_diagnostics',
+			$wpdb->prefix . 'scalyn_diagnostics',
+			$period->start,
+			$period->end
+		);
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared -- Prepared bounded repository read; evidence is not cached.
+		$rows = $wpdb->get_results( $sql, ARRAY_A );
+		if ( ! is_array( $rows ) || ! empty( $wpdb->last_error ) || count( $rows ) > self::MAX_PAGE_SIZE ) {
+			throw new \RuntimeException( 'Reporting data unavailable.' );
+		}
+		foreach ( $rows as $row ) {
+			if ( $row['created_at'] < $period->start || $row['created_at'] >= $period->end ) {
+				throw new \RuntimeException( 'Reporting data unavailable.' );
+			}
+		}
+		return $rows;
+	}
+
+	/**
 	 * Persists a single check result as one row in scalyn_diagnostics.
 	 *
 	 * @param string           $diagnostic_uuid Shared identifier for the run this result belongs to.

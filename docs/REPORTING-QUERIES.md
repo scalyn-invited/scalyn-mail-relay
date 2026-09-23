@@ -27,7 +27,7 @@ trends. Consumers must label them site-wide even when mail activity is filtered.
 Counts describe retained current log outcomes grouped by creation time, not
 immutable lifecycle events or lifetime totals. Retention may remove evidence.
 Accepted is not delivered. Separate reads are not a transactional report snapshot;
-snapshot consistency and report metadata belong to ticket 4. Missing data must
+use the [ticket 4 snapshot service](REPORT-SNAPSHOTS.md) for consistent multi-section reports. Missing data must
 not be described as a healthy period. SQL errors throw fixed safe exceptions,
 not fabricated zero activity.
 
