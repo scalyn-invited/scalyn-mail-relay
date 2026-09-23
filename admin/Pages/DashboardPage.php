@@ -24,10 +24,7 @@ defined( 'ABSPATH' ) || exit;
  * and the shared MailLogRepository. Must not query database tables directly,
  * construct transports, access Saturn/Yaj internals, or calculate health scores.
  *
- * Health score, activity stats, and diagnostic results remain as explicit
- * empty state until Yaj's logging and diagnostics REST contracts are available.
- *
- * Ownership: Kim / Admin.
+ * Ownership: Bernie / Admin.
  */
 final class DashboardPage {
 
@@ -46,9 +43,10 @@ final class DashboardPage {
 		$provider_verified   = $provider_configured && $settings->is_provider_verified();
 		$test_email_accepted = $provider_configured && $settings->has_accepted_test_email();
 
-		$log_repo   = $container->get( MailLogRepository::class );
-		$rows       = $log_repo->find_recent( 1, 0 );
-		$latest_log = $rows[0] ?? null;
+		$log_repo         = $container->get( MailLogRepository::class );
+		$rows             = $log_repo->find_recent( 1, 0 );
+		$latest_log       = $rows[0] ?? null;
+		$activity_summary = \Scalyn\MailRelay\Admin\ActivitySummaryPresenter::load( $log_repo, current_time( 'mysql' ) );
 
 		$timeline_url = '';
 		if ( null !== $latest_log ) {

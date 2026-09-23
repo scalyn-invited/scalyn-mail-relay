@@ -37,6 +37,8 @@ final class DashboardPageTest extends TestCase {
 	private WpdbStub $wpdb;
 
 	private array $mock_diagnostic_data = array();
+	public array $activity_counts = array();
+	public bool $activity_read_fails = false;
 
 	protected function setUp(): void {
 		$this->wpdb                        = new WpdbStub();
@@ -128,6 +130,12 @@ final class DashboardPageTest extends TestCase {
 			}
 
 			public function get_results( string $sql, string $output = 'OBJECT' ) {
+				if ( str_contains( $sql, 'COUNT(*) AS row_count' ) ) {
+					if ( $this->parent->activity_read_fails ) {
+						throw new RuntimeException( 'private database details' );
+					}
+					return $this->parent->activity_counts;
+				}
 				// Check if this is a diagnostic query by checking if diagnostics table is referenced.
 				if ( strpos( $sql, 'scalyn_diagnostics' ) !== false ) {
 					// This is a diagnostic query, use mock data.
@@ -775,6 +783,39 @@ final class DashboardPageTest extends TestCase {
 		$this->assertSame( 0, $log_prepare['args'][1], 'Dashboard must use offset 0.' );
 	}
 
+	public function test_activity_counts_and_read_freshness_are_rendered(): void {
+		$this->grant_view_dashboard();
+		$this->activity_counts = array(
+			array( 'status' => 'accepted', 'row_count' => 12 ),
+			array( 'status' => 'failed', 'row_count' => 3 ),
+			array( 'status' => 'prepared', 'row_count' => 2 ),
+		);
+		$output = $this->render_and_capture();
+		$this->assertStringContainsString( 'data-scalyn-count="accepted">12</dd>', $output );
+		$this->assertStringContainsString( 'data-scalyn-count="failed">3</dd>', $output );
+		$this->assertStringContainsString( 'Counts read as of (site time):', $output );
+		$this->assertStringContainsString( 'All providers.', $output );
+		$this->assertStringContainsString( 'not live monitoring', $output );
+		$this->assertStringContainsString( 'Displayed health snapshot:', $output );
+		$this->assertStringContainsString( 'later bounces are not automatically included', $output );
+	}
+
+	public function test_empty_activity_does_not_claim_health(): void {
+		$this->grant_view_dashboard();
+		$output = $this->render_and_capture();
+		$this->assertStringContainsString( 'data-scalyn-count="accepted">0</dd>', $output );
+		$this->assertStringContainsString( 'No retained activity in this period. This does not establish email health.', $output );
+	}
+
+	public function test_activity_failure_is_not_zero_or_private_exception(): void {
+		$this->grant_view_dashboard();
+		$this->activity_read_fails = true;
+		$output = $this->render_and_capture();
+		$this->assertStringContainsString( 'Activity totals are unavailable', $output );
+		$this->assertStringNotContainsString( 'data-scalyn-count=', $output );
+		$this->assertStringNotContainsString( 'private database details', $output );
+	}
+
 	public function test_no_direct_sql_exists_in_dashboard_render_path(): void {
 		$this->grant_view_dashboard();
 		$this->wpdb->get_results_return = array( $this->make_log_row() );
@@ -786,6 +827,10 @@ final class DashboardPageTest extends TestCase {
 		// The only tables the dashboard may read are the ones its repositories own:
 		// mail logs (MailLogRepository) and the persisted health score (HealthScoreRepository).
 		foreach ( $this->wpdb->prepare_calls as $call ) {
+			if ( str_contains( $call['query'], 'FROM %i' ) ) {
+				$this->assertContains( $call['args'][0], array( 'wp_scalyn_mail_logs', 'wp_scalyn_health_scores' ) );
+				continue;
+			}
 			$this->assertMatchesRegularExpression(
 				'/scalyn_(mail_logs|health_scores)/',
 				$call['query'],

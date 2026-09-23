@@ -70,6 +70,7 @@ $setup_steps = array(
 	<?php \Scalyn\MailRelay\Admin\Components\VerificationScope::render(); ?>
 
 	<div class="scalyn-grid">
+		<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/activity-summary.php'; ?>
 
 		<section class="scalyn-card" aria-labelledby="scalyn-health-heading">
 			<h2 id="scalyn-health-heading"><?php esc_html_e( 'Email Health — configuration score', 'scalyn-mail-relay' ); ?></h2>
