@@ -85,7 +85,7 @@ Outcome: actionable incidents surface without repeated notification noise.
 Outcome: client issues can be investigated and explained with stored evidence.
 
 - [x] Add repository queries/read models for date ranges, provider filters, activity totals, recent failures, and score trends. See [ticket 1 contract and validation](REPORTING-QUERIES.md); bounded site-local periods, provider-filtered mail reads and site-wide daily score trends. Bernie's review remains outstanding.
-- [ ] Present accepted and failed counts with accurate lifecycle labels and evidence freshness.
+- [x] Present accepted and failed counts with accurate lifecycle labels and evidence freshness. Dashboard seven-day retained activity summary, safe unavailable state, explicit site-time cutoff and separate health freshness; see [ticket 2 verification](qa/2026-09-23-dashboard-metrics.md). Bernie's review remains outstanding.
 - [ ] Add prioritised recommendations grounded in diagnostic results.
 - [ ] Define report snapshots with reporting periods, timestamps, findings, and evidence references.
 - [ ] Implement permission-protected CSV and JSON exports with privacy controls and CSV formula-injection protection.
