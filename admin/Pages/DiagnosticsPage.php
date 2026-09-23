@@ -68,6 +68,7 @@ final class DiagnosticsPage {
 		$cadence           = $container->get( SettingsRepository::class )->get_diagnostic_schedule();
 		$score_freshness   = \Scalyn\MailRelay\Admin\MonitoringStatusPresenter::evidence( $health['created_at'], $cadence, time() );
 		$results_freshness = \Scalyn\MailRelay\Admin\MonitoringStatusPresenter::evidence( $run_data['results'][0]['created_at'] ?? null, $cadence, time() );
+		$recommendations   = ( new \Scalyn\MailRelay\Diagnostics\RecommendationEngine() )->recommend( $run_data['results'], $cadence, time() );
 
 		// Fetch and classify recent mail failures.
 		$recent_failures = $this->get_recent_failures( $mail_log_repo, $classifier );

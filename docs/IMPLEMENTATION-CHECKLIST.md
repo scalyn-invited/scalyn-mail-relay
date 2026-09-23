@@ -86,7 +86,7 @@ Outcome: client issues can be investigated and explained with stored evidence.
 
 - [x] Add repository queries/read models for date ranges, provider filters, activity totals, recent failures, and score trends. See [ticket 1 contract and validation](REPORTING-QUERIES.md); bounded site-local periods, provider-filtered mail reads and site-wide daily score trends. Bernie's review remains outstanding.
 - [x] Present accepted and failed counts with accurate lifecycle labels and evidence freshness. Dashboard seven-day retained activity summary, safe unavailable state, explicit site-time cutoff and separate health freshness; see [ticket 2 verification](qa/2026-09-23-dashboard-metrics.md). Bernie's review remains outstanding.
-- [ ] Add prioritised recommendations grounded in diagnostic results.
+- [x] Add prioritised recommendations grounded in diagnostic results. Diagnostics now shows deterministic, evidence-referenced guidance with refresh-first handling for stale/ambiguous results; see [ticket 3 rules and validation](DIAGNOSTIC-RECOMMENDATIONS.md). Bernie's review remains outstanding.
 - [ ] Define report snapshots with reporting periods, timestamps, findings, and evidence references.
 - [ ] Implement permission-protected CSV and JSON exports with privacy controls and CSV formula-injection protection.
 - [ ] Add PDF reports using the same report data after the data contract is stable.

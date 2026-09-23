@@ -18,6 +18,29 @@ use Scalyn\MailRelay\Providers\ValidationResult;
  * Covers the capability gate plus configured and not-configured B1 states.
  */
 final class DiagnosticsPageTest extends TestCase {
+	public function test_guidance_follows_health_and_preserves_score_disclaimer(): void {
+		$this->grant_run_diagnostics();
+		$this->configure_provider();
+		$output = $this->render_and_capture();
+		$health = strpos( $output, 'Overall Email Health' );
+		$guidance = strpos( $output, 'What to address next' );
+		$scope = strpos( $output, 'Message authentication and delivery: not verified' );
+		$this->assertNotFalse( $health );
+		$this->assertNotFalse( $guidance );
+		$this->assertNotFalse( $scope );
+		$this->assertTrue( $health < $guidance && $guidance < $scope );
+		$this->assertSame( 1, substr_count( $output, 'What to address next' ) );
+		$this->assertStringContainsString( 'Configuration score only; authentication and delivery not verified.', substr( $output, $health, $guidance - $health ) );
+		$this->assertStringContainsString( 'diagnostic cards above', $output );
+		$this->assertStringContainsString( '<div class="scalyn-diagnostics-guidance">', $output );
+	}
+	public function test_recommendations_render_refresh_when_no_evidence(): void {
+		$this->grant_run_diagnostics();
+		$output = $this->render_and_capture();
+		$this->assertStringContainsString( 'What to address next', $output );
+		$this->assertStringContainsString( 'Refresh diagnostic evidence first', $output );
+		$this->assertStringContainsString( 'No settings are changed automatically', $output );
+	}
 	public function test_monitoring_panel_and_dkim_form_are_not_on_diagnostics(): void {
 		$this->grant_run_diagnostics();
 		$GLOBALS['_test_current_user_can'][Capabilities::MANAGE_SETTINGS]=true;
