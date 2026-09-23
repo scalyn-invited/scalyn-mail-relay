@@ -52,7 +52,6 @@ defined( 'ABSPATH' ) || exit;
 	<p><?php esc_html_e( 'Displayed health snapshot:', 'scalyn-mail-relay' ); ?> <?php echo esc_html( $score_freshness ); ?></p>
 	<p><?php esc_html_e( 'Results and the latest retained health snapshot may come from different runs. Evidence is stale after the configured cadence plus five minutes, or 24 hours plus five minutes when monitoring is disabled.', 'scalyn-mail-relay' ); ?></p>
 	<p class="scalyn-lead"><?php esc_html_e( 'Email configuration checks and remediation guidance.', 'scalyn-mail-relay' ); ?></p>
-	<?php \Scalyn\MailRelay\Admin\Components\VerificationScope::render(); ?>
 
 	<?php if ( $provider_configured ) : ?>
 		<!-- Run Diagnostics Action (Header) -->
@@ -267,6 +266,7 @@ defined( 'ABSPATH' ) || exit;
 		<!-- Overall Health Score -->
 		<section class="scalyn-diagnostics-section" aria-labelledby="scalyn-diagnostics-health-section-heading">
 			<h2 id="scalyn-diagnostics-health-section-heading" class="scalyn-diagnostics-section__title"><?php esc_html_e( 'Overall Email Health', 'scalyn-mail-relay' ); ?></h2>
+			<p><?php esc_html_e( 'Configuration score only; authentication and delivery not verified.', 'scalyn-mail-relay' ); ?></p>
 
 			<div class="scalyn-diagnostics-grid">
 				<?php
@@ -330,4 +330,8 @@ defined( 'ABSPATH' ) || exit;
 		<?php endif; ?>
 
 	<?php endif; ?>
+	<div class="scalyn-diagnostics-guidance">
+		<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/recommendations.php'; ?>
+		<?php \Scalyn\MailRelay\Admin\Components\VerificationScope::render(); ?>
+	</div>
 </div>

@@ -47,6 +47,7 @@ $GLOBALS['_test_wp_nonce_valid']   = false;
 $GLOBALS['_test_wp_redirect']      = null;
 $GLOBALS['_test_current_time']     = null; // null = use real time; string = fixed time for tests.
 $GLOBALS['_test_wp_enqueued_styles']    = array(); // handle => src.
+$GLOBALS['_test_wp_enqueued_style_versions'] = array(); // handle => version.
 $GLOBALS['_test_wp_enqueued_scripts']   = array(); // handle => src.
 $GLOBALS['_test_wp_localized_scripts']  = array(); // handle => array( object_name => data ).
 
@@ -67,6 +68,7 @@ if ( ! function_exists( 'wp_enqueue_style' ) ) {
 	/** Records enqueued style handles. */
 	function wp_enqueue_style( string $handle, string $src = '', array $deps = array(), $ver = false, string $media = 'all' ): void {
 		$GLOBALS['_test_wp_enqueued_styles'][ $handle ] = $src;
+		$GLOBALS['_test_wp_enqueued_style_versions'][ $handle ] = $ver;
 	}
 }
 

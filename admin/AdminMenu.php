@@ -139,7 +139,9 @@ final class AdminMenu {
 			return;
 		}
 
-		wp_enqueue_style( 'scalyn-mail-relay-admin', SCALYN_MAIL_RELAY_URL . 'assets/css/admin.css', array(), SCALYN_MAIL_RELAY_VERSION );
+		$style_path    = SCALYN_MAIL_RELAY_PATH . 'assets/css/admin.css';
+		$style_version = is_readable( $style_path ) ? (string) filemtime( $style_path ) : SCALYN_MAIL_RELAY_VERSION;
+		wp_enqueue_style( 'scalyn-mail-relay-admin', SCALYN_MAIL_RELAY_URL . 'assets/css/admin.css', array(), $style_version );
 
 		// Enqueue the admin script on every plugin screen. The script self-gates
 		// on the presence of the #scalyn-run-diagnostics button, which is rendered

@@ -197,6 +197,8 @@
 .scalyn-diagnostics-section { margin-bottom: 32px; }
 .scalyn-diagnostics-section__title { margin-top: 0; margin-bottom: 8px; font-size: 16px; font-weight: 600; color: #1e1e1e; }
 .scalyn-diagnostics-section__description { margin: 0 0 16px; color: #50575e; font-size: 14px; }
+.scalyn-diagnostics-guidance { display: grid; row-gap: 16px; margin-top: 16px; }
+.scalyn-diagnostics-guidance .scalyn-card { margin: 0; }
 
 /* ---- Error states ---- */
 .scalyn-error-state { background: #fce8e8; border-left: 4px solid #b32d2e; }

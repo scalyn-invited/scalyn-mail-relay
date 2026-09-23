@@ -147,6 +147,7 @@ final class AdminMenuTest extends TestCase {
 
 	private function reset_enqueue_globals(): void {
 		$GLOBALS['_test_wp_enqueued_styles']   = array();
+		$GLOBALS['_test_wp_enqueued_style_versions'] = array();
 		$GLOBALS['_test_wp_enqueued_scripts']  = array();
 		$GLOBALS['_test_wp_localized_scripts'] = array();
 	}
@@ -173,6 +174,7 @@ final class AdminMenuTest extends TestCase {
 		( new AdminMenu() )->enqueue_assets( 'mail-relay_page_scalyn-mail-relay-diagnostics' );
 
 		$this->assertArrayHasKey( 'scalyn-mail-relay-admin', $GLOBALS['_test_wp_enqueued_styles'] );
+		$this->assertSame( (string) filemtime( SCALYN_MAIL_RELAY_PATH . 'assets/css/admin.css' ), $GLOBALS['_test_wp_enqueued_style_versions']['scalyn-mail-relay-admin'] );
 		$this->assertArrayHasKey( 'scalyn-mail-relay-admin', $GLOBALS['_test_wp_enqueued_scripts'] );
 		$this->assertStringEndsWith( 'assets/js/admin.js', $GLOBALS['_test_wp_enqueued_scripts']['scalyn-mail-relay-admin'] );
 
