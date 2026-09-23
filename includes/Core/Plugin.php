@@ -159,6 +159,8 @@ final class Plugin {
 		);
 		$this->container->set( HealthScorer::class, static fn(): HealthScorer => new HealthScorer() );
 		$this->container->set( HealthScoreRepository::class, static fn(): HealthScoreRepository => new HealthScoreRepository() );
+		$this->container->set( \Scalyn\MailRelay\Diagnostics\RecommendationEngine::class, static fn(): \Scalyn\MailRelay\Diagnostics\RecommendationEngine => new \Scalyn\MailRelay\Diagnostics\RecommendationEngine() );
+		$this->container->set( \Scalyn\MailRelay\Database\ReportSnapshotRepository::class, static fn( Container $c ): \Scalyn\MailRelay\Database\ReportSnapshotRepository => new \Scalyn\MailRelay\Database\ReportSnapshotRepository( $c->get( MailLogRepository::class ), $c->get( HealthScoreRepository::class ), $c->get( DiagnosticRepository::class ), $c->get( \Scalyn\MailRelay\Diagnostics\RecommendationEngine::class ) ) );
 		$this->container->set( \Scalyn\MailRelay\Database\DiagnosticPublicationRepository::class, static fn( Container $c ): \Scalyn\MailRelay\Database\DiagnosticPublicationRepository => new \Scalyn\MailRelay\Database\DiagnosticPublicationRepository( $c->get( DiagnosticRepository::class ), $c->get( HealthScoreRepository::class ), $c->get( HealthScorer::class ), $c->get( MailLogRepository::class ) ) );
 		$this->container->set( DiagnosticsRunEndpoint::class, static fn(): DiagnosticsRunEndpoint => new DiagnosticsRunEndpoint() );
 
