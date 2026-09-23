@@ -37,6 +37,86 @@ final class MailLogRepository {
 	public const MAX_PAGE_SIZE = 250;
 
 	/**
+	 * Returns retained activity counts, not delivery counts, for a creation period.
+	 *
+	 * @param \Scalyn\MailRelay\Reporting\ReportPeriod $period Site-local boundaries.
+	 * @param string|null                              $provider Exact provider ID; null means all.
+	 * @return array Total, canonical status counts, and unrecognized status count.
+	 * @throws \RuntimeException When reading fails.
+	 */
+	public function activity_totals( \Scalyn\MailRelay\Reporting\ReportPeriod $period, ?string $provider = null ): array {
+		global $wpdb;
+		$args  = array( $wpdb->prefix . 'scalyn_mail_logs', $period->start, $period->end );
+		$where = $this->report_provider_filter( $provider, $args );
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Fixed fragment; variadic args contain all 3 or 4 replacements, covered by query tests.
+		$sql = $wpdb->prepare( "SELECT status, COUNT(*) AS row_count FROM %i WHERE created_at >= %s AND created_at < %s {$where} GROUP BY status", ...$args );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared -- Prepared repository read, uncached operational evidence.
+		$rows = $wpdb->get_results( $sql, ARRAY_A );
+		if ( ! is_array( $rows ) || ! empty( $wpdb->last_error ) ) {
+			throw new \RuntimeException( 'Reporting data unavailable.' );
+		}
+		$result = array(
+			'total'        => 0,
+			'statuses'     => array_fill_keys( MailStatus::all(), 0 ),
+			'unrecognized' => 0,
+		);
+		foreach ( $rows as $row ) {
+			$count            = max( 0, (int) $row['row_count'] );
+			$result['total'] += $count;
+			if ( array_key_exists( $row['status'], $result['statuses'] ) ) {
+				$result['statuses'][ $row['status'] ] += $count;
+			} else {
+				$result['unrecognized'] += $count;
+			}
+		}
+		return $result;
+	}
+
+	/**
+	 * Returns a bounded recent-failure projection without provider response text.
+	 *
+	 * @param \Scalyn\MailRelay\Reporting\ReportPeriod $period Site-local creation period.
+	 * @param string|null                              $provider Exact provider ID, null for all.
+	 * @param int                                      $limit Maximum rows, clamped to 1–250.
+	 * @return array Rows with correlation, provider, and timestamps only.
+	 * @throws \RuntimeException When reading fails.
+	 */
+	public function report_failures( \Scalyn\MailRelay\Reporting\ReportPeriod $period, ?string $provider = null, int $limit = 25 ): array {
+		global $wpdb;
+		$args   = array( $wpdb->prefix . 'scalyn_mail_logs', $period->start, $period->end );
+		$where  = $this->report_provider_filter( $provider, $args );
+		$args[] = MailStatus::FAILED;
+		$args[] = min( self::MAX_PAGE_SIZE, max( 1, $limit ) );
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Fixed fragment; variadic args contain all 5 or 6 replacements, covered by query tests.
+		$sql = $wpdb->prepare( "SELECT id, message_uuid, provider, created_at, failed_at FROM %i WHERE created_at >= %s AND created_at < %s {$where} AND status = %s ORDER BY created_at DESC, id DESC LIMIT %d", ...$args );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared -- Prepared bounded repository read.
+		$rows = $wpdb->get_results( $sql, ARRAY_A );
+		if ( ! is_array( $rows ) || ! empty( $wpdb->last_error ) ) {
+			throw new \RuntimeException( 'Reporting data unavailable.' );
+		}
+		return $rows;
+	}
+
+	/**
+	 * Builds only a fixed SQL fragment and appends validated provider input.
+	 *
+	 * @param string|null $provider Provider ID; empty string explicitly selects unattributed rows.
+	 * @param array       $args Prepared arguments.
+	 * @return string Fixed SQL fragment.
+	 * @throws \InvalidArgumentException When provider input is invalid.
+	 */
+	private function report_provider_filter( ?string $provider, array &$args ): string {
+		if ( null === $provider ) {
+			return '';
+		}
+		if ( strlen( $provider ) > 100 || ! preg_match( '/^[a-zA-Z0-9_-]*$/D', $provider ) ) {
+			throw new \InvalidArgumentException( 'Invalid reporting provider.' );
+		}
+		$args[] = $provider;
+		return 'AND provider = %s';
+	}
+
+	/**
 	 * Inserts a new mail log row, or updates the existing row for the same message_uuid.
 	 *
 	 * The mailer column is intentionally stored as an empty string. The current
