@@ -31,6 +31,38 @@ final class HealthScoreRepository {
 	public const MAX_PAGE_SIZE = 250;
 
 	/**
+	 * Returns site-wide daily configuration-score trends, never provider attribution.
+	 *
+	 * Missing days are absent, not zero. Null scores do not contribute to averages.
+	 *
+	 * @param \Scalyn\MailRelay\Reporting\ReportPeriod $period Site-local period, at most 366 days.
+	 * @return array Daily count, scored count, average/min/max, and latest evidence time.
+	 * @throws \RuntimeException When reading fails.
+	 */
+	public function daily_trend( \Scalyn\MailRelay\Reporting\ReportPeriod $period ): array {
+		global $wpdb;
+		$sql = $wpdb->prepare(
+			'SELECT DATE(created_at) AS day, COUNT(*) AS snapshot_count, COUNT(overall_score) AS scored_count, AVG(overall_score) AS average_score, MIN(overall_score) AS minimum_score, MAX(overall_score) AS maximum_score, MAX(created_at) AS latest_at FROM %i WHERE created_at >= %s AND created_at < %s GROUP BY DATE(created_at) ORDER BY day ASC LIMIT 367',
+			$wpdb->prefix . 'scalyn_health_scores',
+			$period->start,
+			$period->end
+		);
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared -- Prepared bounded repository aggregation, no cached evidence.
+		$rows = $wpdb->get_results( $sql, ARRAY_A );
+		if ( ! is_array( $rows ) || ! empty( $wpdb->last_error ) ) {
+			throw new \RuntimeException( 'Reporting data unavailable.' );
+		}
+		foreach ( $rows as &$row ) {
+			$row['snapshot_count'] = (int) $row['snapshot_count'];
+			$row['scored_count']   = (int) $row['scored_count'];
+			foreach ( array( 'average_score', 'minimum_score', 'maximum_score' ) as $key ) {
+				$row[ $key ] = null === $row[ $key ] ? null : (float) $row[ $key ];
+			}
+		}
+		return $rows;
+	}
+
+	/**
 	 * Persists a health score snapshot as one row in scalyn_health_scores.
 	 *
 	 * @param HealthScoreResult $result The score to persist.

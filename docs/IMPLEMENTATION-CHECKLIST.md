@@ -84,7 +84,7 @@ Outcome: actionable incidents surface without repeated notification noise.
 
 Outcome: client issues can be investigated and explained with stored evidence.
 
-- [ ] Add repository queries/read models for date ranges, provider filters, activity totals, recent failures, and score trends.
+- [x] Add repository queries/read models for date ranges, provider filters, activity totals, recent failures, and score trends. See [ticket 1 contract and validation](REPORTING-QUERIES.md); bounded site-local periods, provider-filtered mail reads and site-wide daily score trends. Bernie's review remains outstanding.
 - [ ] Present accepted and failed counts with accurate lifecycle labels and evidence freshness.
 - [ ] Add prioritised recommendations grounded in diagnostic results.
 - [ ] Define report snapshots with reporting periods, timestamps, findings, and evidence references.
