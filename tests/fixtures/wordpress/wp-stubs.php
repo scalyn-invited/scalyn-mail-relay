@@ -1,5 +1,11 @@
 <?php
 
+if ( ! function_exists( 'wp_verify_nonce' ) ) {
+	function wp_verify_nonce( $nonce, $action = -1 ) {
+		return 'scalyn_export_report' === $action && 'valid-export-nonce' === $nonce ? 1 : false;
+	}
+}
+
 // Filter support for custom cron schedules. Kept separate from action assertions.
 function submit_button(string $text='Save Changes'):void {echo '<p><button type="submit">'.esc_html($text).'</button></p>';}
 function checked(mixed $checked, mixed $current=true, bool $display=true):string {

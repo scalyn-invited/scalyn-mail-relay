@@ -42,6 +42,7 @@ final class AdminMenu {
 	public function register(): void {
 		add_action( 'admin_menu', array( $this, 'add_menu' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
+		add_action( 'admin_post_scalyn_export_report', array( new ReportExportController(), 'handle' ) );
 	}
 
 	/**
@@ -127,6 +128,7 @@ final class AdminMenu {
 			array( $this, 'render_audit' )
 		);
 		add_submenu_page( 'scalyn-mail-relay', __( 'Alerts & Recovery', 'scalyn-mail-relay' ), __( 'Alerts & Recovery', 'scalyn-mail-relay' ), Capabilities::MANAGE_SETTINGS, 'scalyn-mail-relay-alerts', array( $this, 'render_alerts' ) );
+		add_submenu_page( 'scalyn-mail-relay', __( 'Reports', 'scalyn-mail-relay' ), __( 'Reports', 'scalyn-mail-relay' ), Capabilities::EXPORT_REPORTS, 'scalyn-mail-relay-reports', array( new \Scalyn\MailRelay\Admin\Pages\ReportsPage(), 'render' ) );
 	}
 
 	/**
