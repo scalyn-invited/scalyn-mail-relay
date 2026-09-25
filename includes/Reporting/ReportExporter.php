@@ -16,7 +16,7 @@ final class ReportExporter {
 	 * Serializes a trusted repository snapshot, excluding evidence identifiers by default.
 	 *
 	 * @param ReportSnapshot $snapshot Captured report.
-	 * @param string         $format Either csv or json.
+	 * @param string         $format Either csv, json or pdf.
 	 * @param bool           $references Explicit opt-in for operational identifiers.
 	 * @return string Complete download body.
 	 * @throws \RuntimeException On encoding failure or unsupported format.
@@ -24,6 +24,9 @@ final class ReportExporter {
 	public function encode( ReportSnapshot $snapshot, string $format, bool $references = false ): string {
 		$data            = $this->privacy( $snapshot->data, $references );
 		$data['privacy'] = array( 'evidence_references_included' => $references );
+		if ( 'pdf' === $format ) {
+			return ( new PdfReportRenderer() )->render( $data );
+		}
 		if ( 'json' === $format ) {
 			$json = wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
 			if ( false === $json ) {

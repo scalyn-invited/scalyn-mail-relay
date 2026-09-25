@@ -89,7 +89,7 @@ Outcome: client issues can be investigated and explained with stored evidence.
 - [x] Add prioritised recommendations grounded in diagnostic results. Diagnostics now shows deterministic, evidence-referenced guidance with refresh-first handling for stale/ambiguous results; see [ticket 3 rules and validation](DIAGNOSTIC-RECOMMENDATIONS.md). Bernie's review remains outstanding.
 - [x] Define report snapshots with reporting periods, timestamps, findings, and evidence references. Versioned immutable in-memory capture with consistent read-only database view, bounded private projections and explicit limitations; see [ticket 4 contract and validation](REPORT-SNAPSHOTS.md). Bernie's contract review remains outstanding; exports are separate tickets.
 - [x] Implement permission-protected CSV and JSON exports with privacy controls and CSV formula-injection protection. Reports page uses the existing export capability, POST nonce, validated filters and direct downloads; evidence identifiers are opt-in. See [ticket 5 behavior and validation](REPORT-EXPORTS.md). Bernie's review remains outstanding.
-- [ ] Add PDF reports using the same report data after the data contract is stable.
+- [x] Add PDF reports using the same report data after the data contract is stable. Shared privacy-filtered snapshot, protected download, paginated layout and hardened Dompdf renderer; see [ticket 6 behavior, packaging and verification](PDF-REPORTS.md). Bernie's dependency/architecture review remains outstanding.
 - [ ] Record exports in the audit trail and expire generated files where applicable.
 - [ ] Completion gate: report figures match the selected records, findings are traceable, and exports respect permissions.
 
