@@ -39,7 +39,7 @@ final class ReportExportController {
 				throw new \RuntimeException( 'Invalid report options.', 400 );
 			}
 		}
-		if ( ! in_array( $input['format'], array( 'csv', 'json' ), true ) || ! in_array( $input['provider_scope'], array( 'all', 'unattributed', 'specific' ), true ) || ( isset( $input['references'] ) && '1' !== $input['references'] ) ) {
+		if ( ! in_array( $input['format'], array( 'csv', 'json', 'pdf' ), true ) || ! in_array( $input['provider_scope'], array( 'all', 'unattributed', 'specific' ), true ) || ( isset( $input['references'] ) && '1' !== $input['references'] ) ) {
 			throw new \RuntimeException( 'Invalid report options.', 400 );
 		}
 		$provider = null;
@@ -63,9 +63,14 @@ final class ReportExportController {
 		} catch ( \Throwable $error ) {
 			throw new \RuntimeException( 'Report export unavailable.', 503 );
 		}
+		$types = array(
+			'csv'  => 'text/csv; charset=UTF-8',
+			'json' => 'application/json; charset=UTF-8',
+			'pdf'  => 'application/pdf',
+		);
 		return array(
 			'body' => $body,
-			'mime' => 'csv' === $input['format'] ? 'text/csv; charset=UTF-8' : 'application/json; charset=UTF-8',
+			'mime' => $types[ $input['format'] ],
 			'name' => 'scalyn-mail-relay-report.' . $input['format'],
 		);
 	}
