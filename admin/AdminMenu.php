@@ -113,14 +113,6 @@ final class AdminMenu {
 		);
 		add_submenu_page(
 			'scalyn-mail-relay',
-			__( 'Settings — Scalyn Mail Relay', 'scalyn-mail-relay' ),
-			__( 'Settings', 'scalyn-mail-relay' ),
-			Capabilities::MANAGE_SETTINGS,
-			'scalyn-mail-relay-data-controls',
-			array( $this, 'render_data_controls' )
-		);
-		add_submenu_page(
-			'scalyn-mail-relay',
 			__( 'Audit History — Scalyn Mail Relay', 'scalyn-mail-relay' ),
 			__( 'Audit History', 'scalyn-mail-relay' ),
 			Capabilities::MANAGE_SETTINGS,
@@ -129,6 +121,14 @@ final class AdminMenu {
 		);
 		add_submenu_page( 'scalyn-mail-relay', __( 'Alerts & Recovery', 'scalyn-mail-relay' ), __( 'Alerts & Recovery', 'scalyn-mail-relay' ), Capabilities::MANAGE_SETTINGS, 'scalyn-mail-relay-alerts', array( $this, 'render_alerts' ) );
 		add_submenu_page( 'scalyn-mail-relay', __( 'Reports', 'scalyn-mail-relay' ), __( 'Reports', 'scalyn-mail-relay' ), Capabilities::EXPORT_REPORTS, 'scalyn-mail-relay-reports', array( new \Scalyn\MailRelay\Admin\Pages\ReportsPage(), 'render' ) );
+		add_submenu_page(
+			'scalyn-mail-relay',
+			__( 'Settings — Scalyn Mail Relay', 'scalyn-mail-relay' ),
+			__( 'Settings', 'scalyn-mail-relay' ),
+			Capabilities::MANAGE_SETTINGS,
+			'scalyn-mail-relay-data-controls',
+			array( $this, 'render_data_controls' )
+		);
 	}
 
 	/**
