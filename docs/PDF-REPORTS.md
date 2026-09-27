@@ -49,5 +49,5 @@ server. Downloaded copies remain under the operator's control.
   clean. It should be addressed in a focused maintenance change.
 
 Bernie dependency/architecture review and eventual remote CI remain outstanding.
-Synthetic QA PDFs are ignored build artifacts, not shipped reports. Ticket 7
-adds export auditing and applicable expiry handling.
+Synthetic QA PDFs are ignored build artifacts, not shipped reports. [Ticket 7](EXPORT-AUDITING.md)
+implements export auditing and documents expiry handling for streamed reports.

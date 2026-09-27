@@ -42,7 +42,7 @@ Separate downloads are separate captures and may differ as retained data changes
 
 No report is written to server storage. Browser-downloaded copies remain under
 the operator's control and are not affected by plugin retention. Export-specific
-audit events are ticket 7; [PDF is now available in ticket 6](PDF-REPORTS.md). No capability, schema, dependency,
+audit events are implemented in [ticket 7](EXPORT-AUDITING.md); [PDF is available in ticket 6](PDF-REPORTS.md). No capability, schema, dependency,
 retention or mail lifecycle change. No email is sent. Rollback removes the new
 page, handler and serializer; no migration or server file cleanup is necessary.
 
