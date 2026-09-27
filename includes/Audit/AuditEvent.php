@@ -22,6 +22,7 @@ final readonly class AuditEvent {
 	public const FIELDS = array( 'provider.active', 'smtp.host', 'smtp.port', 'smtp.encryption', 'smtp.username', 'smtp.password', 'smtp.from_name', 'smtp.from_email', 'advanced.log_retention_days', 'advanced.delete_data_on_uninstall', 'advanced.diagnostic_schedule', 'advanced.alert_webhook_enabled', 'advanced.dkim_selector' );
 
 	private const OUTCOMES = array(
+		'report_export'            => array( 'started', 'prepared', 'failed' ),
 		'alert_incident'           => array( 'opened', 'resolved' ),
 		'alert_notification'       => array( 'sent', 'failed', 'skipped', 'retry' ),
 		'settings_changed'         => array( 'changed' ),
@@ -39,15 +40,27 @@ final readonly class AuditEvent {
 	 * @param string $outcome Fixed observed outcome.
 	 * @param string $correlation_id Optional UUID, never an address/domain/provider response.
 	 * @param array  $changed_fields Recognized field names only; no values.
+	 * @param array  $export Fixed export metadata, permitted only for report exports.
 	 * @throws \InvalidArgumentException When any part of the event is not allowed.
 	 */
 	public function __construct(
 		public string $action,
 		public string $outcome,
 		public string $correlation_id = '',
-		public array $changed_fields = array()
+		public array $changed_fields = array(),
+		public array $export = array()
 	) {
 		$this->actor = AuditActor::capture();
+		if ( 'report_export' === $action ) {
+			if ( 3 !== count( $export ) || ! in_array( $export['format'] ?? null, array( 'csv', 'json', 'pdf' ), true )
+				|| ! is_bool( $export['references'] ?? null ) || ! is_string( $export['report_uuid'] ?? null )
+				|| ( '' !== $export['report_uuid'] && 1 !== preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iD', $export['report_uuid'] ) )
+				|| ( 'prepared' === $outcome && '' === $export['report_uuid'] ) || '' === $correlation_id || array() !== $changed_fields ) {
+				throw new \InvalidArgumentException( 'Invalid export audit event.' );
+			}
+		} elseif ( array() !== $export ) {
+			throw new \InvalidArgumentException( 'Invalid export audit event.' );
+		}
 		if ( ! isset( self::OUTCOMES[ $action ] ) || ! in_array( $outcome, self::OUTCOMES[ $action ], true )
 			|| ( '' !== $correlation_id && 1 !== preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iD', $correlation_id ) )
 			|| count( $changed_fields ) > count( self::FIELDS ) ) {
@@ -66,11 +79,16 @@ final readonly class AuditEvent {
 	 * @return array Versioned metadata without sensitive values.
 	 */
 	public function metadata(): array {
-		return array(
+		$metadata = array(
 			'version'        => 2,
 			'source'         => $this->actor->source,
 			'outcome'        => $this->outcome,
 			'changed_fields' => array_values( array_unique( $this->changed_fields ) ),
 		);
+		if ( 'report_export' === $this->action ) {
+			$metadata['version'] = 3;
+			$metadata['export']  = $this->export;
+		}
+		return $metadata;
 	}
 }

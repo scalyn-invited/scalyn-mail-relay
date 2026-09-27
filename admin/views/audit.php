@@ -9,6 +9,7 @@ defined( 'ABSPATH' ) || exit;
 ?>
 <div class="wrap">
 	<h1><?php esc_html_e( 'Audit History', 'scalyn-mail-relay' ); ?></h1>
+	<p><?php esc_html_e( 'Report exports show the requested format and whether evidence identifiers were included. Prepared means the report was generated; it does not confirm that the browser received or saved it. Correlation groups one export attempt, and the report reference identifies its captured data.', 'scalyn-mail-relay' ); ?></p>
 	<p><?php esc_html_e( 'Administrative activity, newest records first. Times use the site timezone. User IDs refer to WordPress accounts; deleted accounts retain their numeric ID. Unknown means attribution was not recorded. Manual, REST, scheduled, CLI and application describe execution context, not proof of human intent.', 'scalyn-mail-relay' ); ?></p>
 	<p><?php esc_html_e( 'Accepted means the provider acknowledged a test email, not confirmed delivery. Completed diagnostics may contain failed checks. A started operation without a result may have been interrupted or its audit write may have failed. Audit history follows the retention period configured in Settings; individual expired records are removed, so part of a correlated operation may expire before another part.', 'scalyn-mail-relay' ); ?></p>
 	<?php if ( $error ) : ?>
@@ -17,7 +18,7 @@ defined( 'ABSPATH' ) || exit;
 		<table class="widefat striped">
 			<caption class="screen-reader-text"><?php esc_html_e( 'Audit events, up to 50 per page', 'scalyn-mail-relay' ); ?></caption>
 			<thead><tr>
-				<?php foreach ( array( __( 'Time', 'scalyn-mail-relay' ), __( 'Action', 'scalyn-mail-relay' ), __( 'Outcome', 'scalyn-mail-relay' ), __( 'Actor', 'scalyn-mail-relay' ), __( 'Source', 'scalyn-mail-relay' ), __( 'Correlation', 'scalyn-mail-relay' ), __( 'Changed fields', 'scalyn-mail-relay' ) ) as $heading ) : ?>
+				<?php foreach ( array( __( 'Time', 'scalyn-mail-relay' ), __( 'Action', 'scalyn-mail-relay' ), __( 'Outcome', 'scalyn-mail-relay' ), __( 'Actor', 'scalyn-mail-relay' ), __( 'Source', 'scalyn-mail-relay' ), __( 'Correlation', 'scalyn-mail-relay' ), __( 'Details', 'scalyn-mail-relay' ) ) as $heading ) : ?>
 					<th scope="col"><?php echo esc_html( $heading ); ?></th>
 				<?php endforeach; ?>
 			</tr></thead>
@@ -33,7 +34,17 @@ defined( 'ABSPATH' ) || exit;
 					<td><?php echo esc_html( $row['user_id'] > 0 ? '#' . $row['user_id'] : __( 'Unattributed', 'scalyn-mail-relay' ) ); ?></td>
 					<td><?php echo esc_html( $row['source'] ); ?></td>
 					<td><code><?php echo esc_html( $row['correlation_id'] ); ?></code></td>
-					<td><?php echo esc_html( implode( ', ', $row['changed_fields'] ) ); ?></td>
+					<td>
+					<?php if ( array() !== $row['export'] ) : ?>
+						<?php echo esc_html( strtoupper( $row['export']['format'] ) ); ?><br>
+						<?php echo esc_html( $row['export']['references'] ? __( 'Evidence identifiers: included', 'scalyn-mail-relay' ) : __( 'Evidence identifiers: excluded', 'scalyn-mail-relay' ) ); ?>
+						<?php if ( '' !== $row['export']['report_uuid'] ) : ?>
+							<br><?php esc_html_e( 'Report reference:', 'scalyn-mail-relay' ); ?> <code><?php echo esc_html( $row['export']['report_uuid'] ); ?></code>
+						<?php endif; ?>
+					<?php else : ?>
+						<?php echo esc_html( implode( ', ', $row['changed_fields'] ) ); ?>
+					<?php endif; ?>
+					</td>
 				</tr>
 			<?php endforeach; ?>
 			</tbody>

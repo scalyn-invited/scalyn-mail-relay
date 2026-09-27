@@ -7,6 +7,8 @@
 
 namespace Scalyn\MailRelay\Admin;
 
+use Scalyn\MailRelay\Audit\AuditEvent;
+use Scalyn\MailRelay\Core\HookNames;
 use Scalyn\MailRelay\Core\Capabilities;
 use Scalyn\MailRelay\Core\Plugin;
 use Scalyn\MailRelay\Core\SettingsRepository;
@@ -56,23 +58,51 @@ final class ReportExportController {
 		} catch ( \InvalidArgumentException $error ) {
 			throw new \RuntimeException( 'Invalid report options.', 400 );
 		}
+		$audit_uuid = wp_generate_uuid4();
+		$export     = array(
+			'format'      => $input['format'],
+			'references'  => isset( $input['references'] ),
+			'report_uuid' => '',
+		);
+		$this->audit( 'started', $audit_uuid, $export );
 		try {
-			$container = Plugin::instance()->container();
-			$snapshot  = $container->get( ReportSnapshotRepository::class )->capture( $period, $provider, $container->get( SettingsRepository::class )->get_diagnostic_schedule() );
-			$body      = ( new ReportExporter() )->encode( $snapshot, $input['format'], isset( $input['references'] ) );
+			$container             = Plugin::instance()->container();
+			$snapshot              = $container->get( ReportSnapshotRepository::class )->capture( $period, $provider, $container->get( SettingsRepository::class )->get_diagnostic_schedule() );
+			$export['report_uuid'] = $snapshot->data['report_uuid'];
+			$body                  = ( new ReportExporter() )->encode( $snapshot, $input['format'], isset( $input['references'] ) );
 		} catch ( \Throwable $error ) {
+			$this->audit( 'failed', $audit_uuid, $export );
 			throw new \RuntimeException( 'Report export unavailable.', 503 );
 		}
+		$this->audit( 'prepared', $audit_uuid, $export );
 		$types = array(
 			'csv'  => 'text/csv; charset=UTF-8',
 			'json' => 'application/json; charset=UTF-8',
 			'pdf'  => 'application/pdf',
 		);
 		return array(
-			'body' => $body,
-			'mime' => $types[ $input['format'] ],
-			'name' => 'scalyn-mail-relay-report.' . $input['format'],
+			'body'         => $body,
+			'mime'         => $types[ $input['format'] ],
+			'name'         => 'scalyn-mail-relay-report.' . $input['format'],
+			'audit_uuid'   => $audit_uuid,
+			'audit_export' => $export,
 		);
+	}
+
+	/**
+	 * Emits bounded metadata without allowing audit failures to change the export.
+	 *
+	 * @param string $outcome Observed preparation outcome, never receipt confirmation.
+	 * @param string $uuid Export attempt correlation.
+	 * @param array  $export Validated format, privacy choice and optional capture UUID.
+	 */
+	private function audit( string $outcome, string $uuid, array $export ): void {
+		try {
+			do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'report_export', $outcome, $uuid, array(), $export ) );
+		} catch ( \Throwable $error ) {
+			// An observer failure must not expose details or change a report response.
+			return;
+		}
 	}
 
 	/**
@@ -102,6 +132,7 @@ final class ReportExportController {
 			wp_die( esc_html__( 'Report could not be exported. Check your permission, reload the Reports page and verify the selected options. If the problem persists, try again later.', 'scalyn-mail-relay' ), '', array( 'response' => absint( $error->getCode() ) ) );
 		}
 		if ( headers_sent() ) {
+			$this->audit( 'failed', $response['audit_uuid'], $response['audit_export'] );
 			wp_die( esc_html__( 'Report download unavailable because output has already started.', 'scalyn-mail-relay' ) );
 		}
 		nocache_headers();

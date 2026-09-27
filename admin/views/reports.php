@@ -9,6 +9,7 @@ defined( 'ABSPATH' ) || exit;
 ?>
 <div class="wrap scalyn-mail-relay">
 	<h1><?php esc_html_e( 'Reports', 'scalyn-mail-relay' ); ?></h1>
+	<p><?php esc_html_e( 'Export attempts are recorded in Audit History with your WordPress user ID, format and evidence-identifier choice. Audit records follow the retention period in Settings. Downloaded copies remain under your control.', 'scalyn-mail-relay' ); ?></p>
 	<p><?php esc_html_e( 'Download a consistent snapshot of retained mail activity, site-wide configuration health and diagnostic guidance. Accepted does not mean delivered or placed in an inbox.', 'scalyn-mail-relay' ); ?></p>
 	<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 		<input type="hidden" name="action" value="scalyn_export_report">
