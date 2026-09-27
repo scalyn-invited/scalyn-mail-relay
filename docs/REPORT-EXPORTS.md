@@ -3,7 +3,11 @@
 Owner: Bernie. Baseline: merged develop `036aa43` (PR #51).
 
 Open **Mail Relay → Reports**. Choose a site-local start and exclusive end using
-`YYYY-MM-DD HH:MM:SS` (maximum 366 days), mail provider scope and format. Specific
+the calendar/date-time controls (maximum 366 days), mail provider scope and format. You can also
+enter the date and time with the keyboard, including seconds. Picker appearance follows your
+browser and locale; the displayed site timezone applies, not your device timezone.
+The export handler accepts native date-time values with minutes or seconds and preserves
+the existing strict timestamp format internally, with no timezone conversion. Specific
 provider uses the exact provider identifier, for example `smtp`. All providers and
 unattributed mail are separate choices. Diagnostics and health remain site-wide.
 
@@ -57,3 +61,17 @@ page, handler and serializer; no migration or server file cleanup is necessary.
   through the actual WordPress admin-post route using an empty future test period.
 - No customer data, live settings or external email changed. No server-side export
   artifacts created. Bernie review and remote CI remain separate from local checks.
+
+## Calendar picker update — 2026-09-25
+
+- Start and End now use native `datetime-local` controls with second precision,
+  associated labels and shared site-timezone guidance; no new scripts or dependencies.
+- Only the form boundary normalizes native timestamps. The strict reporting period
+  contract, exclusive end, maximum duration, permissions and privacy rules are unchanged.
+  Existing space-separated timestamps remain accepted. No schema or migration changes.
+- PHPUnit: **973 tests, 2,269 assertions passed**, covering minute/second precision,
+  unchanged site-local timestamps and rejection of impossible dates, timezone offsets,
+  fractional seconds and invalid ranges. WPCS, PHP syntax (170 files) and diff checks passed.
+- Browser popup verification is pending: the local WordPress session expired and
+  requires sign-in. No mail was sent or settings changed.
+- Rollback restores the text inputs and removes form-boundary normalization; no data cleanup.

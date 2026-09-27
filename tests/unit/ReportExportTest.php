@@ -17,7 +17,7 @@ final class ReportExportTest extends TestCase {
 	protected function tearDown(): void {
 		(new ReflectionProperty(Plugin::class,'instance'))->setValue(null,null);
 		$GLOBALS['_test_current_user_can']=[];
-		unset($GLOBALS['wpdb']);
+		unset($GLOBALS['wpdb'], $GLOBALS['_test_timezone']);
 	}
 	private function input():array {
 		return ['_wpnonce'=>'valid-export-nonce','start'=>'2026-09-01 00:00:00','end'=>'2026-09-02 00:00:00','format'=>'json','provider_scope'=>'all','provider'=>''];
@@ -34,6 +34,10 @@ final class ReportExportTest extends TestCase {
 			[['format'=>'html'],'POST',400], [['format'=>[]],'POST',400], [['references'=>'0'],'POST',400], [['references'=>[]],'POST',400],
 			[['provider_scope'=>'bad'],'POST',400], [['provider_scope'=>'specific','provider'=>'smtp!'],'POST',400],
 			[['start'=>'2026-02-30 00:00:00'],'POST',400], [['end'=>'2028-01-01 00:00:00'],'POST',400], [['end'=>null],'POST',400],
+			[['start'=>'2026-02-30T00:00'],'POST',400], [['start'=>'2026-09-01T24:00'],'POST',400],
+			[['start'=>'2026-09-01T00:00:00Z'],'POST',400], [['start'=>'2026-09-01T00:00+08:00'],'POST',400],
+			[['start'=>'2026-09-01T00:00:00.123'],'POST',400], [['start'=>'2026-09-01'],'POST',400],
+			[['end'=>'2026-08-31T00:00'],'POST',400], [['end'=>'2028-01-01T00:00'],'POST',400],
 		];
 	}
 	public function test_wrong_capability_cannot_download_or_render():void {
@@ -50,7 +54,25 @@ final class ReportExportTest extends TestCase {
 		$this->assertStringContainsString('name="references" value="1"',$html);
 		$this->assertStringNotContainsString('checked',$html);
 		$this->assertStringContainsString('366 days',$html);
+		$this->assertSame(2,substr_count($html,'type="datetime-local" required step="1"'));
+		$this->assertMatchesRegularExpression('/id="report-start"[^>]+value="[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"/',$html);
+		$this->assertMatchesRegularExpression('/id="report-end"[^>]+value="[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"/',$html);
 		$this->assertSame([],$GLOBALS['wpdb']->queries);
+	}
+	/** @dataProvider pickerTimes */
+	public function test_picker_values_preserve_site_local_time(string $start,string $end,string $expectedStart,string $expectedEnd):void {
+		$GLOBALS['_test_timezone']='Asia/Manila';
+		Plugin::instance()->boot();
+		$GLOBALS['wpdb']->get_var_return='3';
+		$result=(new ReportExportController())->prepare(array_replace($this->input(),['start'=>$start,'end'=>$end]),'POST');
+		$data=json_decode($result['body'],true,512,JSON_THROW_ON_ERROR);
+		$this->assertSame(['start'=>$expectedStart,'end_exclusive'=>$expectedEnd,'timezone'=>'Asia/Manila'],$data['period']);
+	}
+	public static function pickerTimes():array {
+		return [
+			['2026-09-01T12:34','2026-09-02T12:34','2026-09-01 12:34:00','2026-09-02 12:34:00'],
+			['2026-09-01T12:34:56','2026-09-02T12:34:57','2026-09-01 12:34:56','2026-09-02 12:34:57'],
+		];
 	}
 	public function test_valid_empty_download_uses_snapshot_and_fixed_headers():void {
 		Plugin::instance()->boot();

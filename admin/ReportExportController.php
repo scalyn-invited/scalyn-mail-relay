@@ -52,7 +52,7 @@ final class ReportExportController {
 			$provider = $input['provider'];
 		}
 		try {
-			$period = new ReportPeriod( $input['start'], $input['end'] );
+			$period = new ReportPeriod( $this->normalize_local_datetime( $input['start'] ), $this->normalize_local_datetime( $input['end'] ) );
 		} catch ( \InvalidArgumentException $error ) {
 			throw new \RuntimeException( 'Invalid report options.', 400 );
 		}
@@ -73,6 +73,22 @@ final class ReportExportController {
 			'mime' => $types[ $input['format'] ],
 			'name' => 'scalyn-mail-relay-report.' . $input['format'],
 		);
+	}
+
+	/**
+	 * Converts native date-picker input to the existing site-local period format.
+	 *
+	 * @param string $value Submitted wall time; no timezone conversion is applied.
+	 * @return string Normalized timestamp, still subject to ReportPeriod validation.
+	 */
+	private function normalize_local_datetime( string $value ): string {
+		if ( preg_match( '/^[1-9][0-9]{3}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(?::[0-9]{2})?$/D', $value ) ) {
+			$value = str_replace( 'T', ' ', $value );
+			if ( 16 === strlen( $value ) ) {
+				$value .= ':00';
+			}
+		}
+		return $value;
 	}
 
 	/** Handles authenticated admin-post downloads and terminates the response. */
