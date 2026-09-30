@@ -56,6 +56,13 @@ final class HookNames {
 	public const MAIL_FAILED = 'scalyn_mail_relay_mail_failed';
 
 	/**
+	 * Fired when a request was attempted but provider acceptance cannot be established.
+	 * Consumers must not represent this as Accepted or Failed, or schedule an automatic retry.
+	 * Arguments: ( SendResult $result, MailMessage $message ).
+	 */
+	public const MAIL_OUTCOME_UNCONFIRMED = 'scalyn_mail_relay_mail_outcome_unconfirmed';
+
+	/**
 	 * Fired after a provider connection test completes (success or failure).
 	 *
 	 * Subscribers may use this for audit logging. The result indicates whether

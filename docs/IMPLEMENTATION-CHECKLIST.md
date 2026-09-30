@@ -1,13 +1,17 @@
 # Scalyn Mail Relay Implementation Checklist
 
-This checklist turns the platform roadmap into ten sequential milestones for a
-solo developer. Complete monitoring and client reporting on the existing SMTP
-foundation before expanding providers and delivery evidence.
+This checklist turns the platform roadmap into ten main milestones and two
+scheduled provider expansion stages for a solo developer. Complete monitoring
+and client reporting on the existing SMTP foundation before expanding providers
+and delivery evidence. Execute the expansion stages sequentially alongside the
+main roadmap as scheduled below; retain the existing milestone numbering.
 
 Owner: Bernie, sole project owner and developer across all modules, architecture,
 testing, review, integration, and release decisions.
 
 Created: 2026-09-16.
+
+Provider expansion schedule updated: 2026-09-27.
 
 ## Working rules
 
@@ -97,10 +101,10 @@ Outcome: client issues can be investigated and explained with stored evidence.
 
 Outcome: one API provider works through the same operational workflow as SMTP.
 
-- [ ] Select the first provider and define its supported message capabilities.
-- [ ] Implement provider-specific configuration, validation, and credential protection/replacement/removal.
-- [ ] Build the adapter behind `ProviderInterface`; review any required shared-contract changes deliberately.
-- [ ] Connect configuration, verification, test sending, and normal WordPress sending.
+- [x] Select SendGrid as the first Phase 2 API provider, as approved by Bernie. Supported-message targets, limitations, security boundaries and contract gaps are recorded in [ADR-0016](adr/0016-sendgrid-first-api-provider.md) and [ticket 1 scope](SENDGRID-PROVIDER-SCOPE.md). Detailed scope review remains outstanding.
+- [x] Implement SendGrid configuration, validation, encrypted credential storage and explicit keep/replace/remove actions. Separate server encryption key approved by Bernie; no adapter registration or SMTP change. See [ADR-0017](adr/0017-sendgrid-credential-protection.md) and [configuration/verification notes](SENDGRID-CONFIGURATION.md). Bernie reported browser QA complete on 2026-09-30; owner implementation review remains pending.
+- [x] Build the SendGrid adapter behind `ProviderInterface`; no shared-contract changes were needed for this isolated adapter. See [ticket 3 scope and verification](SENDGRID-ADAPTER.md). Registration and normal WordPress sending remain ticket 4.
+- [x] Connect configuration, sandbox verification, deliberate test sending, and normal WordPress sending through the SendGrid adapter. See [ticket 4 workflow and limitations](SENDGRID-WORKFLOW.md) and [ADR-0018](adr/0018-unconfirmed-provider-acceptance.md). Local automated checks passed; Bernie architecture review, browser QA and controlled live verification remain.
 - [ ] Normalize acceptance, failure, rate-limit, and ambiguous-outcome handling.
 - [ ] Preserve UUID correlation, safe logs, and timeline events.
 - [ ] Run equivalent provider-contract tests and live verification for SMTP and the API adapter.
@@ -110,6 +114,9 @@ Outcome: one API provider works through the same operational workflow as SMTP.
 
 Outcome: users can distinguish acceptance, confirmed delivery, and observed inbox placement.
 
+Use the first API provider from Milestone 7 to establish and verify the initial
+delivery/bounce integration before repeating the workflow for other providers.
+
 - [ ] Define provider-message correlation and out-of-band event contracts.
 - [ ] Implement webhook authentication, signature verification, replay protection, and duplicate-event handling.
 - [ ] Preserve delivery/bounce evidence alongside original send-attempt history.
@@ -118,6 +125,32 @@ Outcome: users can distinguish acceptance, confirmed delivery, and observed inbo
 - [ ] Introduce controlled message/header analysis and mailbox testing with explicit privacy boundaries.
 - [ ] Define deliverability assessment coverage, freshness, and scoring policy before displaying a numerical score.
 - [ ] Completion gate: every delivery or placement claim has supporting evidence; provider acceptance remains `Accepted`, and delivery confirmation alone does not imply inbox placement.
+
+## Provider expansion A — Remaining Phase 2 providers
+
+Schedule: after Milestone 8 and before Milestone 9. Complete the first provider's
+transport and delivery-evidence workflow before starting this stage. Bernie
+prioritises the remaining providers by managed-client needs; provider order is
+not yet decided. Implement one provider at a time, using the ticket sequence below.
+
+Outcome: all Phase 2 providers listed in the Technical Architecture are available
+as individually selectable transports with documented capabilities and evidence
+coverage. The provider completed in Milestones 7–8 counts toward this list and
+does not need a duplicate implementation.
+
+- [ ] Record the remaining Phase 2 provider order and create a separate ticket set for each provider.
+- [ ] Microsoft 365 — transport, evidence coverage and verification complete.
+- [ ] Google Workspace — transport, evidence coverage and verification complete.
+- [ ] SendGrid — transport, evidence coverage and verification complete.
+- [ ] Mailgun — transport, evidence coverage and verification complete.
+- [ ] Brevo — transport, evidence coverage and verification complete.
+- [ ] Postmark — transport, evidence coverage and verification complete.
+- [ ] SMTP2GO — transport, evidence coverage and verification complete.
+- [ ] Completion gate: each provider has linked implementation and live verification evidence, documented limitations and safe outcomes. Unsupported delivery evidence remains explicitly unavailable.
+
+Multiple saved configurations, message routing and automatic failover are
+scheduled in Milestone 9. They are not prerequisites for selecting one of these
+providers as the active transport.
 
 ## 9. Agency controls and transport recovery
 
@@ -132,6 +165,33 @@ Outcome: managed clients have appropriate access and recovery behavior is predic
 - [ ] Before implementing resend, choose source regeneration or explicitly authorised, short-lived payload storage; metadata-only logs cannot reconstruct messages.
 - [ ] Test routing decisions, permission boundaries, and duplicate-send prevention scenarios.
 - [ ] Completion gate: clients cannot alter locked settings, routing is predictable, and recovery safely handles ambiguous outcomes.
+
+## Provider expansion B — Phase 3 providers
+
+Schedule: after Milestone 9 and before Milestone 10. Reuse the verified provider,
+delivery-evidence and configuration contracts. Bernie sets the order according
+to managed-client demand, with one provider active in development at a time.
+
+- [ ] Record Phase 3 provider priority and create a separate ticket set for each provider.
+- [ ] Amazon SES — transport, evidence coverage and verification complete.
+- [ ] SparkPost — transport, evidence coverage and verification complete.
+- [ ] Mailjet — transport, evidence coverage and verification complete.
+- [ ] Zoho Mail — transport, evidence coverage and verification complete.
+- [ ] Verify each adapter with Milestone 9's configuration attribution, routing and recovery controls, including provider-specific limitations and duplicate-send prevention.
+- [ ] Completion gate: all Phase 3 adapters meet the shared provider acceptance criteria and have linked implementation, security and live verification evidence.
+
+## Ticket sequence for each additional provider
+
+Repeat this sequence for each provider in expansion A and B. Use one focused
+branch and pull request per ticket. A provider checkbox above is a completion
+summary; check it only after its ticket set and verification are complete.
+
+- [ ] Ticket 1: define supported authentication, message formats, recipients, attachments, service limits and available delivery/bounce evidence; record any shared-contract decisions.
+- [ ] Ticket 2: implement configuration, validation, credential protection and replacement/removal; include OAuth refresh and revocation where applicable.
+- [ ] Ticket 3: implement the adapter behind `ProviderInterface` and connect verification, test sending and normal WordPress sending.
+- [ ] Ticket 4: normalize acceptance, failure, rate limits and ambiguous outcomes; preserve UUID correlation, safe logs, timelines and audit attribution.
+- [ ] Ticket 5: integrate supported delivery/bounce evidence through Milestone 8's contracts, with authentication, replay protection and deduplication; explicitly document unavailable evidence.
+- [ ] Ticket 6: run shared provider-contract tests, security/failure scenarios and controlled live verification; check routing/recovery compatibility where Milestone 9 applies, and record release evidence and limitations.
 
 ## 10. Multisite, cloud monitoring, and AI
 

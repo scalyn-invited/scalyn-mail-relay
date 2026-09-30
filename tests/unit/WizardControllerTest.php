@@ -6,6 +6,7 @@ use Scalyn\MailRelay\Core\Capabilities;
 use Scalyn\MailRelay\Core\Plugin;
 use Scalyn\MailRelay\Core\ProviderRegistry;
 use Scalyn\MailRelay\Core\SettingsRepository;
+use Scalyn\MailRelay\Core\CredentialCipher;
 use Scalyn\MailRelay\Mail\MailDispatcher;
 use Scalyn\MailRelay\Mail\MailMessage;
 use Scalyn\MailRelay\Mail\SendResult;
@@ -27,6 +28,7 @@ final class WizardTestProvider implements ProviderInterface {
 
 	/** Records the config passed to validate_config(). */
 	public array $last_validate_config = array();
+	public array $last_connection_config = array();
 
 	/** Records the message passed to send(). */
 	public ?MailMessage $last_sent_message = null;
@@ -47,6 +49,7 @@ final class WizardTestProvider implements ProviderInterface {
 	}
 
 	public function test_connection( array $config ): ConnectionResult {
+		$this->last_connection_config = $config;
 		return $this->connection_result ?? new ConnectionResult( true, 'Connection OK.' );
 	}
 
@@ -93,6 +96,7 @@ final class WizardControllerTest extends TestCase {
 
 	private WizardTestProvider $provider;
 	private ProviderRegistry $registry;
+	private CredentialCipher $cipher;
 
 	protected function setUp(): void {
 		// Reset Plugin singleton so each test gets a fresh Container.
@@ -118,17 +122,19 @@ final class WizardControllerTest extends TestCase {
 		$this->provider = new WizardTestProvider();
 		$this->registry = new ProviderRegistry();
 		$this->registry->register( $this->provider );
+		$this->cipher = new CredentialCipher( base64_encode( str_repeat( 'x', 32 ) ) );
 
 		// Pre-populate the fresh container with our stubs.
 		$container    = Plugin::instance()->container();
 		$registry_ref = $this->registry;
 		$container->set( ProviderRegistry::class, $this->registry );
 		// SettingsRepository factory so each get() produces a fresh instance.
-		$container->set( SettingsRepository::class, static fn() => new SettingsRepository() );
+		$cipher_ref = $this->cipher;
+		$container->set( SettingsRepository::class, static fn() => new SettingsRepository( $cipher_ref ) );
 		// MailDispatcher constructed with our stub registry and fresh settings.
 		$container->set(
 			MailDispatcher::class,
-			static fn() => new MailDispatcher( $registry_ref, new SettingsRepository() )
+			static fn() => new MailDispatcher( $registry_ref, new SettingsRepository( $cipher_ref ) )
 		);
 	}
 
@@ -166,6 +172,68 @@ final class WizardControllerTest extends TestCase {
 		} catch ( WpRedirectException $e ) { // phpcs:ignore Generic.CodeAnalysis.EmptyStatement.DetectedCatch
 			// Expected — redirect occurred; test asserts on $GLOBALS['_test_wp_redirect'].
 		}
+	}
+
+	private function configure_sendgrid(): WizardTestProvider {
+		$sendgrid = new WizardTestProvider();
+		$sendgrid->id = 'sendgrid';
+		$this->registry->register( $sendgrid );
+		$settings = new SettingsRepository( $this->cipher );
+		$settings->save_sendgrid(
+			array(
+				'key_action' => 'replace',
+				'api_key' => 'SG.synthetic_test_credential_0123456789',
+				'from_email' => 'verified@example.com',
+				'from_name' => 'Scalyn, Studio',
+			),
+			$this->cipher
+		);
+		$settings->save( array( 'provider' => array( 'active' => 'sendgrid' ) ) );
+		return $sendgrid;
+	}
+
+	public function test_sendgrid_wizard_uses_encrypted_config_and_its_own_sender(): void {
+		$sendgrid = $this->configure_sendgrid();
+		$this->post_step( 3 );
+		$this->run_handle();
+		$this->assertStringContainsString( 'step=4', (string) $this->get_redirect() );
+		$this->assertSame( 'SG.synthetic_test_credential_0123456789', $sendgrid->last_validate_config['api_key'] );
+		$this->assertSame( '', ( new SettingsRepository() )->get_smtp_config()['host'] );
+
+		$this->post_step( 4 );
+		$this->run_handle();
+		$this->assertSame( 'SG.synthetic_test_credential_0123456789', $sendgrid->last_connection_config['api_key'] );
+		$this->assertTrue( ( new SettingsRepository() )->is_provider_verified() );
+
+		$sendgrid->send_result = new SendResult( true, 'sendgrid', null, '202', 'Accepted by SendGrid.' );
+		$this->post_step( 5, array( 'test_recipient' => 'inbox@example.com' ) );
+		$this->run_handle();
+		$this->assertSame( 'verified@example.com', $sendgrid->last_sent_message->from );
+		$this->assertSame( 'inbox@example.com', $sendgrid->last_sent_message->to[0] );
+		$this->assertTrue( ( new SettingsRepository() )->has_accepted_test_email() );
+		$this->assertStringNotContainsString( 'SG.synthetic_test_credential', json_encode( get_transient( 'scalyn_wizard_email_1' ) ) );
+	}
+
+	public function test_sendgrid_wizard_rejects_unreadable_key_before_verification(): void {
+		$sendgrid = $this->configure_sendgrid();
+		$container = Plugin::instance()->container();
+		$container->set( SettingsRepository::class, static fn() => new SettingsRepository( new CredentialCipher( base64_encode( str_repeat( 'z', 32 ) ) ) ) );
+		$this->post_step( 3 );
+		$this->run_handle();
+		$this->assertStringContainsString( 'step=3', (string) $this->get_redirect() );
+		$this->assertSame( array( 'sendgrid' ), get_transient( 'scalyn_wizard_step3_errors_1' ) );
+		$this->assertSame( array(), $sendgrid->last_validate_config );
+	}
+
+	public function test_sendgrid_unconfirmed_test_email_is_not_audited_as_failed(): void {
+		$sendgrid = $this->configure_sendgrid();
+		$sendgrid->send_result = new SendResult( false, 'sendgrid', null, null, 'Acceptance unconfirmed.', false, 'unknown', array(), true );
+		$events = array();
+		$GLOBALS['_test_wp_actions'][\Scalyn\MailRelay\Core\HookNames::AUDIT_EVENT] = static function( $event ) use ( &$events ): void { $events[] = $event->outcome; };
+		$this->post_step( 5, array( 'test_recipient' => 'inbox@example.com' ) );
+		$this->run_handle();
+		$this->assertSame( array( 'started', 'unconfirmed' ), $events );
+		$this->assertFalse( ( new SettingsRepository() )->has_accepted_test_email() );
 	}
 
 	// -------------------------------------------------------------------------

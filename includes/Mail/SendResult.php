@@ -28,6 +28,7 @@ final class SendResult {
 	 * @param bool        $retryable           Whether a transient failure may succeed on retry.
 	 * @param string|null $failure_category    Failure classification: 'auth', 'config', 'network', 'bounce', etc.
 	 * @param array       $metadata            Optional supplemental data. Must not contain credentials or secrets.
+	 * @param bool        $acceptance_unconfirmed True when the request may have reached the provider but no acknowledgement was observed.
 	 */
 	public function __construct(
 		public readonly bool $success,
@@ -37,6 +38,7 @@ final class SendResult {
 		public readonly ?string $response_message = null,
 		public readonly bool $retryable = false,
 		public readonly ?string $failure_category = null,
-		public readonly array $metadata = array()
+		public readonly array $metadata = array(),
+		public readonly bool $acceptance_unconfirmed = false
 	) {}
 }

@@ -19,7 +19,7 @@ final readonly class AuditEvent {
 	 */
 	public AuditActor $actor;
 
-	public const FIELDS = array( 'provider.active', 'smtp.host', 'smtp.port', 'smtp.encryption', 'smtp.username', 'smtp.password', 'smtp.from_name', 'smtp.from_email', 'advanced.log_retention_days', 'advanced.delete_data_on_uninstall', 'advanced.diagnostic_schedule', 'advanced.alert_webhook_enabled', 'advanced.dkim_selector' );
+	public const FIELDS = array( 'provider.active', 'smtp.host', 'smtp.port', 'smtp.encryption', 'smtp.username', 'smtp.password', 'smtp.from_name', 'smtp.from_email', 'sendgrid.api_key', 'sendgrid.from_name', 'sendgrid.from_email', 'advanced.log_retention_days', 'advanced.delete_data_on_uninstall', 'advanced.diagnostic_schedule', 'advanced.alert_webhook_enabled', 'advanced.dkim_selector' );
 
 	private const OUTCOMES = array(
 		'report_export'            => array( 'started', 'prepared', 'failed' ),
@@ -29,7 +29,7 @@ final readonly class AuditEvent {
 		'retention_changed'        => array( 'changed' ),
 		'uninstall_policy_changed' => array( 'changed' ),
 		'provider_verification'    => array( 'started', 'verified', 'failed' ),
-		'test_email'               => array( 'started', 'accepted', 'failed' ),
+		'test_email'               => array( 'started', 'accepted', 'failed', 'unconfirmed' ),
 		'diagnostic_run'           => array( 'started', 'completed', 'failed' ),
 	);
 

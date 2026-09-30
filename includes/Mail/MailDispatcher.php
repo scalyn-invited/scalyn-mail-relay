@@ -69,11 +69,23 @@ final class MailDispatcher {
 		}
 
 		$provider = $this->registry->get( $provider_id );
-		$config   = $this->settings->get_provider_config( $provider_id );
-		$result   = $provider->send( $message, $config );
+		try {
+			$config = $this->settings->get_provider_config( $provider_id );
+		} catch ( \Throwable $error ) {
+			$result = new SendResult( false, $provider_id, null, null, 'Stored provider credentials are unavailable. Replace the key in Providers.', false, 'config' );
+			do_action( HookNames::MAIL_FAILED, $result, $message );
+			return $result;
+		}
+		try {
+			$result = $provider->send( $message, $config );
+		} catch ( \Throwable $error ) {
+			$result = new SendResult( false, $provider_id, null, null, 'Provider acceptance is unconfirmed. Check provider activity before retrying.', false, 'unknown', array(), true );
+		}
 
 		if ( $result->success ) {
 			do_action( HookNames::MAIL_SENT, $result, $message );
+		} elseif ( $result->acceptance_unconfirmed ) {
+			do_action( HookNames::MAIL_OUTCOME_UNCONFIRMED, $result, $message );
 		} else {
 			do_action( HookNames::MAIL_FAILED, $result, $message );
 		}

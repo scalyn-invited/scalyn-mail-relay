@@ -6,6 +6,12 @@ if ( ! function_exists( 'wp_verify_nonce' ) ) {
 	}
 }
 
+if ( ! function_exists( 'is_wp_error' ) ) {
+	function is_wp_error( mixed $value ): bool {
+		return $value instanceof \WP_Error;
+	}
+}
+
 // Filter support for custom cron schedules. Kept separate from action assertions.
 function submit_button(string $text='Save Changes'):void {echo '<p><button type="submit">'.esc_html($text).'</button></p>';}
 function checked(mixed $checked, mixed $current=true, bool $display=true):string {

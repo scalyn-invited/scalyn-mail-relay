@@ -93,8 +93,10 @@ final class SettingsRepository {
 
 	/**
 	 * Loads settings from the database and merges with defaults.
+	 *
+	 * @param CredentialCipher|null $cipher Optional credential service for transport use.
 	 */
-	public function __construct() {
+	public function __construct( private readonly ?CredentialCipher $cipher = null ) {
 		$stored     = get_option( self::OPTION_KEY, array() );
 		$this->data = is_array( $stored )
 			? array_replace_recursive( self::DEFAULTS, $stored )
@@ -197,8 +199,101 @@ final class SettingsRepository {
 		if ( 'smtp' === $provider_id ) {
 			return $this->get_smtp_config();
 		}
+		if ( 'sendgrid' === $provider_id ) {
+			$config = $this->data['sendgrid'] ?? array();
+			$stored = $config['key_cipher'] ?? '';
+			if ( ! is_string( $stored ) || '' === $stored ) {
+				return array();
+			}
+			return array(
+				'api_key'    => ( $this->cipher ?? new CredentialCipher() )->decrypt( $stored ),
+				'from_email' => $config['from_email'] ?? '',
+				'from_name'  => $config['from_name'] ?? '',
+			);
+		}
 
 		return array();
+	}
+
+	/**
+	 * Credential-free SendGrid configuration for Admin.
+	 *
+	 * @return array Public configuration and credential presence only.
+	 */
+	public function get_sendgrid_settings(): array {
+		$config = $this->data['sendgrid'] ?? array();
+		return array(
+			'from_email' => is_string( $config['from_email'] ?? null ) ? sanitize_email( $config['from_email'] ) : '',
+			'from_name'  => is_string( $config['from_name'] ?? null ) ? sanitize_text_field( $config['from_name'] ) : '',
+			'has_key'    => ! empty( $config['key_cipher'] ),
+		);
+	}
+
+	/**
+	 * Saves SendGrid configuration, with explicit credential intent.
+	 *
+	 * @param array            $input Strictly validated configuration and action.
+	 * @param CredentialCipher $cipher Credential protection service.
+	 * @return bool Whether the desired settings were persisted (including no-op).
+	 * @throws \InvalidArgumentException When input is invalid.
+	 */
+	public function save_sendgrid( #[\SensitiveParameter] array $input, CredentialCipher $cipher ): bool {
+		$action = $input['key_action'] ?? null;
+		$secret = $input['api_key'] ?? '';
+		$email  = $input['from_email'] ?? null;
+		$name   = $input['from_name'] ?? null;
+		if ( ! in_array( $action, array( 'keep', 'replace', 'remove' ), true ) || ! is_string( $secret )
+			|| ! is_string( $email ) || strlen( $email ) > 254 || ! filter_var( $email, FILTER_VALIDATE_EMAIL )
+			|| ! is_string( $name ) || strlen( $name ) > 200 || preg_match( '/[\r\n\x00]/', $name )
+			|| ( 'replace' !== $action && '' !== $secret )
+			|| ( 'replace' === $action && ( strlen( $secret ) < 16 || strlen( $secret ) > 512 || ! preg_match( '/^[A-Za-z0-9._-]+$/D', $secret ) ) )
+			|| ( 'remove' === $action && true !== ( $input['confirm_remove'] ?? false ) ) ) {
+			throw new \InvalidArgumentException( 'Invalid SendGrid settings. No changes were saved.' );
+		}
+		$before = $this->data;
+		$old    = $before['sendgrid'] ?? array();
+		$stored = $old['key_cipher'] ?? '';
+		if ( 'replace' === $action ) {
+			$stored = $cipher->encrypt( $secret );
+		} elseif ( 'remove' === $action ) {
+			$stored = '';
+		} elseif ( ! is_string( $stored ) || '' === $stored ) {
+			throw new \InvalidArgumentException( 'Provide a new API key using Replace.' );
+		} else {
+			$cipher->decrypt( $stored );
+		}
+		$config = array(
+			'from_email' => $email,
+			'from_name'  => sanitize_text_field( $name ),
+			'key_cipher' => $stored,
+		);
+		if ( $config === $old ) {
+			return true;
+		}
+		$next             = $before;
+		$next['sendgrid'] = $config;
+		if ( 'sendgrid' === $this->get_active_provider_id() ) {
+			$next['provider']['verified']               = false;
+			$next['provider']['verified_at']            = null;
+			$next['provider']['test_email_accepted_at'] = null;
+		}
+		if ( ! update_option( self::OPTION_KEY, $next ) ) {
+			return false;
+		}
+		$this->data = $next;
+		$fields     = array();
+		foreach ( array( 'from_email', 'from_name', 'key_cipher' ) as $field ) {
+			if ( ( $old[ $field ] ?? null ) !== $config[ $field ] ) {
+				$fields[] = 'sendgrid.' . ( 'key_cipher' === $field ? 'api_key' : $field );
+			}
+		}
+		try {
+			do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'settings_changed', 'changed', '', $fields ) );
+		} catch ( \Throwable $error ) {
+			// Audit observer failure must not repeat or undo an already saved credential.
+			return true;
+		}
+		return true;
 	}
 
 	/**
@@ -264,7 +359,12 @@ final class SettingsRepository {
 		$sanitized  = $this->sanitize( $new_settings );
 		$before     = $this->data;
 		$this->data = array_replace_recursive( $this->data, $sanitized );
-		$saved      = update_option( self::OPTION_KEY, $this->data );
+		if ( isset( $sanitized['provider']['active'] ) && ( $before['provider']['active'] ?? '' ) !== $sanitized['provider']['active'] ) {
+			$this->data['provider']['verified']               = false;
+			$this->data['provider']['verified_at']            = null;
+			$this->data['provider']['test_email_accepted_at'] = null;
+		}
+		$saved = update_option( self::OPTION_KEY, $this->data );
 		if ( ! $saved ) {
 			$this->data = $before;
 		}
