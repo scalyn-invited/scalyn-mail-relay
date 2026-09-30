@@ -25,6 +25,19 @@ final class SettingsRepositoryTest extends TestCase {
 		$this->assertSame( 'smtp', $repo->get_active_provider_id() );
 	}
 
+	public function test_switching_provider_resets_old_verification_and_test_email(): void {
+		$repo = new SettingsRepository();
+		$repo->save( array( 'provider' => array( 'active' => 'smtp' ) ) );
+		$repo->mark_test_email_accepted();
+		$this->assertTrue( $repo->has_accepted_test_email() );
+		$repo->save( array( 'provider' => array( 'active' => 'sendgrid' ) ) );
+		$fresh = new SettingsRepository();
+		$this->assertSame( 'sendgrid', $fresh->get_active_provider_id() );
+		$this->assertFalse( $fresh->is_provider_verified() );
+		$this->assertNull( $fresh->get_provider_verified_at() );
+		$this->assertFalse( $fresh->has_accepted_test_email() );
+	}
+
 	public function test_smtp_config_returns_defaults_when_nothing_stored(): void {
 		$repo = new SettingsRepository();
 		$smtp = $repo->get_smtp_config();

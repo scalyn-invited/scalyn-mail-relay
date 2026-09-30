@@ -141,12 +141,23 @@ final class WizardController {
 		}
 
 		check_admin_referer( 'scalyn_wizard_step3' );
+		$settings = $this->get_settings();
+		if ( 'sendgrid' === $settings->get_active_provider_id() ) {
+			try {
+				$valid = $this->get_registry()->get( 'sendgrid' )->validate_config( $settings->get_provider_config( 'sendgrid' ) )->valid;
+			} catch ( \Throwable $error ) {
+				$valid = false;
+			}
+			if ( ! $valid ) {
+				set_transient( $this->transient_key( 'step3_errors' ), array( 'sendgrid' ), self::TRANSIENT_TTL );
+			}
+			wp_safe_redirect( $this->step_url( $valid ? 4 : 3 ) );
+			exit;
+		}
 
 		// phpcs:disable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- fields are sanitized individually below.
 		$smtp_post = isset( $_POST['smtp'] ) && is_array( $_POST['smtp'] ) ? wp_unslash( $_POST['smtp'] ) : array();
 		// phpcs:enable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
-
-		$settings = $this->get_settings();
 
 		// Build the effective config for validation. When the submitted password
 		// is blank, substitute the currently stored password so that
@@ -229,8 +240,8 @@ final class WizardController {
 		}
 
 		$provider = $registry->get( $provider_id );
-		$config   = $settings->get_provider_config( $provider_id );
 		try {
+			$config = $settings->get_provider_config( $provider_id );
 			$result = $provider->test_connection( $config );
 		} catch ( \Throwable $error ) {
 			$result = new ConnectionResult( false, __( 'The connection test could not complete. Check your provider configuration.', 'scalyn-mail-relay' ) );
@@ -296,12 +307,13 @@ final class WizardController {
 		}
 
 		$settings    = $this->get_settings();
-		$smtp_config = $settings->get_smtp_config();
-		$from_email  = (string) ( $smtp_config['from_email'] ?? '' );
-		$from_name   = (string) ( $smtp_config['from_name'] ?? '' );
-		$from        = '' !== $from_name
+		$provider_id = $settings->get_active_provider_id();
+		$sender      = 'sendgrid' === $provider_id ? $settings->get_sendgrid_settings() : $settings->get_smtp_config();
+		$from_email  = (string) ( $sender['from_email'] ?? '' );
+		$from_name   = (string) ( $sender['from_name'] ?? '' );
+		$from        = 'sendgrid' === $provider_id ? $from_email : ( '' !== $from_name
 			? $from_name . ' <' . $from_email . '>'
-			: $from_email;
+			: $from_email );
 
 		$message = new MailMessage(
 			uuid:    wp_generate_uuid4(),
@@ -309,7 +321,7 @@ final class WizardController {
 			to:      array( $recipient ),
 			subject: __( 'Scalyn Mail Relay — Test Email', 'scalyn-mail-relay' ),
 			body:    '<p>' . esc_html__( 'This is a test email sent from the Scalyn Mail Relay Setup Wizard.', 'scalyn-mail-relay' ) . '</p>'
-				. '<p>' . esc_html__( 'If you received this message, your SMTP server accepted the test email.', 'scalyn-mail-relay' ) . '</p>',
+				. '<p>' . esc_html__( 'If you received this message, your configured provider accepted the test email.', 'scalyn-mail-relay' ) . '</p>',
 			content_type: 'text/html',
 			context: array(
 				'source' => 'wizard_test',
@@ -319,8 +331,9 @@ final class WizardController {
 
 		$dispatcher = $this->get_dispatcher();
 		do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'test_email', 'started', $message->uuid ) );
-		$result = $dispatcher->dispatch( $message );
-		do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'test_email', $result->success ? 'accepted' : 'failed', $message->uuid ) );
+		$result        = $dispatcher->dispatch( $message );
+		$audit_outcome = $result->success ? 'accepted' : ( $result->acceptance_unconfirmed ? 'unconfirmed' : 'failed' );
+		do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'test_email', $audit_outcome, $message->uuid ) );
 
 		// Persist test-email completion separately from connection verification so
 		// the Dashboard can represent the setup steps accurately.
@@ -329,8 +342,8 @@ final class WizardController {
 		}
 
 		$safe_message = $result->success
-			? __( 'The configured SMTP server accepted the test email. This does not confirm recipient delivery or SPF/DKIM authentication. Check your inbox to confirm receipt; if missing, check Spam/Junk and provider delivery logs or bounce reports.', 'scalyn-mail-relay' )
-			: (string) ( $result->response_message ?? __( 'The test email could not be sent. Check your SMTP configuration.', 'scalyn-mail-relay' ) );
+			? __( 'The configured provider accepted the test email. This does not confirm recipient delivery or SPF/DKIM authentication. Check your inbox to confirm receipt; if missing, check Spam/Junk and provider delivery logs or bounce reports.', 'scalyn-mail-relay' )
+			: (string) ( $result->response_message ?? __( 'The test email could not be sent. Check your provider configuration.', 'scalyn-mail-relay' ) );
 
 		// @security Store only normalized boolean and safe message string.
 		set_transient(

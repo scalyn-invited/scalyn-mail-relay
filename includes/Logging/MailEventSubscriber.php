@@ -61,6 +61,30 @@ final class MailEventSubscriber {
 	public function register(): void {
 		add_action( HookNames::MAIL_SENT, array( $this, 'on_mail_sent' ), 10, 2 );
 		add_action( HookNames::MAIL_FAILED, array( $this, 'on_mail_failed' ), 10, 2 );
+		add_action( HookNames::MAIL_OUTCOME_UNCONFIRMED, array( $this, 'on_mail_unconfirmed' ), 10, 2 );
+	}
+
+	/**
+	 * Records a prepared request without claiming provider acceptance or failure.
+	 *
+	 * @param SendResult  $result Safe normalized unconfirmed outcome.
+	 * @param MailMessage $message Correlated message.
+	 */
+	public function on_mail_unconfirmed( SendResult $result, MailMessage $message ): void {
+		try {
+			$this->log_repo->upsert( $message, $result, MailStatus::PREPARED );
+			$this->timeline_repo->insert_event(
+				$message->uuid,
+				'mail_outcome_unconfirmed',
+				MailStatus::PREPARED,
+				__( 'Provider acceptance unconfirmed', 'scalyn-mail-relay' ),
+				$result->response_message,
+				$this->build_failed_event_data( $result )
+			);
+		} catch ( \Throwable $error ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Class only, no provider response or credential material.
+			error_log( 'Scalyn Mail Relay: unconfirmed mail log persistence failed: ' . get_class( $error ) );
+		}
 	}
 
 	/**

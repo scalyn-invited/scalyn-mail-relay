@@ -29,6 +29,7 @@ use Scalyn\MailRelay\Logging\MailRetentionRepository;
 use Scalyn\MailRelay\Logging\TimelineRepository;
 use Scalyn\MailRelay\Mail\FailureClassifier;
 use Scalyn\MailRelay\Mail\MailDispatcher;
+use Scalyn\MailRelay\Mail\WordPressMailBridge;
 use Scalyn\MailRelay\Rest\DiagnosticsRunEndpoint;
 
 defined( 'ABSPATH' ) || exit;
@@ -115,7 +116,8 @@ final class Plugin {
 		$this->container->set( AuditRepository::class, static fn(): AuditRepository => new AuditRepository() );
 		$this->container->set( AuditRecorder::class, static fn( Container $c ): AuditRecorder => new AuditRecorder( $c->get( AuditRepository::class ) ) );
 		$this->container->set( AdminMenu::class, static fn(): AdminMenu => new AdminMenu() );
-		$this->container->set( SettingsRepository::class, static fn(): SettingsRepository => new SettingsRepository() );
+		$this->container->set( CredentialCipher::class, static fn(): CredentialCipher => new CredentialCipher() );
+		$this->container->set( SettingsRepository::class, static fn( Container $c ): SettingsRepository => new SettingsRepository( $c->get( CredentialCipher::class ) ) );
 		$this->container->set( ProviderRegistry::class, static fn(): ProviderRegistry => new ProviderRegistry() );
 		$this->container->set(
 			MailDispatcher::class,
@@ -124,6 +126,7 @@ final class Plugin {
 				$c->get( SettingsRepository::class )
 			)
 		);
+		$this->container->set( WordPressMailBridge::class, static fn( Container $c ): WordPressMailBridge => new WordPressMailBridge( $c->get( SettingsRepository::class ), $c->get( MailDispatcher::class ) ) );
 
 		$this->container->set( MailLogRepository::class, static fn(): MailLogRepository => new MailLogRepository() );
 		$this->container->set( MailRetentionRepository::class, static fn(): MailRetentionRepository => new MailRetentionRepository() );
@@ -194,6 +197,7 @@ final class Plugin {
 		// Mail logging hooks run on every request (not only admin) because mail
 		// can be dispatched from frontend, REST, WP-CLI, and cron contexts.
 		$this->container->get( MailEventSubscriber::class )->register();
+		$this->container->get( WordPressMailBridge::class )->register();
 		$this->container->get( AuditRecorder::class )->register();
 		$this->container->get( RetentionService::class )->register();
 		$this->container->get( DiagnosticSchedule::class )->register();

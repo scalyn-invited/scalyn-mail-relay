@@ -133,6 +133,19 @@ final class MailEventSubscriberTest extends TestCase {
 		$this->assertArrayHasKey( HookNames::MAIL_FAILED, $GLOBALS['_test_wp_added_actions'] );
 	}
 
+	public function test_unconfirmed_send_is_logged_as_prepared_not_failed(): void {
+		$this->wpdb->get_var_return = null;
+		$result = new SendResult( false, 'sendgrid', null, null, 'Acceptance unconfirmed.', false, 'unknown', array(), true );
+		$this->make_subscriber()->on_mail_unconfirmed( $result, $this->make_message() );
+		$logs = $this->inserts_for_table( 'mail_logs' );
+		$this->assertSame( MailStatus::PREPARED, $logs[0]['status'] );
+		$this->assertNull( $logs[0]['failed_at'] );
+		$this->assertNull( $logs[0]['sent_at'] );
+		$timeline = $this->inserts_for_table( 'mail_timeline' );
+		$this->assertSame( 'mail_outcome_unconfirmed', $timeline[0]['event_type'] );
+		$this->assertSame( MailStatus::PREPARED, $timeline[0]['event_status'] );
+	}
+
 	public function test_register_mail_sent_action_accepts_two_arguments(): void {
 		$this->make_subscriber()->register();
 

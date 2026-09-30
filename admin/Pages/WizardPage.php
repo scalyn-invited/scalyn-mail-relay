@@ -71,6 +71,7 @@ final class WizardPage {
 			// 'password' deliberately omitted — never passed to template.
 		);
 		$smtp_has_password = '' !== (string) $smtp_raw['password'];
+		$sendgrid_settings = $settings->get_sendgrid_settings();
 
 		// Step 3 validation errors (from previous failed POST).
 		$step3_errors = $this->consume_transient( 'step3_errors' );
@@ -132,12 +133,19 @@ final class WizardPage {
 			return 2;
 		}
 
-		// Step 3: Check if SMTP credentials are configured.
-		$smtp = $settings->get_smtp_config();
-		if ( '' === trim( $smtp['host'] ?? '' )
-			|| 0 === absint( $smtp['port'] ?? 0 )
-			|| '' === trim( $smtp['from_email'] ?? '' ) ) {
-			return 3;
+		// Step 3: The selected provider must have its own configuration.
+		if ( 'sendgrid' === $active_provider_id ) {
+			$sendgrid = $settings->get_sendgrid_settings();
+			if ( ! $sendgrid['has_key'] || '' === $sendgrid['from_email'] ) {
+				return 3;
+			}
+		} else {
+			$smtp = $settings->get_smtp_config();
+			if ( '' === trim( $smtp['host'] ?? '' )
+				|| 0 === absint( $smtp['port'] ?? 0 )
+				|| '' === trim( $smtp['from_email'] ?? '' ) ) {
+				return 3;
+			}
 		}
 
 		// Step 4: Check if connection has been verified.

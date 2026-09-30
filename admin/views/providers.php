@@ -15,6 +15,7 @@ $wizard_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 <div class="wrap scalyn-mail-relay">
 	<h1><?php esc_html_e( 'Providers', 'scalyn-mail-relay' ); ?></h1>
 	<p class="scalyn-lead"><?php esc_html_e( 'Registered mail transport providers.', 'scalyn-mail-relay' ); ?></p>
+	<p class="description"><?php esc_html_e( 'Saved settings are not proof of provider authorization, message acceptance, or delivery. Verify the selected provider in the Setup Wizard.', 'scalyn-mail-relay' ); ?></p>
 
 	<?php if ( empty( $providers ) ) : ?>
 		<div class="scalyn-card">
@@ -38,11 +39,16 @@ $wizard_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 				<tbody>
 					<?php foreach ( $providers as $p ) : ?>
 						<tr>
-							<td><strong><?php echo esc_html( $p['label'] ); ?></strong></td>
+							<td>
+								<strong><?php echo esc_html( $p['label'] ); ?></strong>
+								<?php if ( $p['is_active'] ) : ?>
+									<span class="scalyn-badge scalyn-badge--connected"><?php esc_html_e( 'Active', 'scalyn-mail-relay' ); ?></span>
+								<?php endif; ?>
+							</td>
 							<td><code><?php echo esc_html( $p['id'] ); ?></code></td>
 							<td>
 								<?php if ( $p['configured'] ) : ?>
-									<span class="scalyn-badge scalyn-badge--connected"><?php esc_html_e( 'Configured', 'scalyn-mail-relay' ); ?></span>
+									<span class="scalyn-badge scalyn-badge--connected"><?php esc_html_e( 'Settings saved', 'scalyn-mail-relay' ); ?></span>
 								<?php else : ?>
 									<span class="scalyn-badge scalyn-badge--disconnected"><?php esc_html_e( 'Not configured', 'scalyn-mail-relay' ); ?></span>
 								<?php endif; ?>
@@ -58,4 +64,5 @@ $wizard_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 			</table>
 		</div>
 	<?php endif; ?>
+	<?php $sendgrid_form->render(); ?>
 </div>
