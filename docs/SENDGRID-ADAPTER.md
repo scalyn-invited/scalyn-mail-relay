@@ -11,7 +11,8 @@ remains a later ticket. No real message was sent while building this adapter.
 - One request per `MailMessage`, using a fixed global HTTPS endpoint and WordPress
   safe HTTP transport. TLS verification and unsafe-URL protection are enabled;
   redirects are disabled, timeout is 15 seconds and response reading is capped
-  at 1,024 bytes. The response body is discarded.
+  at 1,024 bytes. Ticket 5 recognizes an exact credits-restriction signal before
+  discarding the body; raw response content is never retained.
 - The supplied configuration must contain the decrypted `api_key`, configured
   `from_email` and optional `from_name`. Local validation makes no HTTP request.
   A message's sender address must match the configured address; the message's
@@ -39,18 +40,20 @@ remains a later ticket. No real message was sent while building this adapter.
 `test_connection()` posts a synthetic sandbox request. HTTP 200 means SendGrid
 validated that request's shape; no real email or delivery claim follows. A normal
 send succeeds only on HTTP 202 and yields `Accepted` through `SendResult`.
-The adapter does not parse or retain provider response bodies or raw exceptions.
+The adapter never retains provider response bodies or raw exceptions. Ticket 5
+parses bounded JSON only to recognize an exact allowlisted account restriction.
 HTTP authorization failures, rate limits and other responses return fixed safe
 guidance. Network errors and missing responses are described as unconfirmed.
 
 The current `SendResult` has a boolean success field and downstream failure
 consumers. Ticket 4 added the minimal safe unconfirmed-outcome path required
-before registration; ticket 5 must complete the broader certainty review. An
+before registration; [ticket 5](SENDGRID-OUTCOMES.md) completes the broader certainty rules. An
 ambiguous network result is never presented as a proven rejection or
 automatically retried. Provider message identifiers,
 logging and timeline correlation remain tickets 5–6. Event webhooks remain
-Milestone 8. SMTP continues to skip CC/BCC/Reply-To; this ticket does not claim
-feature parity or change SMTP behavior.
+Milestone 8. SMTP skipped CC/BCC/Reply-To at ticket 3; ticket 7 now preserves
+those roles and rejects unsupported input before sending. See the
+[current parity and live verification notes](MILESTONE-7-VERIFICATION.md).
 
 ## Verification and dependencies
 

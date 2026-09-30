@@ -47,9 +47,9 @@ with fixed safe messages. A request with no observed HTTP response is recorded
 as `Prepared` plus an `acceptance unconfirmed` timeline event, never as proven
 `Accepted` or `Failed`, and is not automatically retried. See [ADR-0018](adr/0018-unconfirmed-provider-acceptance.md).
 
-Ticket 5 still owns full normalization of API failure categories, rate limits
-and certainty. Ticket 6 owns expanded UUID/log/audit attribution; ticket 7 owns
-provider-contract parity and controlled live verification. Webhook delivery and
+See [ticket 5 outcomes](SENDGRID-OUTCOMES.md), [ticket 6 correlation](SENDGRID-CORRELATION.md)
+and [ticket 7 verification](MILESTONE-7-VERIFICATION.md) for subsequent normalization,
+attribution, provider-contract parity and live verification evidence. Webhook delivery and
 bounce evidence remain Milestone 8. Bernie must review the shared-result/hook
 decision and perform browser/live QA with an account he controls before release.
 
@@ -65,5 +65,5 @@ sandbox verification and real email acceptance/receipt remain blocked on the
 operator's SendGrid account allowance. No real email was sent during these
 probes. Status-only 401/403 guidance now includes credits/billing and account
 restrictions, and does not infer authentication failure. Detailed error
-normalization remains ticket 5. The unrelated release-readiness PDF was not
+normalization is now implemented in ticket 5. The unrelated release-readiness PDF was not
 modified. Final check results and remote CI are recorded in the pull request.
