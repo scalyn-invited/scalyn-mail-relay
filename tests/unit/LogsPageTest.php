@@ -17,7 +17,8 @@ use Scalyn\MailRelay\Logging\TimelineRepository;
  *
  * Privacy invariants tested:
  *  - event_data column is never echoed.
- *  - subject, recipient, and body are not in the schema and cannot appear.
+ *  - bodies, raw provider responses and arbitrary event data never appear.
+ *  - opt-in recipient/subject values are covered by OptionalMailMetadataTest.
  *  - "Delivered" terminology never appears.
  *  - Raw unvalidated UUIDs are never echoed to the page.
  *  - XSS payloads in provider/source/event_label/event_message are escaped.
@@ -25,6 +26,36 @@ use Scalyn\MailRelay\Logging\TimelineRepository;
 final class LogsPageTest extends TestCase {
 
 	private WpdbStub $wpdb;
+
+	public function test_logs_redesign_reports_only_visible_count_and_offers_uuid_lookup(): void {
+		$GLOBALS['_test_current_user_can'][ Capabilities::VIEW_LOGS ] = true;
+		$this->wpdb->get_results_return = array( $this->make_log_row() );
+		$_GET = array('status'=>'failed', 'paged'=>'2');
+		ob_start();
+		$this->make_page()->render();
+		$output = (string) ob_get_clean();
+		$this->assertStringContainsString('Records on this page: 1 · Page 2', $output);
+		$this->assertStringContainsString('Filtered by: Failed', $output);
+		$this->assertStringContainsString('name="message_uuid"', $output);
+		$this->assertStringContainsString('aria-describedby="scalyn-message-lookup-help"', $output);
+		$this->assertStringContainsString('role="region" aria-labelledby="scalyn-log-results-heading" tabindex="0"', $output);
+		$this->assertStringContainsString('aria-label="Email log pages"', $output);
+		$this->assertStringContainsString('Log privacy and retention', $output);
+	}
+
+	public function test_list_provides_accessible_drawer_and_full_page_fallback(): void {
+		$GLOBALS['_test_current_user_can'][ Capabilities::VIEW_LOGS ] = true;
+		$this->wpdb->get_results_return = array( $this->make_log_row() );
+		ob_start();
+		$this->make_page()->render();
+		$output = (string) ob_get_clean();
+		$this->assertStringContainsString( '<dialog class="scalyn-timeline-drawer" aria-labelledby="scalyn-drawer-heading">', $output );
+		$this->assertStringContainsString( 'data-scalyn-timeline>', $output );
+		$this->assertStringContainsString( 'message_uuid=550e8400-e29b-41d4-a716-446655440000', $output );
+		$this->assertStringContainsString( 'data-scalyn-close', $output );
+		$this->assertStringContainsString( 'data-scalyn-load-error role="alert" hidden', $output );
+		$this->assertStringContainsString( 'data-scalyn-full-page', $output );
+	}
 
 	protected function setUp(): void {
 		$this->wpdb                        = new WpdbStub();
@@ -208,7 +239,8 @@ final class LogsPageTest extends TestCase {
 
 		$this->assertStringContainsString( 'data-label="Provider"', $output );
 		$this->assertStringContainsString( 'data-label="Source"', $output );
-		$this->assertStringContainsString( 'data-label="Attachments"', $output );
+		$this->assertStringContainsString( 'data-label="Recipient"', $output );
+		$this->assertStringContainsString( 'data-label="Subject"', $output );
 		$this->assertStringContainsString( 'data-label="Timestamp"', $output );
 	}
 

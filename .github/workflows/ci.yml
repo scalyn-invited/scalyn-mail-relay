@@ -29,3 +29,10 @@ jobs:
         run: composer lint:wpcs
       - name: Unit tests
         run: composer test
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Admin interface checks
+        run: |
+          node --check assets/js/admin.js
+          node --test tests/js/admin.test.cjs

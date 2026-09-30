@@ -43,6 +43,18 @@ final class DashboardPage {
 		$provider_verified   = $provider_configured && $settings->is_provider_verified();
 		$test_email_accepted = $provider_configured && $settings->has_accepted_test_email();
 
+		// Only label and verification metadata reach this card; never read credentials.
+		$active_provider_id    = $settings->get_active_provider_id();
+		$active_provider_label = $provider_configured ? $container->get( ProviderRegistry::class )->get( $active_provider_id )->get_label() : '';
+		$provider_transport    = match ( $active_provider_id ) {
+			'smtp' => __( 'SMTP', 'scalyn-mail-relay' ),
+			'sendgrid' => __( 'API (HTTPS)', 'scalyn-mail-relay' ),
+			default => __( 'Not reported', 'scalyn-mail-relay' ),
+		};
+		$verified_at          = $provider_verified ? $settings->get_provider_verified_at() : null;
+		$verified_timestamp   = $verified_at ? strtotime( $verified_at ) : false;
+		$provider_verified_at = false !== $verified_timestamp ? wp_date( 'Y-m-d H:i:s', $verified_timestamp ) : __( 'Not recorded', 'scalyn-mail-relay' );
+
 		$log_repo         = $container->get( MailLogRepository::class );
 		$rows             = $log_repo->find_recent( 1, 0 );
 		$latest_log       = $rows[0] ?? null;

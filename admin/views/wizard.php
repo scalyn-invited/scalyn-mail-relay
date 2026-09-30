@@ -29,6 +29,12 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 
 	<h1><?php esc_html_e( 'Setup Wizard', 'scalyn-mail-relay' ); ?></h1>
 	<p class="scalyn-lead"><?php esc_html_e( 'Configure your mail provider in a few simple steps.', 'scalyn-mail-relay' ); ?></p>
+	<p class="scalyn-wizard-progress">
+		<?php
+		/* translators: 1: current step, 2: total steps, 3: step label. */
+		echo esc_html( sprintf( __( 'Step %1$d of %2$d · %3$s', 'scalyn-mail-relay' ), $current_step, $total_steps, $step_labels[ $current_step ] ) );
+		?>
+	</p>
 
 	<nav class="scalyn-wizard-nav" aria-label="<?php esc_attr_e( 'Setup Wizard steps', 'scalyn-mail-relay' ); ?>">
 		<ol class="scalyn-wizard-steps">
@@ -36,7 +42,7 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 				<?php
 				if ( $num < $current_step ) {
 					$step_class  = 'scalyn-wizard-step scalyn-wizard-step--complete';
-					$aria_status = __( 'complete', 'scalyn-mail-relay' );
+					$aria_status = __( 'previous step', 'scalyn-mail-relay' );
 				} elseif ( $num === $current_step ) {
 					$step_class  = 'scalyn-wizard-step scalyn-wizard-step--active';
 					$aria_status = __( 'current step', 'scalyn-mail-relay' );
@@ -45,12 +51,8 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 					$aria_status = __( 'not yet started', 'scalyn-mail-relay' );
 				}
 				?>
-				<li class="<?php echo esc_attr( $step_class ); ?>">
-					<?php if ( $num < $current_step ) : ?>
-						<span class="scalyn-wizard-step__number" aria-hidden="true">✓</span>
-					<?php else : ?>
-						<span class="scalyn-wizard-step__number" aria-hidden="true"><?php echo esc_html( (string) $num ); ?></span>
-					<?php endif; ?>
+				<li class="<?php echo esc_attr( $step_class ); ?>"<?php echo $num === $current_step ? ' aria-current="step"' : ''; ?>>
+					<span class="scalyn-wizard-step__number" aria-hidden="true"><?php echo esc_html( (string) $num ); ?></span>
 					<span class="scalyn-wizard-step__label"><?php echo esc_html( $label ); ?></span>
 					<span class="screen-reader-text"><?php echo esc_html( $aria_status ); ?></span>
 				</li>
@@ -58,6 +60,7 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 		</ol>
 	</nav>
 
+	<div class="scalyn-wizard-layout">
 	<div class="scalyn-wizard-body scalyn-card">
 		<?php
 		switch ( $current_step ) {
@@ -65,12 +68,13 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 			case 1:
 				?>
 				<h2><?php esc_html_e( 'Welcome to Scalyn Mail Relay', 'scalyn-mail-relay' ); ?></h2>
-				<p><?php esc_html_e( 'This wizard will guide you through connecting a mail provider, verifying delivery, and generating your first email health score.', 'scalyn-mail-relay' ); ?></p>
-				<ol>
+				<p><?php esc_html_e( 'Connect your mail provider, verify the connection, send a test email, and run an email health check. Finish with a configuration summary and recommended next steps.', 'scalyn-mail-relay' ); ?></p>
+				<ol class="scalyn-wizard-checklist">
 					<li><?php esc_html_e( 'Choose a mail provider', 'scalyn-mail-relay' ); ?></li>
 					<li><?php esc_html_e( 'Enter provider credentials', 'scalyn-mail-relay' ); ?></li>
 					<li><?php esc_html_e( 'Verify the connection', 'scalyn-mail-relay' ); ?></li>
 					<li><?php esc_html_e( 'Send a test email', 'scalyn-mail-relay' ); ?></li>
+					<li><?php esc_html_e( 'Run a health check and review next steps', 'scalyn-mail-relay' ); ?></li>
 						</ol>
 				<p class="description"><?php esc_html_e( 'Provider acceptance does not guarantee inbox delivery. Scalyn Mail Relay will help you identify and resolve deliverability issues.', 'scalyn-mail-relay' ); ?></p>
 				<?php
@@ -81,7 +85,7 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 				?>
 				<h2><?php esc_html_e( 'Choose a Mail Provider', 'scalyn-mail-relay' ); ?></h2>
 				<p><?php esc_html_e( 'Select the mail provider you want to use with this site.', 'scalyn-mail-relay' ); ?></p>
-				<p class="description"><?php esc_html_e( 'Saving changes the active provider immediately. Configure SendGrid in Providers first; until a valid key and sender are saved, site email using SendGrid will fail closed.', 'scalyn-mail-relay' ); ?></p>
+				<p class="description"><?php esc_html_e( 'Saving changes the active provider immediately. Configure its credentials in the next step; email cannot be sent through an unconfigured provider.', 'scalyn-mail-relay' ); ?></p>
 
 				<?php if ( empty( $registered_providers ) ) : ?>
 					<div class="scalyn-empty-state">
@@ -92,7 +96,7 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 						<?php wp_nonce_field( 'scalyn_wizard_step2' ); ?>
 						<input type="hidden" name="wizard_step" value="2" />
 
-						<fieldset>
+						<fieldset class="scalyn-wizard-providers">
 							<legend class="screen-reader-text"><?php esc_html_e( 'Available mail providers', 'scalyn-mail-relay' ); ?></legend>
 							<?php foreach ( $registered_providers as $provider_key => $provider_label ) : ?>
 								<label class="scalyn-provider-option">
@@ -102,7 +106,20 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 										value="<?php echo esc_attr( $provider_key ); ?>"
 										<?php checked( $active_provider_id, $provider_key ); ?>
 									/>
-									<?php echo esc_html( $provider_label ); ?>
+									<span>
+										<strong><?php echo esc_html( $provider_label ); ?></strong>
+										<span class="scalyn-provider-option__description">
+											<?php
+											echo esc_html(
+												match ( $provider_key ) {
+													'smtp' => __( 'Use an existing mail server with a host, port and login supplied by your provider.', 'scalyn-mail-relay' ),
+													'sendgrid' => __( 'Send through the SendGrid API using a Mail Send key and a verified sender.', 'scalyn-mail-relay' ),
+													default => __( 'Use this registered mail provider for your site.', 'scalyn-mail-relay' ),
+												}
+											);
+											?>
+										</span>
+									</span>
 								</label>
 							<?php endforeach; ?>
 						</fieldset>
@@ -121,20 +138,10 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 			case 3:
 				if ( 'sendgrid' === $active_provider_id ) :
 					?>
-					<h2><?php esc_html_e( 'Configure SendGrid', 'scalyn-mail-relay' ); ?></h2>
-					<p><?php esc_html_e( 'Save a Mail Send API key and verified sender in Providers. The key is never shown again here.', 'scalyn-mail-relay' ); ?></p>
-					<p><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-providers' ) ); ?>"><?php esc_html_e( 'Open SendGrid Settings', 'scalyn-mail-relay' ); ?></a></p>
 					<?php if ( is_array( $step3_errors ) && in_array( 'sendgrid', $step3_errors, true ) ) : ?>
-						<div class="notice notice-error inline"><p><?php esc_html_e( 'SendGrid settings are incomplete or the stored key cannot be read. Replace the key in Providers.', 'scalyn-mail-relay' ); ?></p></div>
+						<div class="notice notice-error inline"><p><?php esc_html_e( 'SendGrid settings are incomplete or the stored key cannot be read. Check the sender and replace the key below.', 'scalyn-mail-relay' ); ?></p></div>
 					<?php endif; ?>
-					<p><?php echo esc_html( $sendgrid_settings['has_key'] && '' !== $sendgrid_settings['from_email'] ? __( 'A key and sender are saved. Continue to validate them.', 'scalyn-mail-relay' ) : __( 'A key and sender are required before continuing.', 'scalyn-mail-relay' ) ); ?></p>
-					<?php if ( $sendgrid_settings['has_key'] && '' !== $sendgrid_settings['from_email'] ) : ?>
-						<form method="post" action="<?php echo esc_url( $wizard_base_url ); ?>">
-							<?php wp_nonce_field( 'scalyn_wizard_step3' ); ?>
-							<input type="hidden" name="wizard_step" value="3" />
-							<p class="submit"><button type="submit" class="button button-primary"><?php esc_html_e( 'Continue', 'scalyn-mail-relay' ); ?></button></p>
-						</form>
-					<?php endif; ?>
+					<?php $sendgrid_form->render( true ); ?>
 					<?php
 					break;
 				endif;
@@ -143,6 +150,7 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 				};
 				?>
 				<h2><?php esc_html_e( 'Configure SMTP', 'scalyn-mail-relay' ); ?></h2>
+				<p><?php esc_html_e( 'Use the connection details supplied by your mail provider. Saving updates the SMTP settings used by this site.', 'scalyn-mail-relay' ); ?></p>
 
 				<?php if ( is_array( $step3_errors ) && ! empty( $step3_errors ) ) : ?>
 					<div class="notice notice-error inline">
@@ -373,7 +381,29 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 			// -----------------------------------------------------------------
 			case 6:
 				?>
+				<h2><?php esc_html_e( 'Health Check', 'scalyn-mail-relay' ); ?></h2>
+				<p><?php esc_html_e( 'Run diagnostics to generate a configuration-health snapshot. Checks may contact DNS and your configured SMTP server; no test email is sent by this action.', 'scalyn-mail-relay' ); ?></p>
+				<?php if ( current_user_can( \Scalyn\MailRelay\Core\Capabilities::RUN_DIAGNOSTICS ) ) : ?>
+					<?php require __DIR__ . '/wizard-health.php'; ?>
+					<p>
+					<button type="button" class="button button-primary" id="scalyn-run-diagnostics" data-scalyn-action="run-diagnostics" data-endpoint="<?php echo esc_url( rest_url( 'scalyn-mail-relay/v1/diagnostics/run' ) ); ?>"><?php esc_html_e( 'Run Health Check', 'scalyn-mail-relay' ); ?></button>
+					</p>
+					<noscript><p><?php esc_html_e( 'Enable JavaScript to run the health check. No check runs automatically.', 'scalyn-mail-relay' ); ?></p></noscript>
+				<?php else : ?>
+					<p><?php esc_html_e( 'You do not have permission to run diagnostics or view health results. Ask an administrator to complete the health check.', 'scalyn-mail-relay' ); ?></p>
+				<?php endif; ?>
+				<p class="description"><?php esc_html_e( 'You may continue without running a check, but this does not mark email health as verified. Existing snapshots may predate your setup changes.', 'scalyn-mail-relay' ); ?></p>
+				<?php
+				break;
+
+			case 7:
+				?>
 				<h2><?php esc_html_e( 'Provider Configuration Complete', 'scalyn-mail-relay' ); ?></h2>
+				<p><?php esc_html_e( 'Review the recorded state before relying on site email. Reaching this step does not confirm that a test email arrived.', 'scalyn-mail-relay' ); ?></p>
+				<p><?php esc_html_e( 'Selected provider:', 'scalyn-mail-relay' ); ?> <strong><?php echo esc_html( $registered_providers[ $active_provider_id ] ?? __( 'Unknown', 'scalyn-mail-relay' ) ); ?></strong></p>
+				<?php if ( current_user_can( \Scalyn\MailRelay\Core\Capabilities::RUN_DIAGNOSTICS ) ) : ?>
+					<?php require __DIR__ . '/wizard-health.php'; ?>
+				<?php endif; ?>
 
 				<?php if ( '' !== $active_provider_id ) : ?>
 					<p><?php esc_html_e( 'Your mail provider has been configured.', 'scalyn-mail-relay' ); ?></p>
@@ -395,8 +425,6 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 				break;
 		}
 		?>
-	</div>
-
 	<div class="scalyn-wizard-footer">
 		<?php if ( $current_step > 1 ) : ?>
 			<a href="<?php echo esc_url( add_query_arg( 'step', $current_step - 1, $wizard_base_url ) ); ?>" class="button scalyn-wizard-btn scalyn-wizard-btn--back">
@@ -409,9 +437,12 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 		?>
 		<?php if ( $current_step < $total_steps && ! $has_form ) : ?>
 			<a href="<?php echo esc_url( add_query_arg( 'step', $current_step + 1, $wizard_base_url ) ); ?>" class="button button-primary scalyn-wizard-btn scalyn-wizard-btn--next">
-				<?php esc_html_e( 'Next', 'scalyn-mail-relay' ); ?> &rarr;
+				<?php echo esc_html( 1 === $current_step ? __( 'Start setup', 'scalyn-mail-relay' ) : __( 'Continue', 'scalyn-mail-relay' ) ); ?> &rarr;
 			</a>
 		<?php endif; ?>
+	</div>
+	</div>
+	<?php require __DIR__ . '/wizard-help.php'; ?>
 	</div>
 
 </div>

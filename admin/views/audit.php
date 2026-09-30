@@ -7,14 +7,22 @@
 
 defined( 'ABSPATH' ) || exit;
 ?>
-<div class="wrap">
+<div class="wrap scalyn-mail-relay scalyn-audit">
 	<h1><?php esc_html_e( 'Audit History', 'scalyn-mail-relay' ); ?></h1>
+	<p class="scalyn-lead"><?php esc_html_e( 'Review recorded administrative actions, their outcomes and attribution.', 'scalyn-mail-relay' ); ?></p>
+	<details class="scalyn-card scalyn-disclosure"><summary><?php esc_html_e( 'About audit evidence and retention', 'scalyn-mail-relay' ); ?></summary>
 	<p><?php esc_html_e( 'Report exports show the requested format and whether evidence identifiers were included. Prepared means the report was generated; it does not confirm that the browser received or saved it. Correlation groups one export attempt, and the report reference identifies its captured data.', 'scalyn-mail-relay' ); ?></p>
 	<p><?php esc_html_e( 'Administrative activity, newest records first. Times use the site timezone. User IDs refer to WordPress accounts; deleted accounts retain their numeric ID. Unknown means attribution was not recorded. Manual, REST, scheduled, CLI and application describe execution context, not proof of human intent.', 'scalyn-mail-relay' ); ?></p>
 	<p><?php esc_html_e( 'Accepted means the provider acknowledged a test email, not confirmed delivery. Completed diagnostics may contain failed checks. A started operation without a result may have been interrupted or its audit write may have failed. Audit history follows the retention period configured in Settings; individual expired records are removed, so part of a correlated operation may expire before another part.', 'scalyn-mail-relay' ); ?></p>
+	</details>
 	<?php if ( $error ) : ?>
 		<div class="notice notice-error" role="status"><p><?php esc_html_e( 'Audit history is unavailable. Check database availability and try again.', 'scalyn-mail-relay' ); ?></p></div>
 	<?php else : ?>
+		<section class="scalyn-card scalyn-history-panel" aria-labelledby="scalyn-audit-records">
+		<div class="scalyn-panel-heading"><h2 id="scalyn-audit-records"><?php esc_html_e( 'Recorded activity', 'scalyn-mail-relay' ); ?></h2><p class="description"><?php echo esc_html( sprintf( /* translators: %d: displayed record count, not a lifetime total. */ __( 'Records on this page: %d', 'scalyn-mail-relay' ), count( $page['rows'] ) ) ); ?></p></div>
+		<p class="description"><?php esc_html_e( 'Newest first · Site time · Up to 50 records per page. Changed fields are listed without their values or credentials.', 'scalyn-mail-relay' ); ?></p>
+		<p class="description"><?php esc_html_e( 'On narrow screens, scroll the table horizontally to view all columns.', 'scalyn-mail-relay' ); ?></p>
+		<div class="scalyn-table-scroll" role="region" aria-label="<?php esc_attr_e( 'Audit events', 'scalyn-mail-relay' ); ?>" tabindex="0">
 		<table class="widefat striped">
 			<caption class="screen-reader-text"><?php esc_html_e( 'Audit events, up to 50 per page', 'scalyn-mail-relay' ); ?></caption>
 			<thead><tr>
@@ -49,11 +57,13 @@ defined( 'ABSPATH' ) || exit;
 			<?php endforeach; ?>
 			</tbody>
 		</table>
+		</div>
 		<nav aria-label="<?php esc_attr_e( 'Audit pagination', 'scalyn-mail-relay' ); ?>">
 			<p><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-audit' ) ); ?>"><?php esc_html_e( 'Newest events', 'scalyn-mail-relay' ); ?></a>
 			<?php if ( $page['next'] > 0 ) : ?>
 				<a class="button" href="<?php echo esc_url( add_query_arg( 'before', $page['next'], admin_url( 'admin.php?page=scalyn-mail-relay-audit' ) ) ); ?>"><?php esc_html_e( 'Older events', 'scalyn-mail-relay' ); ?></a>
 			<?php endif; ?></p>
 		</nav>
+		</section>
 	<?php endif; ?>
 </div>

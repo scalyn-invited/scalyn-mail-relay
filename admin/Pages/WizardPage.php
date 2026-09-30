@@ -11,6 +11,9 @@ use Scalyn\MailRelay\Core\Capabilities;
 use Scalyn\MailRelay\Core\Plugin;
 use Scalyn\MailRelay\Core\ProviderRegistry;
 use Scalyn\MailRelay\Core\SettingsRepository;
+use Scalyn\MailRelay\Admin\HealthScorePresenter;
+use Scalyn\MailRelay\Admin\MonitoringStatusPresenter;
+use Scalyn\MailRelay\Database\HealthScoreRepository;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -31,7 +34,7 @@ final class WizardPage {
 	/**
 	 * Total number of wizard steps.
 	 */
-	private const TOTAL_STEPS = 6;
+	private const TOTAL_STEPS = 7;
 
 	/**
 	 * Performs a capability check then renders the wizard view.
@@ -58,6 +61,11 @@ final class WizardPage {
 			$registered_providers[ $id ] = $provider->get_label();
 		}
 		$active_provider_id = $settings->get_active_provider_id();
+		$sendgrid_form      = null;
+		if ( 3 === $current_step && 'sendgrid' === $active_provider_id ) {
+			$sendgrid_form = new \Scalyn\MailRelay\Admin\Components\SendGridSettingsForm( $settings, $container->get( \Scalyn\MailRelay\Core\CredentialCipher::class ) );
+			$sendgrid_form->handle();
+		}
 
 		// SMTP config for the form — password is intentionally excluded.
 		$smtp_raw    = $settings->get_smtp_config();
@@ -82,6 +90,13 @@ final class WizardPage {
 		// Step 5 test email result (from previous POST).
 		$email_result = $this->consume_transient( 'email' );
 
+		$wizard_health    = HealthScorePresenter::present( null );
+		$wizard_freshness = '';
+		if ( $current_step >= 6 && current_user_can( Capabilities::RUN_DIAGNOSTICS ) ) {
+			$wizard_health    = HealthScorePresenter::present( $container->get( HealthScoreRepository::class )->find_latest() );
+			$wizard_freshness = MonitoringStatusPresenter::evidence( $wizard_health['created_at'], $settings->get_diagnostic_schedule(), time() );
+		}
+
 		require SCALYN_MAIL_RELAY_PATH . 'admin/views/wizard.php';
 	}
 
@@ -89,8 +104,8 @@ final class WizardPage {
 	 * Returns the current wizard step number, clamped to the valid range 1–TOTAL_STEPS.
 	 *
 	 * Clamps the URL step to the first incomplete step to prevent skipping ahead beyond
-	 * configured state. For example, visiting &step=6 on a fresh install returns 1 because
-	 * no steps have been completed.
+	 * configured state. For example, visiting &step=7 on a fresh install returns 2
+	 * because no provider has been selected.
 	 *
 	 * Read-only GET navigation — no state is modified; no nonce is required.
 	 *
@@ -115,8 +130,8 @@ final class WizardPage {
 	 * - Step 2: Complete if a provider is chosen.
 	 * - Step 3: Complete if SMTP credentials are saved (host + port + email).
 	 * - Step 4: Complete if connection has been verified (mark_provider_verified called).
-	 * - Step 5: Complete if provider is verified (test email or real send succeeded).
-	 * - Step 6: Always reachable after step 5.
+	 * - Steps 5–7: Reachable once verified. Test email and health checks are explicit
+	 *   actions, not inferred successes from visiting a later step.
 	 *
 	 * @return int The first step that is not yet complete.
 	 */
@@ -153,8 +168,8 @@ final class WizardPage {
 			return 4;
 		}
 
-		// Steps 5–6 are reachable once verified.
-		return 7; // Return beyond max step to allow all steps to be accessible.
+		// Steps 5–7 are reachable once verified; viewing them does not run checks.
+		return self::TOTAL_STEPS + 1;
 	}
 
 	/**
@@ -169,7 +184,8 @@ final class WizardPage {
 			3 => __( 'Configure Provider', 'scalyn-mail-relay' ),
 			4 => __( 'Verify Connection', 'scalyn-mail-relay' ),
 			5 => __( 'Send Test Email', 'scalyn-mail-relay' ),
-			6 => __( 'Complete', 'scalyn-mail-relay' ),
+			6 => __( 'Health Check', 'scalyn-mail-relay' ),
+			7 => __( 'Completion', 'scalyn-mail-relay' ),
 		);
 	}
 

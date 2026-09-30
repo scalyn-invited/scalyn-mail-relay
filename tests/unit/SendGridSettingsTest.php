@@ -53,6 +53,25 @@ final class SendGridSettingsTest extends TestCase {
 		$this->assertSame(self::SECRET,$this->cipher->decrypt($b));
 	}
 
+	public function test_wizard_form_saves_in_place_without_exposing_credentials(): void {
+		$settings = new SettingsRepository();
+		$settings->save(['provider'=>['active'=>'sendgrid']]);
+		$_SERVER['REQUEST_METHOD']='POST';
+		$_POST=$this->input()+['scalyn_sendgrid_settings'=>'1'];
+		ob_start();
+		try { (new SendGridSettingsForm($settings,$this->cipher))->render(true); $html=ob_get_contents(); }
+		finally { ob_end_clean(); }
+		$this->assertTrue($settings->get_sendgrid_settings()['has_key']);
+		$this->assertStringContainsString('wizard&step=3', $html);
+		$this->assertStringContainsString('Continue to verification', $html);
+		$this->assertStringContainsString('wizard&step=4', $html);
+		$this->assertStringContainsString('SendGrid configuration saved', $html);
+		$this->assertStringContainsString('name="_wpnonce"', $html);
+		$this->assertStringNotContainsString(self::SECRET, $html);
+		$this->assertStringNotContainsString('Continue in Setup Wizard', $html);
+		$this->assertStringContainsString('autocomplete="new-password" value=""', $html);
+	}
+
 	public function test_first_save_defaults_to_replace_and_reports_missing_encryption(): void {
 		$html = $this->render(new CredentialCipher(''));
 		$this->assertMatchesRegularExpression('/value="replace"[^>]*selected/', $html);

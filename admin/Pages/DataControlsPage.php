@@ -40,6 +40,7 @@ final class DataControlsPage {
 			$days      = isset( $_POST['retention_days'] ) && is_string( $_POST['retention_days'] ) ? sanitize_text_field( wp_unslash( $_POST['retention_days'] ) ) : '';
 			$delete    = isset( $_POST['delete_on_uninstall'] ) && '1' === $_POST['delete_on_uninstall'];
 			$confirmed = isset( $_POST['confirm_delete'] ) && '1' === $_POST['confirm_delete'];
+			$metadata  = isset( $_POST['log_message_metadata'] ) && '1' === $_POST['log_message_metadata'];
 			$cadence   = isset( $_POST['diagnostic_schedule'] ) ? ( is_string( $_POST['diagnostic_schedule'] ) ? sanitize_text_field( wp_unslash( $_POST['diagnostic_schedule'] ) ) : '' ) : $this->settings->get_diagnostic_schedule();
 			if ( ! in_array( $cadence, SettingsRepository::DIAGNOSTIC_SCHEDULES, true ) ) {
 				$notice = __( 'Choose a valid diagnostic schedule. No settings were changed.', 'scalyn-mail-relay' );
@@ -55,6 +56,7 @@ final class DataControlsPage {
 					array(
 						'advanced' => array(
 							'log_retention_days'       => (int) $days,
+							'log_message_metadata'     => $metadata,
 							'diagnostic_schedule'      => $cadence,
 							'delete_data_on_uninstall' => $delete,
 							'confirm_delete_data'      => $confirmed,
@@ -62,7 +64,7 @@ final class DataControlsPage {
 					)
 				);
 				$fresh = new SettingsRepository();
-				$error = $fresh->get_log_retention_days() !== (int) $days || $fresh->get_delete_data_on_uninstall() !== $delete || $fresh->get_diagnostic_schedule() !== $cadence;
+				$error = $fresh->get_log_retention_days() !== (int) $days || $fresh->get_delete_data_on_uninstall() !== $delete || $fresh->get_diagnostic_schedule() !== $cadence || $fresh->get_log_message_metadata() !== $metadata;
 				if ( ! $error ) {
 					$error = ! \Scalyn\MailRelay\Core\DiagnosticSchedule::reconcile();
 				}
@@ -71,6 +73,7 @@ final class DataControlsPage {
 			}
 		}
 		$days      = $this->settings->get_log_retention_days();
+		$metadata  = $this->settings->get_log_message_metadata();
 		$cadence   = $this->settings->get_diagnostic_schedule();
 		$delete    = $this->settings->get_delete_data_on_uninstall();
 		$status    = $this->state->get();

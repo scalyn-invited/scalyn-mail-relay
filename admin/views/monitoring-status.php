@@ -18,15 +18,21 @@ defined( 'ABSPATH' ) || exit;
 			<dt><?php esc_html_e( 'Scheduled freshness', 'scalyn-mail-relay' ); ?></dt><dd><?php echo esc_html( $monitoring['freshness'] ); ?></dd>
 			<dt><?php esc_html_e( 'Next event (UTC)', 'scalyn-mail-relay' ); ?></dt><dd><?php echo esc_html( $monitoring['next'] ? gmdate( 'Y-m-d H:i:s', $monitoring['next'] ) : __( 'None', 'scalyn-mail-relay' ) ); ?></dd>
 			<dt><?php esc_html_e( 'Last scheduled completion (UTC)', 'scalyn-mail-relay' ); ?></dt><dd><?php echo esc_html( $monitoring['last_success'] ? gmdate( 'Y-m-d H:i:s', $monitoring['last_success'] ) : __( 'None recorded', 'scalyn-mail-relay' ) ); ?></dd>
-			<dt><?php esc_html_e( 'Latest scheduled attempt', 'scalyn-mail-relay' ); ?></dt><dd><?php echo esc_html( $monitoring['scheduled'] ); ?></dd>
-			<dt><?php esc_html_e( 'Latest attempt (any source)', 'scalyn-mail-relay' ); ?></dt><dd><?php echo esc_html( $monitoring['latest'] ); ?></dd>
 		</dl>
+		<details class="scalyn-disclosure"><summary><?php esc_html_e( 'Execution details', 'scalyn-mail-relay' ); ?></summary>
+			<dl>
+				<dt><?php esc_html_e( 'Latest scheduled attempt', 'scalyn-mail-relay' ); ?></dt><dd><?php echo esc_html( $monitoring['scheduled'] ); ?></dd>
+				<dt><?php esc_html_e( 'Latest attempt (any source)', 'scalyn-mail-relay' ); ?></dt><dd><?php echo esc_html( $monitoring['latest'] ); ?></dd>
+			</dl>
+		</details>
 		<?php if ( $monitoring['unfinished'] ) : ?>
 			<p><?php esc_html_e( 'An earlier attempt has no confirmed completion. This does not prove it failed.', 'scalyn-mail-relay' ); ?></p>
 		<?php endif; ?>
 	<?php endif; ?>
+	<details class="scalyn-disclosure"><summary><?php esc_html_e( 'Monitoring limitations', 'scalyn-mail-relay' ); ?></summary>
 	<p><?php esc_html_e( 'Overdue and stale warnings allow five minutes of grace. Manual runs do not refresh scheduled monitoring. Execution status may outlive retained evidence; it is not an email-delivery guarantee.', 'scalyn-mail-relay' ); ?></p>
 	<p><?php esc_html_e( 'WP-Cron relies on site traffic. Low-traffic sites need an external cron trigger. A disabled automatic trigger requires server cron; otherwise scheduled work will not run.', 'scalyn-mail-relay' ); ?></p>
+	</details>
 	<?php if ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ) : ?>
 		<p><?php esc_html_e( 'Traffic-triggered WP-Cron is disabled on this site. Verify that a server cron job calls WordPress cron.', 'scalyn-mail-relay' ); ?></p>
 	<?php endif; ?>

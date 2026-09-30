@@ -807,6 +807,9 @@ class WpRolesStub {
  * $wpdb as a global — tests configure the global, repositories consume it.
  */
 class WpdbStub {
+	public function esc_like( string $text ): string {
+		return addcslashes( $text, '_%\\' );
+	}
 
 	/** Table name prefix. */
 	public string $prefix = 'wp_';

@@ -7,6 +7,15 @@ use Scalyn\MailRelay\Core\SettingsRepository;
 use Scalyn\MailRelay\Database\RetentionStateRepository;
 
 final class DataControlsPageTest extends TestCase {
+	public function test_redesign_section_links_preserve_separate_save_boundaries():void {
+		$html=$this->render();
+		foreach(array('scalyn-privacy-settings','scalyn-monitoring-settings','scalyn-uninstall-settings','scalyn-cleanup-status') as $id){
+			$this->assertStringContainsString('href="#'.$id.'"',$html);
+			$this->assertStringContainsString('id="'.$id.'"',$html);
+		}
+		$this->assertStringContainsString('DKIM has a separate save button above.',$html);
+		$this->assertSame(2,substr_count($html,'<form '));
+	}
 	public function test_settings_page_contains_dkim_and_separate_forms(): void {
 		$html=$this->render();
 		$this->assertStringContainsString('<h1>Settings</h1>',$html);

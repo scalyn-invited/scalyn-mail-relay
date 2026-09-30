@@ -8,6 +8,14 @@ use Scalyn\MailRelay\Admin\Pages\AuditPage;
 use Scalyn\MailRelay\Core\Capabilities;
 
 final class AuditHistoryTest extends TestCase {
+	public function test_redesign_labels_bounded_history_and_keeps_scroll_region():void {
+		ob_start();(new AuditPage(new AuditRepository()))->render();$html=(string)ob_get_clean();
+		$this->assertStringContainsString('Records on this page: 0',$html);
+		$this->assertStringContainsString('id="scalyn-audit-records"',$html);
+		$this->assertStringContainsString('role="region" aria-label="Audit events" tabindex="0"',$html);
+		$this->assertStringContainsString('without their values or credentials',$html);
+		$this->assertStringNotContainsString('<form ',$html);
+	}
 	private WpdbStub $db;
 	protected function setUp(): void {
 		$this->db = new WpdbStub();

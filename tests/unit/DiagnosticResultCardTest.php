@@ -7,6 +7,17 @@ use Scalyn\MailRelay\Admin\Components\DiagnosticResultCard;
  * Tests for DiagnosticResultCard.
  */
 final class DiagnosticResultCardTest extends TestCase {
+	public function test_check_metadata_distinguishes_unknown_from_zero_issues_and_escapes_dates(): void {
+		foreach ( array('pass'=>'0', 'warn'=>'1', 'fail'=>'1', 'unknown'=>'Not assessed', 'error'=>'Not assessed') as $status=>$issues ) {
+			ob_start();
+			DiagnosticResultCard::render('Check','unknown','Unknown',static function():void {},'check',array('status'=>$status,'created_at'=>'<script>date</script>'));
+			$html=(string)ob_get_clean();
+			$this->assertStringContainsString('<dt>Recorded issues</dt><dd>'.$issues.'</dd>',$html);
+			$this->assertStringContainsString('&lt;script&gt;date&lt;/script&gt;',$html);
+			$this->assertStringNotContainsString('<script>date</script>',$html);
+			$this->assertStringContainsString('href="#scalyn-diagnostic-guide"',$html);
+		}
+	}
 
 	/** Renders a diagnostic result card and returns its HTML. */
 	private function render_card( string $heading_id = 'diagnostic-heading' ): string {
@@ -39,7 +50,7 @@ final class DiagnosticResultCardTest extends TestCase {
 		$output = $this->render_card( '' );
 
 		$this->assertStringContainsString(
-			'<section class="scalyn-card scalyn-diagnostic-card"><h3>SPF Record</h3>',
+			'<section class="scalyn-card scalyn-diagnostic-card"><details open><summary><h3>SPF Record</h3>',
 			$output
 		);
 		$this->assertStringNotContainsString( 'aria-labelledby', $output );
@@ -58,6 +69,27 @@ final class DiagnosticResultCardTest extends TestCase {
 			$output
 		);
 		$this->assertStringNotContainsString( ' onmouseover="alert(1)"', $output );
+	}
+
+	public function test_healthy_cards_are_collapsed_but_preserve_the_evidence(): void {
+		ob_start();
+		DiagnosticResultCard::render( 'SPF', 'healthy', 'Pass', static function (): void {
+			echo '<p>Observed evidence</p>';
+		} );
+		$output = (string) ob_get_clean();
+		$this->assertStringContainsString( '<details><summary>', $output );
+		$this->assertStringNotContainsString( '<details open>', $output );
+		$this->assertStringContainsString( '<p>Observed evidence</p>', $output );
+		$this->assertStringContainsString( '</details></section>', $output );
+	}
+
+	public function test_actionable_and_unknown_cards_start_expanded(): void {
+		foreach ( array( 'critical', 'warning', 'unknown' ) as $status ) {
+			ob_start();
+			DiagnosticResultCard::render( 'Check', $status, $status, static function (): void {} );
+			$output = (string) ob_get_clean();
+			$this->assertStringContainsString( '<details open><summary>', $output );
+		}
 	}
 
 	public function test_render_escapes_text_and_sanitizes_status_class(): void {

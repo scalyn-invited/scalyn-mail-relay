@@ -8,8 +8,8 @@
  *   array|null $log          Mail log row as associative array, or null when not found.
  *   array      $timeline     Timeline events as associative arrays, oldest first.
  *
- * Privacy: Do not render $log['response_message'] without explicit Kim approval.
- *          Do not render event_data. Do not render subject, recipient, or body
+ * Privacy: Do not render raw response_message or event_data.
+ *          Do not render subject, recipient, or body
  *          (these fields do not exist in the schema but are listed as reminder).
  *
  * @package ScalynMailRelay
@@ -27,10 +27,10 @@ $status_labels = array(
 	'failed'   => __( 'Failed', 'scalyn-mail-relay' ),
 );
 ?>
-<div class="wrap scalyn-mail-relay">
-	<h1><?php esc_html_e( 'Email Timeline', 'scalyn-mail-relay' ); ?></h1>
+<div class="wrap scalyn-mail-relay scalyn-timeline-detail">
+	<h1 data-scalyn-full-page-only><?php esc_html_e( 'Email Timeline', 'scalyn-mail-relay' ); ?></h1>
 
-	<p>
+	<p data-scalyn-full-page-only>
 		<a href="<?php echo esc_url( $logs_base_url ); ?>" class="button">
 			&larr; <?php esc_html_e( 'Back to Email Logs', 'scalyn-mail-relay' ); ?>
 		</a>
@@ -97,6 +97,14 @@ $status_labels = array(
 			<h2><?php esc_html_e( 'Message Summary', 'scalyn-mail-relay' ); ?></h2>
 			<table class="form-table scalyn-log-summary">
 				<tbody>
+					<?php
+					foreach ( array(
+						'logged_recipients' => __( 'Recipient', 'scalyn-mail-relay' ),
+						'logged_subject'    => __( 'Subject', 'scalyn-mail-relay' ),
+					) as $field => $field_label ) :
+						?>
+						<tr><th scope="row"><?php echo esc_html( $field_label ); ?></th><td><?php echo esc_html( isset( $log[ $field ] ) ? ( '' !== $log[ $field ] ? $log[ $field ] : __( '(Empty)', 'scalyn-mail-relay' ) ) : __( 'Not recorded', 'scalyn-mail-relay' ) ); ?></td></tr>
+					<?php endforeach; ?>
 					<tr>
 						<th scope="row"><?php esc_html_e( 'Message ID', 'scalyn-mail-relay' ); ?></th>
 						<td><code><?php echo esc_html( $message_uuid ); ?></code></td>
@@ -188,6 +196,18 @@ $status_labels = array(
 		<?php endif; ?>
 	</div>
 
+	<?php if ( isset( $log_status ) ) : ?>
+		<section class="scalyn-card">
+			<h2><?php esc_html_e( 'Analysis and next steps', 'scalyn-mail-relay' ); ?></h2>
+			<?php if ( 'failed' === $log_status ) : ?>
+				<p><?php esc_html_e( 'The sending attempt was recorded as failed. Review the timeline explanation before retrying; a failure does not always prove the provider rejected the message.', 'scalyn-mail-relay' ); ?></p>
+				<p><?php esc_html_e( 'Verify the selected provider and its connection in the Setup Wizard. Compare the message ID with your provider’s activity log. Resolve the reported cause before sending another test to avoid duplicates.', 'scalyn-mail-relay' ); ?></p>
+			<?php else : ?>
+				<p><?php esc_html_e( 'Use the recorded timeline as evidence for this attempt. For a missing message, check the recipient’s Spam/Junk folder and the provider’s delivery or bounce records. Configuration diagnostics do not establish delivery.', 'scalyn-mail-relay' ); ?></p>
+			<?php endif; ?>
+			<details class="scalyn-disclosure"><summary><?php esc_html_e( 'Evidence limits', 'scalyn-mail-relay' ); ?></summary><p><?php esc_html_e( 'Raw headers and provider responses are not displayed. Timeline explanations are normalized operational evidence, not complete provider transcripts. Missing evidence cannot be reconstructed from the current configuration.', 'scalyn-mail-relay' ); ?></p></details>
+		</section>
+	<?php endif; ?>
 	<?php if ( isset( $log_status ) && 'accepted' === $log_status ) : ?>
 		<p class="description scalyn-log-note">
 			<?php esc_html_e( 'Accepted means the configured provider acknowledged the message. Accepted does not guarantee inbox delivery. The recipient server may reject it later; check provider delivery logs and bounce reports. Later bounces are not automatically reflected in this status.', 'scalyn-mail-relay' ); ?>

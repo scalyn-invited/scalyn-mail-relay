@@ -14,7 +14,7 @@ use Scalyn\MailRelay\Mail\SendResult;
  *
  * Privacy invariants verified:
  *  - mailer column is always '' (no inferred value).
- *  - subject, recipient, and body are never present in any insert or update.
+ *  - recipient/subject capture is off by default; bodies are never captured.
  *  - retry_count is 0 on initial insert (not incremented without RETRIED evidence).
  *  - find_recent() enforces a bounded maximum page size.
  */

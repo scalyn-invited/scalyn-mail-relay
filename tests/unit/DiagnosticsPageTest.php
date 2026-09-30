@@ -207,7 +207,8 @@ final class DiagnosticsPageTest extends TestCase {
 
 		// 6 cards: SPF, MX, DKIM, DMARC, SMTP/TLS, Health Score (all unknown when no data)
 		$this->assertSame( 6, substr_count( $output, 'class="scalyn-card scalyn-diagnostic-card"' ) );
-		$this->assertSame( 6, substr_count( $output, 'scalyn-badge--unknown' ) );
+		// Six detail cards plus three category summaries remain unknown.
+		$this->assertSame( 9, substr_count( $output, 'scalyn-badge--unknown' ) );
 		$this->assertStringContainsString( 'SPF Record', $output );
 		$this->assertStringContainsString( 'MX Records', $output );
 		$this->assertStringContainsString( 'DKIM Records', $output );
@@ -244,7 +245,9 @@ final class DiagnosticsPageTest extends TestCase {
 
 		$this->assertStringContainsString( 'Run Diagnostics Now', $output );
 		// Button should now be enabled with the REST endpoint URL.
-		$this->assertStringContainsString( 'href="http://example.com/wp-json/scalyn-mail-relay/v1/diagnostics/run"', $output );
+		$this->assertStringContainsString( 'data-endpoint="http://example.com/wp-json/scalyn-mail-relay/v1/diagnostics/run"', $output );
+		$this->assertStringContainsString( '<button type="button" class="button button-primary" id="scalyn-run-diagnostics"', $output );
+		$this->assertStringNotContainsString( 'href="http://example.com/wp-json/scalyn-mail-relay/v1/diagnostics/run"', $output );
 		$this->assertStringContainsString( 'button button-primary', $output );
 		// Health score displays as a badge (from StatusBadge), not as duplicate large text.
 		$this->assertStringContainsString( 'Unknown', $output );
@@ -458,8 +461,8 @@ final class DiagnosticsPageTest extends TestCase {
 		$this->assertStringContainsString( 'Health score based on: Operational reliability.', $output );
 		$this->assertStringContainsString( 'Message authentication and delivery: not verified', $output );
 		$this->assertStringNotContainsString( 'based on the results of all diagnostic checks', $output );
-		// The five check cards are still Unknown; the health card is the only healthy badge.
-		$this->assertSame( 5, substr_count( $output, 'scalyn-badge--unknown' ) );
+		// Five checks and three categories remain unknown; only the score has evidence.
+		$this->assertSame( 8, substr_count( $output, 'scalyn-badge--unknown' ) );
 		$this->assertSame( 1, substr_count( $output, 'scalyn-badge--healthy' ) );
 	}
 

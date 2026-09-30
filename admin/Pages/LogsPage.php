@@ -76,8 +76,26 @@ final class LogsPage {
 	 *   array $rows          Log rows, newest first; may be empty.
 	 *   int   $page          Current page number (≥ 1).
 	 *   bool  $has_next_page Whether additional rows may exist beyond this page.
+	 *
+	 * @throws \InvalidArgumentException Caught locally and rendered as a safe filter error.
 	 */
 	private function render_list(): void {
+		$filters      = array();
+		$filter_error = false;
+		try {
+			foreach ( array( 'start', 'end', 'provider', 'source', 'recipient', 'search' ) as $key ) {
+				// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Reject malformed read-only filter input before sanitizing.
+				if ( isset( $_GET[ $key ] ) && ! is_string( $_GET[ $key ] ) ) {
+					throw new \InvalidArgumentException( 'Invalid log filter.' );
+				}
+				// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only search, validated by LogFilters.
+				$filters[ $key ] = isset( $_GET[ $key ] ) && is_string( $_GET[ $key ] ) ? sanitize_text_field( wp_unslash( $_GET[ $key ] ) ) : '';
+			}
+			$filters = \Scalyn\MailRelay\Logging\LogFilters::validate( $filters );
+		} catch ( \InvalidArgumentException $error ) {
+			$filters      = array();
+			$filter_error = true;
+		}
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended
 		$paged  = isset( $_GET['paged'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['paged'] ) ) : '1';
 		$status = isset( $_GET['status'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['status'] ) ) : '';
@@ -93,9 +111,21 @@ final class LogsPage {
 
 		// Fetch one extra row to determine if there's a next page. Apply the status
 		// in the repository so filtering and pagination describe the full result set.
-		$rows          = $status
-			? $this->log_repo->find_recent_by_status( $status, self::PER_PAGE + 1, $offset )
-			: $this->log_repo->find_recent( self::PER_PAGE + 1, $offset );
+		$rows = array();
+		if ( $filter_error ) {
+			$rows = array();
+		} elseif ( $filters ) {
+			try {
+				$rows = $this->log_repo->search( $filters, $status, self::PER_PAGE + 1, $offset );
+			} catch ( \Throwable $error ) {
+				$rows         = array();
+				$filter_error = true;
+			}
+		} else {
+			$rows = $status
+				? $this->log_repo->find_recent_by_status( $status, self::PER_PAGE + 1, $offset )
+				: $this->log_repo->find_recent( self::PER_PAGE + 1, $offset );
+		}
 		$has_next_page = count( $rows ) > self::PER_PAGE;
 
 		// Trim to page size.

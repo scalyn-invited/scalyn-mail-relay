@@ -7,9 +7,9 @@
 
 defined( 'ABSPATH' ) || exit;
 ?>
-<section class="scalyn-card" aria-labelledby="scalyn-sendgrid-heading">
-	<h2 id="scalyn-sendgrid-heading"><?php esc_html_e( 'SendGrid settings', 'scalyn-mail-relay' ); ?></h2>
-	<p><?php esc_html_e( 'Save your sender and API key, then use the Setup Wizard to select SendGrid and verify the connection.', 'scalyn-mail-relay' ); ?></p>
+<section class="<?php echo $in_wizard ? 'scalyn-wizard-provider-form' : 'scalyn-card'; ?>" aria-labelledby="scalyn-sendgrid-heading">
+	<h2 id="scalyn-sendgrid-heading"><?php echo esc_html( $in_wizard ? __( 'Configure SendGrid', 'scalyn-mail-relay' ) : __( 'SendGrid settings', 'scalyn-mail-relay' ) ); ?></h2>
+	<p><?php echo esc_html( $in_wizard ? __( 'Save your sender and API key here, then continue to connection verification. Saving changes the SendGrid configuration used by this site.', 'scalyn-mail-relay' ) : __( 'Save your sender and API key, then use the Setup Wizard to select SendGrid and verify the connection.', 'scalyn-mail-relay' ) ); ?></p>
 	<?php if ( ! $encryption_available ) : ?>
 		<div class="notice notice-error inline"><p><?php esc_html_e( 'Server encryption is unavailable. A valid SCALYN_MAIL_RELAY_ENCRYPTION_KEY and PHP OpenSSL are required before an API key can be saved.', 'scalyn-mail-relay' ); ?></p></div>
 	<?php endif; ?>
@@ -20,10 +20,16 @@ defined( 'ABSPATH' ) || exit;
 	<?php endif; ?>
 	<?php if ( $config['has_key'] && '' !== $config['from_email'] ) : ?>
 		<p><strong><?php esc_html_e( 'Sender and encrypted API key are saved.', 'scalyn-mail-relay' ); ?></strong></p>
-		<p><a class="button button-primary" href="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-wizard&step=' . $wizard_step ) ); ?>"><?php esc_html_e( 'Continue in Setup Wizard', 'scalyn-mail-relay' ); ?></a></p>
+		<?php if ( ! $in_wizard ) : ?>
+			<p><a class="button button-primary" href="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-wizard&step=' . $wizard_step ) ); ?>"><?php esc_html_e( 'Continue in Setup Wizard', 'scalyn-mail-relay' ); ?></a></p>
+		<?php endif; ?>
 	<?php endif; ?>
 	<?php if ( $can_manage ) : ?>
-		<form method="post" autocomplete="off">
+		<form method="post" autocomplete="off"
+		<?php
+		if ( $in_wizard ) :
+			?>
+			action="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-wizard&step=3' ) ); ?>"<?php endif; ?>>
 			<?php wp_nonce_field( 'scalyn_sendgrid_settings' ); ?>
 			<input type="hidden" name="scalyn_sendgrid_settings" value="1" />
 			<p><label for="sg-from-email"><?php esc_html_e( 'Sender email', 'scalyn-mail-relay' ); ?></label><br />
@@ -42,5 +48,11 @@ defined( 'ABSPATH' ) || exit;
 			<p><label><input type="checkbox" name="confirm_remove" value="1" /> <?php esc_html_e( 'I confirm removal of the saved API key. This does not revoke the key at SendGrid.', 'scalyn-mail-relay' ); ?></label></p>
 			<?php submit_button( __( 'Save SendGrid configuration', 'scalyn-mail-relay' ) ); ?>
 		</form>
+	<?php else : ?>
+		<p><?php esc_html_e( 'You do not have permission to configure mail providers. Ask an administrator to save these settings.', 'scalyn-mail-relay' ); ?></p>
 	<?php endif; ?>
 </section>
+<?php if ( $in_wizard && $config['has_key'] && '' !== $config['from_email'] ) : ?>
+	<p><?php esc_html_e( 'Save any changes above before continuing. Verification uses the saved configuration.', 'scalyn-mail-relay' ); ?></p>
+	<p><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-wizard&step=' . $wizard_step ) ); ?>"><?php esc_html_e( 'Continue to verification', 'scalyn-mail-relay' ); ?></a></p>
+<?php endif; ?>
