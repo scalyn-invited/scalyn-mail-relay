@@ -151,7 +151,7 @@ class SendGridProvider implements ProviderInterface {
 		if ( strtolower( $from['email'] ) !== strtolower( $config['from_email'] ) ) {
 			throw new \InvalidArgumentException( 'The message sender does not match the configured SendGrid sender.' );
 		}
-		if ( ! isset( $from['name'] ) && '' !== $config['from_name'] ) {
+		if ( ! isset( $from['name'] ) && '' !== ( $config['from_name'] ?? '' ) ) {
 			$from['name'] = $config['from_name'];
 		}
 		if ( array() === $message->to || count( $message->to ) > self::MAX_RECIPIENTS ) {
@@ -167,6 +167,7 @@ class SendGridProvider implements ProviderInterface {
 		}
 		$reply_to = null;
 		$headers  = array();
+		$seen     = array();
 		foreach ( $message->headers as $header ) {
 			if ( ! is_string( $header ) || strlen( $header ) > 2048 || preg_match( '/[\r\n\x00]/', $header )
 				|| ! preg_match( '/^([A-Za-z][A-Za-z0-9-]*):[ \t]*(.+)$/D', $header, $parts ) ) {
@@ -180,8 +181,9 @@ class SendGridProvider implements ProviderInterface {
 				}
 			} elseif ( 'reply-to' === $name && null === $reply_to ) {
 				$reply_to = $this->address( $value );
-			} elseif ( in_array( $name, self::SAFE_HEADERS, true ) && ! isset( $headers[ $parts[1] ] ) && strlen( $value ) <= 998 ) {
+			} elseif ( in_array( $name, self::SAFE_HEADERS, true ) && ! isset( $seen[ $name ] ) && strlen( $value ) <= 998 ) {
 				$headers[ $parts[1] ] = $value;
+				$seen[ $name ]        = true;
 			} else {
 				throw new \InvalidArgumentException( 'A message header is unsupported or repeated.' );
 			}

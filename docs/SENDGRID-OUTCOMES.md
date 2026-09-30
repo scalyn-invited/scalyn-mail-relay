@@ -26,8 +26,12 @@ SMTP send exceptions also need caution: PHPMailer may throw after DATA, after
 partial recipient acceptance, or after losing a response. Without phase and
 per-recipient evidence, timeout/connectivity/rejection/unknown send exceptions
 are conservatively unconfirmed, not evidence that every recipient failed.
-Recognized authentication/TLS/certificate failures remain failures. Local
-pre-send preparation errors remain failures. A false send return cannot become
+Ticket 7 establishes an explicit pre-DATA SMTP connection boundary: connection,
+authentication, TLS and preparation failures before `send()` remain definite
+failures. After `send()` starts, every exception is conservatively unconfirmed,
+including partial-recipient rejection; exception keywords alone cannot establish
+whether submission happened. The connection is closed on all exit paths.
+A false send return cannot become
 Accepted. Connection-only probes keep their existing non-send semantics.
 All send results in these adapters are non-retryable for automation. Existing
 SMTP exception categories are retained, while remediation gives uncertainty

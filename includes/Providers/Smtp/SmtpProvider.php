@@ -40,9 +40,8 @@ class SmtpProvider implements ProviderInterface {
 	/**
 	 * Lowercase header names that PHPMailer manages internally.
 	 *
-	 * These are skipped in add_safe_header() to prevent duplicates and
-	 * avoid overriding transport-level behaviour. Cc, Bcc, and Reply-To
-	 * require proper address parsing and are documented as a follow-up task.
+	 * These cannot override transport-level fields through custom headers.
+	 * Cc, Bcc and Reply-To are parsed into PHPMailer's recipient APIs instead.
 	 *
 	 * @var string[]
 	 */
@@ -248,6 +247,10 @@ class SmtpProvider implements ProviderInterface {
 		$this->configure_transport( $mailer, $config );
 
 		try {
+			if ( ! in_array( $message->content_type, array( 'text/plain', 'text/html' ), true )
+				|| '' === $message->body || preg_match( '/[\r\n\x00]/', $message->subject ) ) {
+				return new SendResult( false, 'smtp', null, null, 'The message content or subject is unsupported.', false, TransportFailureCategory::CONFIG );
+			}
 			// Validate and set the sender address from the message (not from config;
 			// the provider uses the message's from address for actual transport).
 			$from = $this->parse_address( $message->from );
@@ -291,16 +294,27 @@ class SmtpProvider implements ProviderInterface {
 			$mailer->Body = $message->body;
 			// phpcs:enable WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 
-			// Custom headers — safe subset only (structural headers are skipped).
+			// Preserve recipient roles; reject unsupported input before any network call.
+			$reply_seen = false;
 			foreach ( $message->headers as $header ) {
-				$this->add_safe_header( $mailer, (string) $header );
+				if ( ! is_string( $header ) || ! $this->add_safe_header( $mailer, $header, $reply_seen ) ) {
+					return new SendResult( false, 'smtp', null, null, 'A message header is unsupported or invalid.', false, TransportFailureCategory::CONFIG );
+				}
 			}
 
 			// Attachments — paths only; contents are never read into Scalyn data.
 			foreach ( $message->attachments as $attachment ) {
+				if ( ! is_string( $attachment ) || ! preg_match( '~^(?:[A-Za-z]:[\\\\/]|/)~', $attachment )
+					|| ! is_file( $attachment ) || ! is_readable( $attachment ) ) {
+					return new SendResult( false, 'smtp', null, null, 'An attachment is unreadable or unsupported.', false, TransportFailureCategory::CONFIG );
+				}
 				$mailer->addAttachment( (string) $attachment );
 			}
 
+			// Establish a known pre-DATA boundary; send() reuses this connection.
+			if ( ! $mailer->smtpConnect() ) {
+				return new SendResult( false, 'smtp', null, null, 'Unable to connect to the SMTP server before sending.', false, TransportFailureCategory::CONNECTIVITY );
+			}
 			$send_attempted = true;
 			if ( ! $mailer->send() ) {
 				return new SendResult( false, 'smtp', null, null, 'SMTP acceptance is unconfirmed. Check provider activity before retrying.', false, TransportFailureCategory::UNKNOWN, array(), true );
@@ -322,6 +336,8 @@ class SmtpProvider implements ProviderInterface {
 
 		} catch ( PHPMailerException $e ) {
 			return $this->normalize_send_failure( $e, $send_attempted );
+		} finally {
+			$mailer->smtpClose();
 		}
 	}
 
@@ -457,6 +473,12 @@ class SmtpProvider implements ProviderInterface {
 	 * @return array{email: string, name: string}
 	 */
 	private function parse_address( string $address ): array {
+		if ( preg_match( '/[\r\n\x00",]/', $address ) ) {
+			return array(
+				'email' => '',
+				'name'  => '',
+			);
+		}
 		$address = trim( $address );
 		if ( preg_match( '/^(.+?)\s*<([^>]+)>\s*$/', $address, $matches ) ) {
 			return array(
@@ -473,39 +495,56 @@ class SmtpProvider implements ProviderInterface {
 	/**
 	 * Adds a single custom header to PHPMailer if it is safe to do so.
 	 *
-	 * Headers that PHPMailer controls structurally (From, To, Subject,
-	 * Content-Type, etc.) are silently skipped. Any header containing
-	 * CR or LF characters is discarded to prevent header injection.
-	 *
-	 * Cc, Bcc, and Reply-To are skipped in this vertical slice because proper
-	 * handling requires address parsing beyond the scope of this ticket.
-	 * These are documented as a follow-up task.
+	 * Recipient roles use dedicated APIs. Unsupported structural headers and
+	 * injection attempts reject the message instead of silently altering it.
 	 *
 	 * @param PHPMailer $mailer PHPMailer instance to modify.
 	 * @param string    $header Raw header in 'Name: value' format.
-	 * @return void
+	 * @param bool      $reply_seen Whether a Reply-To header was already parsed.
+	 * @return bool Whether the header was represented safely.
 	 */
-	private function add_safe_header( PHPMailer $mailer, string $header ): void {
+	private function add_safe_header( PHPMailer $mailer, string $header, bool &$reply_seen ): bool {
+		if ( strlen( $header ) > 2048 || preg_match( '/[\r\n\x00]/', $header ) ) {
+			return false;
+		}
 		$colon_pos = strpos( $header, ':' );
 		if ( false === $colon_pos ) {
-			return;
+			return false;
 		}
 
 		$name  = trim( substr( $header, 0, $colon_pos ) );
 		$value = trim( substr( $header, $colon_pos + 1 ) );
 
-		// Reject header injection: discard any header whose name or value
-		// contains a carriage return or line feed.
-		if ( preg_match( '/[\r\n]/', $name . $value ) ) {
-			return;
+		if ( ! preg_match( '/^[A-Za-z][A-Za-z0-9-]*$/D', $name ) || '' === $value ) {
+			return false;
+		}
+		$role = strtolower( $name );
+		if ( in_array( $role, array( 'cc', 'bcc', 'reply-to' ), true ) ) {
+			if ( 'reply-to' === $role && ( $reply_seen || str_contains( $value, ',' ) ) ) {
+				return false;
+			}
+			foreach ( explode( ',', $value ) as $raw ) {
+				$address = $this->parse_address( $raw );
+				if ( false === filter_var( $address['email'], FILTER_VALIDATE_EMAIL ) ) {
+					return false;
+				}
+				match ( $role ) {
+					'cc' => $mailer->addCC( $address['email'], $address['name'] ),
+					'bcc' => $mailer->addBCC( $address['email'], $address['name'] ),
+					default => $mailer->addReplyTo( $address['email'], $address['name'] ),
+				};
+			}
+			$reply_seen = $reply_seen || 'reply-to' === $role;
+			return true;
 		}
 
-		// Skip structural headers that PHPMailer manages.
+		// Reject unsupported structural overrides.
 		if ( in_array( strtolower( $name ), self::STRUCTURAL_HEADERS, true ) ) {
-			return;
+			return false;
 		}
 
 		$mailer->addCustomHeader( $name, $value );
+		return true;
 	}
 
 	/**
@@ -583,7 +622,7 @@ class SmtpProvider implements ProviderInterface {
 		list( $message ) = $this->message_and_retry_for_category( $category );
 		// PHPMailer can throw after DATA, or after accepting only some recipients.
 		// Without phase/per-recipient evidence, a resend could create duplicates.
-		$unconfirmed = $send_attempted && ! in_array( $category, array( TransportFailureCategory::AUTH, TransportFailureCategory::TLS, TransportFailureCategory::CERTIFICATE ), true );
+		$unconfirmed = $send_attempted;
 		if ( $unconfirmed ) {
 			$message = 'SMTP acceptance is unconfirmed. Check provider activity before retrying.';
 		}

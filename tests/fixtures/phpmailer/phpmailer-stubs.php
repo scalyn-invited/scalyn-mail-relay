@@ -155,6 +155,12 @@ class PHPMailer {
 
 	/** @var list<array{address: string, name: string}> Recipients added via addAddress(). */
 	public array $recipients = array();
+	public array $cc = array();
+	public array $bcc = array();
+	public array $reply_to = array();
+	public bool $is_html = false;
+	public int $send_calls = 0;
+	public int $connect_calls = 0;
 
 	/** @var list<array{name: string, value: string}> Custom headers added via addCustomHeader(). */
 	public array $custom_headers = array();
@@ -200,6 +206,21 @@ class PHPMailer {
 		return true;
 	}
 
+	public function addCC( string $address, string $name = '' ): bool {
+		$this->cc[] = array( 'address' => $address, 'name' => $name );
+		return true;
+	}
+
+	public function addBCC( string $address, string $name = '' ): bool {
+		$this->bcc[] = array( 'address' => $address, 'name' => $name );
+		return true;
+	}
+
+	public function addReplyTo( string $address, string $name = '' ): bool {
+		$this->reply_to[] = array( 'address' => $address, 'name' => $name );
+		return true;
+	}
+
 	/**
 	 * @param string $name  Header name.
 	 * @param string $value Header value.
@@ -235,7 +256,9 @@ class PHPMailer {
 	 * @param bool $is_html True for HTML body; false for plain text.
 	 * @return void
 	 */
-	public function isHTML( bool $is_html = true ): void {}
+	public function isHTML( bool $is_html = true ): void {
+		$this->is_html = $is_html;
+	}
 
 	/**
 	 * Sends the message. Throws Exception when send_exception is set or
@@ -245,6 +268,7 @@ class PHPMailer {
 	 * @throws Exception
 	 */
 	public function send(): bool {
+		++$this->send_calls;
 		if ( null !== $this->send_exception ) {
 			throw $this->send_exception;
 		}
@@ -260,6 +284,7 @@ class PHPMailer {
 	 * @throws Exception When smtpConnect_exception is set.
 	 */
 	public function smtpConnect( ?array $options = null ): bool {
+		++$this->connect_calls;
 		if ( null !== $this->smtpConnect_exception ) {
 			throw $this->smtpConnect_exception;
 		}

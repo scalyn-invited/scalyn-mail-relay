@@ -135,6 +135,15 @@ namespace {
 			$this->assertSame( 'Hello', $payload['content'][0]['value'] );
 		}
 
+		public function test_optional_sender_name_can_be_omitted(): void {
+			$provider = new StubSendGridProvider();
+			$config = $this->config();
+			unset( $config['from_name'] );
+			$this->assertTrue( $provider->send( $this->message( array( 'from' => 'sender@example.com' ) ), $config )->success );
+			$payload = json_decode( $provider->calls[0]['body'], true );
+			$this->assertSame( array( 'email' => 'sender@example.com' ), $payload['from'] );
+		}
+
 		public function test_local_attachment_is_encoded_once_and_filename_only_is_sent(): void {
 			$path = tempnam( sys_get_temp_dir(), 'sg-test-' );
 			$this->assertNotFalse( $path );
@@ -162,6 +171,7 @@ namespace {
 				array( 'subject' => "Bad\r\nSubject" ),
 				array( 'headers' => array( "Bcc: victim@example.com\r\nX-Test: value" ) ),
 				array( 'headers' => array( 'From: other@example.com' ) ),
+				array( 'headers' => array( 'X-Priority: 1', 'x-priority: 2' ) ),
 				array( 'headers' => array( 'Reply-To: a@example.com,b@example.com' ) ),
 				array( 'headers' => array( 'Cc: a@example.com', 'Cc: invalid' ) ),
 				array( 'attachments' => array( 'https://example.com/private' ) ),

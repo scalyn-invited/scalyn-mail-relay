@@ -25,6 +25,11 @@ This is a bounded extension of the existing contract, not a new lifecycle state.
 Milestone 7 ticket 5 extends this policy to uncertain HTTP statuses and SMTP
 send exceptions without phase/per-recipient evidence. See [outcome rules](../SENDGRID-OUTCOMES.md).
 This conservative interpretation is implemented and awaits Bernie's review.
+Ticket 7 adds an explicit SMTP connection boundary before `send()`; only failures
+before that boundary are known non-submissions. Any exception after send begins
+is unconfirmed, regardless of keyword classification, since partial-recipient
+acceptance or a lost DATA response may have occurred. Connections are closed in
+a finally block. No additional shared result fields or lifecycle states are added.
 Milestone 8 delivery webhooks
 remain the only basis for confirmed delivery; acceptance never means inbox
 placement.

@@ -107,8 +107,12 @@ Outcome: one API provider works through the same operational workflow as SMTP.
 - [x] Connect configuration, sandbox verification, deliberate test sending, and normal WordPress sending through the SendGrid adapter. See [ticket 4 workflow and limitations](SENDGRID-WORKFLOW.md) and [ADR-0018](adr/0018-unconfirmed-provider-acceptance.md). Local automated checks passed; Bernie architecture review, browser QA and controlled live verification remain.
 - [x] Normalize acceptance, failure, rate-limit, and ambiguous-outcome handling. See [ticket 5 outcomes](SENDGRID-OUTCOMES.md); explicit HTTP rejection, safe credits/rate-limit guidance and conservative SMTP/API uncertainty. No automatic retry; Bernie review remains.
 - [x] Preserve UUID correlation, safe logs, and timeline events. See [ticket 6 correlation](SENDGRID-CORRELATION.md); early preparation failures, source attribution and observer isolation are covered by integration-style privacy tests. Bernie review remains.
-- [ ] Run equivalent provider-contract tests and live verification for SMTP and the API adapter.
-- [ ] Completion gate: both transports handle their supported formats and attachments, expose safe outcomes, and pass the required verification.
+- [ ] Run equivalent provider-contract tests and live verification for SMTP and the API adapter. Automated contract/MIME checks are implemented; see [ticket 7 evidence and remaining live QA](MILESTONE-7-VERIFICATION.md).
+  - [x] Shared SMTP/SendGrid tests for supported formats, attachment handling, safe outcomes and no automatic retry; real WordPress PHPMailer MIME check.
+  - [x] Live non-sending SMTP connection probe succeeds.
+  - [ ] Live SendGrid sandbox succeeds; currently blocked by HTTP 401, Email API credits exhausted (2026-09-30).
+  - [ ] Controlled plain/HTML-with-attachment sends and recipient confirmation for both transports; no real emails sent in this implementation pass.
+- [ ] Completion gate: both transports handle their supported formats and attachments, expose safe outcomes, and pass the required verification. Automated evidence passes; live SendGrid verification, controlled sends, owner review and release QA remain outstanding.
 
 ## 8. Delivery evidence and Deliverability Centre
 

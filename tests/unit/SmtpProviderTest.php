@@ -373,7 +373,7 @@ final class SmtpProviderTest extends TestCase {
 
 	public function test_send_normalises_auth_exception_to_safe_message(): void {
 		$stub                 = new StubPHPMailer();
-		$stub->send_exception = new PHPMailerException( 'SMTP authenticate: failed.' );
+		$stub->smtpConnect_exception = new PHPMailerException( 'SMTP authenticate: failed.' );
 		$result               = $this->make_provider( $stub )->send( $this->make_message(), $this->valid_config() );
 
 		$this->assertFalse( $result->success );
@@ -383,7 +383,7 @@ final class SmtpProviderTest extends TestCase {
 
 	public function test_send_normalises_tls_exception_to_safe_message(): void {
 		$stub                 = new StubPHPMailer();
-		$stub->send_exception = new PHPMailerException( 'Could not connect: TLS negotiation failed.' );
+		$stub->smtpConnect_exception = new PHPMailerException( 'Could not connect: TLS negotiation failed.' );
 		$result               = $this->make_provider( $stub )->send( $this->make_message(), $this->valid_config() );
 
 		$this->assertFalse( $result->success );
@@ -393,7 +393,7 @@ final class SmtpProviderTest extends TestCase {
 
 	public function test_send_normalises_certificate_exception_to_safe_message(): void {
 		$stub                 = new StubPHPMailer();
-		$stub->send_exception = new PHPMailerException( 'SSL operation failed: certificate verify failed.' );
+		$stub->smtpConnect_exception = new PHPMailerException( 'SSL operation failed: certificate verify failed.' );
 		$result               = $this->make_provider( $stub )->send( $this->make_message(), $this->valid_config() );
 
 		$this->assertFalse( $result->success );
@@ -489,12 +489,23 @@ final class SmtpProviderTest extends TestCase {
 
 		$this->assertFalse( $connection_result->success );
 		$this->assertStringNotContainsString( 'acceptance is unconfirmed', $connection_result->message );
-		if ( in_array( $send_result->failure_category, array( TransportFailureCategory::AUTH, TransportFailureCategory::TLS, TransportFailureCategory::CERTIFICATE ), true ) ) {
-			$this->assertSame( $send_result->response_message, $connection_result->message );
-			$this->assertFalse( $send_result->acceptance_unconfirmed );
-		} else {
-			$this->assertTrue( $send_result->acceptance_unconfirmed );
-			$this->assertFalse( $send_result->retryable );
+		$this->assertTrue( $send_result->acceptance_unconfirmed );
+		$this->assertFalse( $send_result->retryable );
+		$this->assertTrue( $send_stub->smtpClose_was_called );
+	}
+
+	public function test_pre_data_connection_failure_is_definite_and_never_calls_send(): void {
+		foreach ( array( null, new PHPMailerException( 'Timeout with private data' ), new PHPMailerException( 'SMTP authenticate: failed.' ) ) as $error ) {
+			$stub = new StubPHPMailer();
+			$stub->smtpConnect_result = false;
+			$stub->smtpConnect_exception = $error;
+			$result = $this->make_provider( $stub )->send( $this->make_message(), $this->valid_config() );
+			$this->assertFalse( $result->success );
+			$this->assertFalse( $result->acceptance_unconfirmed );
+			$this->assertFalse( $result->retryable );
+			$this->assertSame( 0, $stub->send_calls );
+			$this->assertTrue( $stub->smtpClose_was_called );
+			$this->assertStringNotContainsString( 'private data', serialize( $result ) );
 		}
 	}
 
@@ -909,7 +920,7 @@ final class SmtpProviderTest extends TestCase {
 	/**
 	 * Structural headers managed by PHPMailer must not be passed via addCustomHeader().
 	 */
-	public function test_send_skips_from_header(): void {
+	public function test_send_rejects_from_header_override(): void {
 		$stub    = new StubPHPMailer();
 		$message = new MailMessage(
 			uuid: 'header-from-001',
@@ -920,13 +931,14 @@ final class SmtpProviderTest extends TestCase {
 			headers: array( 'From: override@evil.com' )
 		);
 
-		$this->make_provider( $stub )->send( $message, $this->valid_config() );
+		$this->assertFalse( $this->make_provider( $stub )->send( $message, $this->valid_config() )->success );
+		$this->assertSame( 0, $stub->send_calls );
 
 		$header_names = array_map( 'strtolower', array_column( $stub->custom_headers, 'name' ) );
 		$this->assertNotContains( 'from', $header_names, 'From header must not be passed to addCustomHeader().' );
 	}
 
-	public function test_send_skips_subject_header(): void {
+	public function test_send_rejects_subject_header_override(): void {
 		$stub    = new StubPHPMailer();
 		$message = new MailMessage(
 			uuid: 'header-subject-001',
@@ -937,13 +949,14 @@ final class SmtpProviderTest extends TestCase {
 			headers: array( 'Subject: Injected Subject' )
 		);
 
-		$this->make_provider( $stub )->send( $message, $this->valid_config() );
+		$this->assertFalse( $this->make_provider( $stub )->send( $message, $this->valid_config() )->success );
+		$this->assertSame( 0, $stub->send_calls );
 
 		$header_names = array_map( 'strtolower', array_column( $stub->custom_headers, 'name' ) );
 		$this->assertNotContains( 'subject', $header_names, 'Subject header must not be passed to addCustomHeader().' );
 	}
 
-	public function test_send_discards_header_containing_newline(): void {
+	public function test_send_rejects_header_containing_newline(): void {
 		$stub    = new StubPHPMailer();
 		$message = new MailMessage(
 			uuid: 'header-inject-001',
@@ -954,10 +967,11 @@ final class SmtpProviderTest extends TestCase {
 			headers: array( "X-Custom: value\r\nBcc: attacker@evil.com" )
 		);
 
-		$this->make_provider( $stub )->send( $message, $this->valid_config() );
+		$this->assertFalse( $this->make_provider( $stub )->send( $message, $this->valid_config() )->success );
+		$this->assertSame( 0, $stub->send_calls );
 
 		// The entire header must be discarded because it contains CR+LF.
-		$this->assertEmpty( $stub->custom_headers, 'Headers containing newlines must be silently discarded.' );
+		$this->assertEmpty( $stub->custom_headers, 'Injected headers must never reach PHPMailer.' );
 	}
 
 	public function test_send_passes_safe_x_custom_header(): void {
