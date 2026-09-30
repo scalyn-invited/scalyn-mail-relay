@@ -8,6 +8,7 @@
 namespace Scalyn\MailRelay\Mail;
 
 use Scalyn\MailRelay\Core\SettingsRepository;
+use Scalyn\MailRelay\Core\HookNames;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -44,11 +45,35 @@ final class WordPressMailBridge {
 		if ( null !== $pre || 'sendgrid' !== $this->settings->get_active_provider_id() ) {
 			return $pre;
 		}
+		$uuid = wp_generate_uuid4();
 		try {
-			$message = $this->prepare( $atts );
+			$message = $this->prepare( $atts, $uuid );
+		} catch ( \Throwable $error ) {
+			// Do not copy even partially parsed customer content into the failure event.
+			$message = new MailMessage(
+				$uuid,
+				'',
+				array(),
+				'',
+				'',
+				context: array(
+					'source_type' => 'wordpress',
+					'source_name' => 'wp_mail',
+				)
+			);
+			$result  = new SendResult( false, 'sendgrid', null, null, 'WordPress mail preparation failed before sending. Check supported sender, headers, content type and attachments.', false, TransportFailureCategory::CONFIG );
+			try {
+				do_action( HookNames::MAIL_FAILED, $result, $message );
+			} catch ( \Throwable $observer_error ) {
+				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Fixed text only.
+				error_log( 'Scalyn Mail Relay: mail preparation observer failed.' );
+			}
+			return false;
+		}
+		try {
 			return $this->dispatcher->dispatch( $message )->success;
 		} catch ( \Throwable $error ) {
-			// No raw WordPress mail or provider exception is ever logged or surfaced.
+			// Do not fabricate a preparation failure after dispatch may have started.
 			return false;
 		}
 	}
@@ -57,11 +82,12 @@ final class WordPressMailBridge {
 	 * Maps the common wp_mail shape without dropping unsupported headers or embeds.
 	 * The SendGrid adapter performs the final address, size and attachment checks.
 	 *
-	 * @param mixed $atts WordPress arguments after the wp_mail filter.
+	 * @param mixed  $atts WordPress arguments after the wp_mail filter.
+	 * @param string $uuid Correlation allocated before preparation.
 	 * @return MailMessage Prepared message.
 	 * @throws \InvalidArgumentException When a structure cannot be mapped safely.
 	 */
-	private function prepare( mixed $atts ): MailMessage {
+	private function prepare( mixed $atts, string $uuid ): MailMessage {
 		if ( ! is_array( $atts ) || ! is_string( $atts['subject'] ?? null ) || ! is_string( $atts['message'] ?? null ) ) {
 			throw new \InvalidArgumentException( 'Unsupported WordPress mail arguments.' );
 		}
@@ -133,7 +159,7 @@ final class WordPressMailBridge {
 			}
 		}
 		return new MailMessage(
-			uuid: wp_generate_uuid4(),
+			uuid: $uuid,
 			from: $from_email,
 			to: array_values( $to ),
 			subject: $atts['subject'],

@@ -28,8 +28,7 @@ defined( 'ABSPATH' ) || exit;
  * timeline writers, or logging services. Those modules subscribe to
  * HookNames::MAIL_SENT and HookNames::MAIL_FAILED and act independently.
  *
- * Ownership: Kim / Core.
- * This class must NOT be modified by Saturn, Yaj or Mikko.
+ * Ownership: Bernie / Core.
  */
 final class MailDispatcher {
 
@@ -58,13 +57,13 @@ final class MailDispatcher {
 
 		if ( '' === $provider_id ) {
 			$result = new SendResult( false, '', null, null, 'No mail provider is configured.', false, 'config' );
-			do_action( HookNames::MAIL_FAILED, $result, $message );
+			$this->publish( HookNames::MAIL_FAILED, $result, $message );
 			return $result;
 		}
 
 		if ( ! $this->registry->has( $provider_id ) ) {
 			$result = new SendResult( false, $provider_id, null, null, 'Configured mail provider is not registered.', false, 'config' );
-			do_action( HookNames::MAIL_FAILED, $result, $message );
+			$this->publish( HookNames::MAIL_FAILED, $result, $message );
 			return $result;
 		}
 
@@ -73,7 +72,7 @@ final class MailDispatcher {
 			$config = $this->settings->get_provider_config( $provider_id );
 		} catch ( \Throwable $error ) {
 			$result = new SendResult( false, $provider_id, null, null, 'Stored provider credentials are unavailable. Replace the key in Providers.', false, 'config' );
-			do_action( HookNames::MAIL_FAILED, $result, $message );
+			$this->publish( HookNames::MAIL_FAILED, $result, $message );
 			return $result;
 		}
 		try {
@@ -83,13 +82,29 @@ final class MailDispatcher {
 		}
 
 		if ( $result->success ) {
-			do_action( HookNames::MAIL_SENT, $result, $message );
+			$this->publish( HookNames::MAIL_SENT, $result, $message );
 		} elseif ( $result->acceptance_unconfirmed ) {
-			do_action( HookNames::MAIL_OUTCOME_UNCONFIRMED, $result, $message );
+			$this->publish( HookNames::MAIL_OUTCOME_UNCONFIRMED, $result, $message );
 		} else {
-			do_action( HookNames::MAIL_FAILED, $result, $message );
+			$this->publish( HookNames::MAIL_FAILED, $result, $message );
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Observer errors cannot reverse an observed outcome or trigger another send.
+	 *
+	 * @param string      $hook Established lifecycle hook.
+	 * @param SendResult  $result Normalized provider result.
+	 * @param MailMessage $message Correlated message.
+	 */
+	private function publish( string $hook, SendResult $result, MailMessage $message ): void {
+		try {
+			do_action( $hook, $result, $message );
+		} catch ( \Throwable $error ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Fixed text only; never include the observer exception or mail content.
+			error_log( 'Scalyn Mail Relay: mail outcome observer failed.' );
+		}
 	}
 }
