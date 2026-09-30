@@ -42,6 +42,10 @@ The adapter receives plaintext credentials only immediately before transport.
 Admin views receive only sender fields and key presence. Credentials, HTTP
 response bodies, exceptions, recipients, subjects and message bodies are not
 added to logs, timeline data, transients or audit events by this integration.
+The later, separately approved [optional mail metadata policy](adr/0019-optional-mail-metadata.md)
+allows the shared log repository to retain bounded To addresses and subjects
+only after explicit administrator opt-in. This does not change adapter payloads,
+timeline privacy or audit/report projections.
 The shared dispatcher catches unreadable credentials and provider exceptions
 with fixed safe messages. A request with no observed HTTP response is recorded
 as `Prepared` plus an `acceptance unconfirmed` timeline event, never as proven

@@ -81,12 +81,19 @@ final class SendGridSettingsForm {
 		}
 	}
 
-	/** Renders only public settings and fixed save feedback. */
-	public function render(): void {
+	/**
+	 * Renders only public settings and fixed save feedback.
+	 *
+	 * @param bool $in_wizard Whether to keep configuration inside wizard step 3.
+	 */
+	public function render( bool $in_wizard = false ): void {
 		$this->handle();
-		$can_manage           = current_user_can( Capabilities::MANAGE_MAIL );
-		$notice               = $this->notice;
-		$saved                = $this->saved;
+		$can_manage = current_user_can( Capabilities::MANAGE_MAIL );
+		$notice     = $this->notice;
+		$saved      = $this->saved;
+		if ( $in_wizard && $saved ) {
+			$notice = __( 'SendGrid configuration saved. Continue to verify the connection. Removing a saved key does not revoke it at SendGrid.', 'scalyn-mail-relay' );
+		}
 		$encryption_available = $this->cipher->is_available();
 		$wizard_step          = 'sendgrid' === $this->settings->get_active_provider_id() ? 4 : 2;
 		$config               = $this->settings->get_sendgrid_settings();

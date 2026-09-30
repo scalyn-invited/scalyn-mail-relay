@@ -80,6 +80,7 @@ final class SettingsRepository {
 			'alert_webhook_enabled'    => false,
 			'diagnostic_schedule'      => 'disabled',
 			'log_retention_days'       => 30,
+			'log_message_metadata'     => false,
 			'delete_data_on_uninstall' => false,
 		),
 	);
@@ -304,6 +305,11 @@ final class SettingsRepository {
 		return self::valid_retention_days( $value ) ? (int) $value : 30;
 	}
 
+	/** Returns explicit consent to retain recipient and subject metadata. */
+	public function get_log_message_metadata(): bool {
+		return true === ( $this->data['advanced']['log_message_metadata'] ?? false );
+	}
+
 	/** Returns the validated opt-in monitoring cadence. */
 	public function get_diagnostic_schedule(): string {
 		$value = $this->data['advanced']['diagnostic_schedule'] ?? 'disabled';
@@ -462,6 +468,12 @@ final class SettingsRepository {
 					throw new \InvalidArgumentException( 'Invalid diagnostic schedule.' );
 				}
 				$output['advanced']['diagnostic_schedule'] = $adv['diagnostic_schedule'];
+			}
+			if ( array_key_exists( 'log_message_metadata', $adv ) ) {
+				if ( ! is_bool( $adv['log_message_metadata'] ) ) {
+					throw new \InvalidArgumentException( 'Invalid mail metadata setting.' );
+				}
+				$output['advanced']['log_message_metadata'] = $adv['log_message_metadata'];
 			}
 			if ( array_key_exists( 'log_retention_days', $adv ) ) {
 				if ( ! self::valid_retention_days( $adv['log_retention_days'] ) ) {

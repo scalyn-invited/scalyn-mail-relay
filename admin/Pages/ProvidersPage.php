@@ -29,15 +29,17 @@ final class ProvidersPage {
 			wp_die( esc_html__( 'You do not have permission to manage mail providers.', 'scalyn-mail-relay' ) );
 		}
 
-		$container     = Plugin::instance()->container();
-		$settings      = $container->get( SettingsRepository::class );
-		$registry      = $container->get( ProviderRegistry::class );
-		$sendgrid_form = new \Scalyn\MailRelay\Admin\Components\SendGridSettingsForm( $settings, $container->get( \Scalyn\MailRelay\Core\CredentialCipher::class ) );
-		$sendgrid_form->handle();
+		$container = Plugin::instance()->container();
+		$settings  = $container->get( SettingsRepository::class );
+		$registry  = $container->get( ProviderRegistry::class );
 
 		$active_provider_id = $settings->get_active_provider_id();
 		$smtp_settings      = $settings->get_smtp_config();
 		$sendgrid_settings  = $settings->get_sendgrid_settings();
+		$can_configure      = current_user_can( Capabilities::MANAGE_SETTINGS );
+		$verified           = $settings->is_provider_verified();
+		$verified_time      = $verified ? strtotime( $settings->get_provider_verified_at() ?? '' ) : false;
+		$verified_date      = false !== $verified_time ? wp_date( 'Y-m-d H:i:s', $verified_time ) : __( 'Not recorded', 'scalyn-mail-relay' );
 		$providers          = array();
 		foreach ( $registry->all() as $id => $provider ) {
 			$configured = match ( $id ) {
@@ -46,13 +48,21 @@ final class ProvidersPage {
 				default => false,
 			};
 			$providers[] = array(
-				'id'         => $id,
-				'label'      => $provider->get_label(),
-				'is_active'  => $id === $active_provider_id,
-				'configured' => $configured,
+				'id'          => $id,
+				'label'       => $provider->get_label(),
+				'is_active'   => $id === $active_provider_id,
+				'configured'  => $configured,
+				'verified'    => $id === $active_provider_id && $verified,
+				'verified_at' => $verified_date,
+				'transport'   => match ( $id ) {
+					'smtp' => 'SMTP',
+					'sendgrid' => 'API (HTTPS)',
+					default => __( 'Not reported', 'scalyn-mail-relay' ),
+				},
 			);
 		}
 		unset( $smtp_settings );
+		$active_label = $registry->has( $active_provider_id ) ? $registry->get( $active_provider_id )->get_label() : __( 'No registered provider selected', 'scalyn-mail-relay' );
 
 		require SCALYN_MAIL_RELAY_PATH . 'admin/views/providers.php';
 	}

@@ -268,10 +268,70 @@
 		} );
 	}
 
-	// Initialize when DOM is ready
-	if ( document.readyState === 'loading' ) {
-		document.addEventListener( 'DOMContentLoaded', initDiagnosticsButton );
-	} else {
+	/** Enhance existing read-only timeline links without changing their fallback. */
+	function initTimelineDrawer() {
+		const dialog = document.querySelector( '.scalyn-timeline-drawer' );
+		if ( ! dialog || typeof dialog.showModal !== 'function' || ! window.AbortController ) {
+			return;
+		}
+		const content = dialog.querySelector( '[data-scalyn-timeline-content]' );
+		const loading = dialog.querySelector( '[data-scalyn-loading]' );
+		const error = dialog.querySelector( '[data-scalyn-load-error]' );
+		const fullPage = dialog.querySelector( '[data-scalyn-full-page]' );
+		let controller;
+		let opener;
+		dialog.querySelector( '[data-scalyn-close]' ).addEventListener( 'click', function() { dialog.close(); } );
+		dialog.addEventListener( 'close', function() {
+			if ( controller ) { controller.abort(); }
+			content.replaceChildren();
+			if ( opener && opener.isConnected ) { opener.focus(); }
+		} );
+		document.querySelectorAll( '[data-scalyn-timeline]' ).forEach( function( link ) {
+			link.addEventListener( 'click', async function( event ) {
+				if ( event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey ) { return; }
+				const url = new URL( link.href, window.location.href );
+				if ( url.origin !== window.location.origin ) { return; }
+				event.preventDefault();
+				if ( controller ) { controller.abort(); }
+				controller = new AbortController();
+				const request = controller;
+				opener = link;
+				content.replaceChildren();
+				loading.hidden = false;
+				error.hidden = true;
+				fullPage.href = url.href;
+				dialog.showModal();
+				const timer = window.setTimeout( function() { request.abort(); }, 20000 );
+				try {
+					// The existing admin page enforces VIEW_LOGS and escapes allowlisted data.
+					const response = await fetch( url.href, { credentials: 'same-origin', cache: 'no-store', signal: request.signal } );
+					if ( ! response.ok || response.redirected ) { throw new Error( 'Timeline unavailable' ); }
+					const doc = new DOMParser().parseFromString( await response.text(), 'text/html' );
+					const detail = doc.querySelector( '.scalyn-timeline-detail' );
+					if ( ! detail ) { throw new Error( 'Timeline unavailable' ); }
+					if ( request !== controller || ! dialog.open ) { return; }
+					// Import only the server-rendered view, never admin chrome or scripts.
+					detail.querySelectorAll( 'script, style, iframe, object, embed, [data-scalyn-full-page-only]' ).forEach( function( node ) { node.remove(); } );
+					content.replaceChildren( ...Array.from( detail.children ).map( function( node ) { return document.importNode( node, true ); } ) );
+				} catch ( failure ) {
+					if ( request === controller && dialog.open ) { error.hidden = false; }
+				} finally {
+					window.clearTimeout( timer );
+					if ( request === controller ) { loading.hidden = true; }
+				}
+			} );
+		} );
+	}
+
+	function initAdmin() {
 		initDiagnosticsButton();
+		initTimelineDrawer();
+	}
+
+	// Initialize when DOM is ready.
+	if ( document.readyState === 'loading' ) {
+		document.addEventListener( 'DOMContentLoaded', initAdmin );
+	} else {
+		initAdmin();
 	}
 } )();

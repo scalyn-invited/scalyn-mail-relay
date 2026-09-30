@@ -35,9 +35,36 @@ final class Migrator {
 		if ( version_compare( $installed, '0.2.0', '<' ) ) {
 			self::create_alert_notifications();
 		}
+		if ( version_compare( $installed, '0.3.0', '<' ) ) {
+			self::add_optional_mail_metadata();
+		}
 		update_option( 'scalyn_mail_relay_db_version', SCALYN_MAIL_RELAY_DB_VERSION, false );
 		if ( SCALYN_MAIL_RELAY_DB_VERSION !== get_option( 'scalyn_mail_relay_db_version' ) ) {
 			throw new \RuntimeException( 'Database version could not be saved.' );
+		}
+	}
+
+	/**
+	 * Adds opt-in metadata to the retained mail aggregate; existing rows stay NULL.
+	 *
+	 * @throws \RuntimeException When required columns cannot be verified.
+	 */
+	private static function add_optional_mail_metadata(): void {
+		global $wpdb;
+		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		$table = $wpdb->prefix . 'scalyn_mail_logs';
+		dbDelta(
+			"CREATE TABLE {$table} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			logged_recipients text NULL,
+			logged_subject varchar(255) NULL,
+			PRIMARY KEY  (id)
+		) {$wpdb->get_charset_collate()};"
+		);
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Verify additive migration before advancing version.
+		$columns = $wpdb->get_col( $wpdb->prepare( 'SHOW COLUMNS FROM %i', $table ) );
+		if ( array_diff( array( 'logged_recipients', 'logged_subject' ), $columns ?? array() ) ) {
+			throw new \RuntimeException( 'Mail metadata migration failed.' );
 		}
 	}
 

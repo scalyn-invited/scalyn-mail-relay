@@ -29,6 +29,15 @@ use Scalyn\MailRelay\Logging\MailLogRepository;
  *  - No raw UUID is echoed without format validation.
  */
 final class DashboardPageTest extends TestCase {
+	public function test_actions_and_activity_precede_detailed_health_panels(): void {
+		$this->grant_view_dashboard();
+		$output = $this->render_and_capture();
+		$this->assertLessThan( strpos( $output, 'scalyn-activity-totals-heading' ), strpos( $output, 'scalyn-actions-heading' ) );
+		$this->assertLessThan( strpos( $output, 'scalyn-health-heading' ), strpos( $output, 'scalyn-activity-totals-heading' ) );
+		$this->assertSame( 1, substr_count( $output, 'id="scalyn-run-diagnostics"' ) );
+		$this->assertStringContainsString( '<details class="scalyn-card scalyn-verification-scope">', $output );
+	}
+
 	public function test_scheduled_monitoring_panel_remains_on_dashboard(): void {
 		$this->grant_view_dashboard();
 		$this->assertStringContainsString('Scheduled health monitoring',$this->render_and_capture());
@@ -672,6 +681,59 @@ final class DashboardPageTest extends TestCase {
 	// =========================================================================
 	// PROVIDER SECTION REGRESSION
 	// =========================================================================
+
+	private function render_provider_card_case( string $id, bool $verified, ?string $date ): string {
+		$this->reset_plugin_singleton();
+		$this->grant_view_dashboard();
+		$GLOBALS['_test_wp_options'][ SettingsRepository::OPTION_KEY ] = array(
+			'provider' => array( 'active' => $id, 'verified' => $verified, 'verified_at' => $date ),
+			'smtp' => array( 'username' => 'private-user', 'password' => 'private-password' ),
+			'sendgrid' => array( 'key_cipher' => 'private-cipher' ),
+		);
+		$this->boot_plugin();
+		$provider = $this->createMock( ProviderInterface::class );
+		$provider->method( 'get_id' )->willReturn( $id );
+		$provider->method( 'get_label' )->willReturn( '<b>Provider label</b>' );
+		$provider->expects( $this->never() )->method( 'test_connection' );
+		$provider->expects( $this->never() )->method( 'send' );
+		Plugin::instance()->container()->get( ProviderRegistry::class )->register( $provider );
+		return $this->render_and_capture();
+	}
+
+	public function test_provider_card_shows_safe_identity_transport_and_success_metadata(): void {
+		foreach ( array( 'smtp' => 'SMTP', 'sendgrid' => 'API (HTTPS)', 'custom' => 'Not reported' ) as $id => $transport ) {
+			$output = $this->render_provider_card_case( $id, true, '2026-09-04T10:00:00+00:00' );
+			$this->assertStringContainsString( '&lt;b&gt;Provider label&lt;/b&gt;', $output );
+			$this->assertStringContainsString( '<dd>' . $transport . '</dd>', $output );
+			$this->assertStringContainsString( 'Successful verification recorded', $output );
+			$this->assertStringContainsString( wp_date( 'Y-m-d H:i:s', strtotime( '2026-09-04T10:00:00+00:00' ) ), $output );
+			$this->assertStringContainsString( 'not the latest attempt result', $output );
+			foreach ( array( 'private-user', 'private-password', 'private-cipher' ) as $secret ) {
+				$this->assertStringNotContainsString( $secret, $output );
+			}
+		}
+	}
+
+	public function test_provider_card_handles_unverified_and_missing_verification_time(): void {
+		$output = $this->render_provider_card_case( 'smtp', false, '2026-09-04T10:00:00+00:00' );
+		$this->assertStringContainsString( 'Not verified for the current configuration', $output );
+		$this->assertStringNotContainsString( 'Last successful verification (site time)', $output );
+		$this->assertStringNotContainsString( '2026-09-04 10:00:00', $output );
+		$output = $this->render_provider_card_case( 'smtp', true, 'invalid date' );
+		$this->assertStringContainsString( '<dd>Not recorded</dd>', $output );
+		$this->assertStringNotContainsString( 'invalid date', $output );
+	}
+
+	public function test_provider_management_links_respect_capabilities(): void {
+		$output = $this->render_provider_card_case( 'smtp', false, null );
+		$this->assertStringNotContainsString( '>Manage provider</a>', $output );
+		$this->assertStringNotContainsString( '>Verify connection</a>', $output );
+		$GLOBALS['_test_current_user_can'][ Capabilities::MANAGE_MAIL ] = true;
+		$GLOBALS['_test_current_user_can'][ Capabilities::MANAGE_SETTINGS ] = true;
+		$output = $this->render_provider_card_case( 'smtp', false, null );
+		$this->assertStringContainsString( '>Manage provider</a>', $output );
+		$this->assertMatchesRegularExpression( '/href="[^"]*step=4[^"]*">Verify connection<\/a>/', $output );
+	}
 
 	public function test_unconfigured_provider_shows_not_configured_badge(): void {
 		$this->grant_view_dashboard();

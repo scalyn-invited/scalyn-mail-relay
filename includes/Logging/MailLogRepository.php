@@ -21,9 +21,8 @@ defined( 'ABSPATH' ) || exit;
  * if the same message_uuid is seen again (e.g. when a PREPARED row is later
  * resolved by a SENT or FAILED event).
  *
- * Privacy: this repository never stores subject lines, recipient addresses, message
- * bodies, attachment contents, or SMTP credentials. Only aggregate and diagnostic
- * fields permitted by the schema are written.
+ * Privacy: recipient/subject capture requires explicit opt-in and schema readiness.
+ * Bodies, raw headers, attachment contents and credentials are never captured.
  *
  * Ownership: Kim / Logging.
  */
@@ -146,22 +145,25 @@ final class MailLogRepository {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Intentional repository INSERT; no caching layer is appropriate for log writes.
 			$inserted = $wpdb->insert(
 				$table,
-				array(
-					'message_uuid'     => $message->uuid,
-					// mailer is empty: the current event contract provides no authoritative
-					// mailer classification. Do not infer from provider ID.
-					'mailer'           => '',
-					'provider'         => $result->provider,
-					'status'           => $status,
-					'source_type'      => (string) ( $message->context['source_type'] ?? '' ),
-					'source_name'      => (string) ( $message->context['source_name'] ?? '' ),
-					'response_code'    => (string) ( $result->response_code ?? '' ),
-					'response_message' => $result->response_message,
-					'attachment_count' => count( $message->attachments ),
-					'retry_count'      => 0,
-					'created_at'       => $now,
-					'sent_at'          => MailStatus::ACCEPTED === $status ? $now : null,
-					'failed_at'        => MailStatus::FAILED === $status ? $now : null,
+				array_merge(
+					array(
+						'message_uuid'     => $message->uuid,
+						// mailer is empty: the current event contract provides no authoritative
+						// mailer classification. Do not infer from provider ID.
+						'mailer'           => '',
+						'provider'         => $result->provider,
+						'status'           => $status,
+						'source_type'      => (string) ( $message->context['source_type'] ?? '' ),
+						'source_name'      => (string) ( $message->context['source_name'] ?? '' ),
+						'response_code'    => (string) ( $result->response_code ?? '' ),
+						'response_message' => $result->response_message,
+						'attachment_count' => count( $message->attachments ),
+						'retry_count'      => 0,
+						'created_at'       => $now,
+						'sent_at'          => MailStatus::ACCEPTED === $status ? $now : null,
+						'failed_at'        => MailStatus::FAILED === $status ? $now : null,
+					),
+					$this->optional_metadata( $message )
 				)
 			);
 			if ( false === $inserted ) {
@@ -187,6 +189,36 @@ final class MailLogRepository {
 				throw new \RuntimeException( 'Mail log update failed.' );
 			}
 		}
+	}
+
+	/**
+	 * Captures bounded opt-in metadata only on initial creation, never backfills.
+	 *
+	 * @param MailMessage $message Message being logged.
+	 * @return array Optional columns; empty by default and before migration.
+	 */
+	private function optional_metadata( MailMessage $message ): array {
+		if ( ! ( new \Scalyn\MailRelay\Core\SettingsRepository() )->get_log_message_metadata()
+			|| version_compare( (string) get_option( 'scalyn_mail_relay_db_version', '0.0.0' ), '0.3.0', '<' ) ) {
+			return array();
+		}
+		$addresses = array();
+		foreach ( array_slice( $message->to, 0, 20 ) as $recipient ) {
+			if ( ! is_string( $recipient ) ) {
+				continue;
+			}
+			if ( preg_match( '/<([^<>]+)>$/', trim( $recipient ), $match ) ) {
+				$recipient = $match[1];
+			}
+			$recipient = trim( $recipient );
+			if ( strlen( $recipient ) <= 254 && filter_var( $recipient, FILTER_VALIDATE_EMAIL ) ) {
+				$addresses[] = $recipient;
+			}
+		}
+		return array(
+			'logged_recipients' => implode( ', ', array_unique( $addresses ) ),
+			'logged_subject'    => mb_substr( sanitize_text_field( $message->subject ), 0, 255 ),
+		);
 	}
 
 	/**
@@ -262,6 +294,71 @@ final class MailLogRepository {
 		$results = $wpdb->get_results( $sql, ARRAY_A );
 
 		return $results ? $results : array();
+	}
+
+	/**
+	 * Searches all retained rows before bounded pagination, never just the page.
+	 *
+	 * @param array  $filters Validated search fields.
+	 * @param string $status Optional terminal outcome.
+	 * @param int    $limit Bounded page size.
+	 * @param int    $offset Row offset.
+	 * @return array Matching rows.
+	 * @throws \RuntimeException When search is unavailable.
+	 */
+	public function search( array $filters, string $status = '', int $limit = 25, int $offset = 0 ): array {
+		global $wpdb;
+		$filters = LogFilters::validate( $filters );
+		if ( ( isset( $filters['search'] ) || isset( $filters['recipient'] ) ) && version_compare( (string) get_option( 'scalyn_mail_relay_db_version', '0.0.0' ), '0.3.0', '<' ) ) {
+			throw new \RuntimeException( 'Email log search requires the database upgrade.' );
+		}
+		$args  = array( $wpdb->prefix . 'scalyn_mail_logs' );
+		$where = array( '1=1' );
+		if ( in_array( $status, array( MailStatus::ACCEPTED, MailStatus::FAILED ), true ) ) {
+			$where[] = 'status = %s';
+			$args[]  = $status;
+		}
+		foreach ( $filters as $key => $value ) {
+			switch ( $key ) {
+				case 'start':
+					$where[] = 'created_at >= %s';
+					$args[]  = $value . ' 00:00:00';
+					break;
+				case 'end':
+					$where[] = 'created_at <= %s';
+					$args[]  = $value . ' 23:59:59';
+					break;
+				case 'provider':
+					$where[] = 'provider = %s';
+					$args[]  = $value;
+					break;
+				case 'source':
+					$where[] = '(source_name LIKE %s OR source_type LIKE %s)';
+					$args[]  = '%' . $wpdb->esc_like( $value ) . '%';
+					$args[]  = '%' . $wpdb->esc_like( $value ) . '%';
+					break;
+				case 'recipient':
+					$where[] = 'logged_recipients LIKE %s';
+					$args[]  = '%' . $wpdb->esc_like( $value ) . '%';
+					break;
+				case 'search':
+					$where[] = '(message_uuid = %s OR logged_subject LIKE %s)';
+					$args[]  = $value;
+					$args[]  = '%' . $wpdb->esc_like( $value ) . '%';
+					break;
+			}
+		}
+		$args[] = min( self::MAX_PAGE_SIZE, max( 1, $limit ) );
+		$args[] = max( 0, $offset );
+		$clause = implode( ' AND ', $where );
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Only fixed allowlisted fragments; all values are prepared.
+		$sql = $wpdb->prepare( "SELECT * FROM %i WHERE {$clause} ORDER BY created_at DESC, id DESC LIMIT %d OFFSET %d", ...$args );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared -- Repository-owned bounded read, prepared above.
+		$rows = $wpdb->get_results( $sql, ARRAY_A );
+		if ( ! is_array( $rows ) || ! empty( $wpdb->last_error ) ) {
+			throw new \RuntimeException( 'Email log search is unavailable.' );
+		}
+		return $rows;
 	}
 
 	/**

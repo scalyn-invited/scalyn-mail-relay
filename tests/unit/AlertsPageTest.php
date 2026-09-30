@@ -8,6 +8,14 @@ use Scalyn\MailRelay\Core\Capabilities;
 use Scalyn\MailRelay\Core\SettingsRepository;
 
 final class AlertsPageTest extends TestCase {
+	public function test_redesign_distinguishes_configuration_from_delivery_and_repair():void {
+		$html=$this->render();
+		$this->assertStringContainsString('id="scalyn-alert-preferences"',$html);
+		$this->assertStringContainsString('id="scalyn-incident-history"',$html);
+		$this->assertStringContainsString('Records on this page: 0',$html);
+		$this->assertStringContainsString('It does not repair configuration, resend email or automatically switch providers.',$html);
+		$this->assertSame(1,substr_count($html,'<form '));
+	}
 	protected function setUp():void {
 		$GLOBALS['wpdb']=new WpdbStub();
 		$GLOBALS['_test_wp_options']=[];

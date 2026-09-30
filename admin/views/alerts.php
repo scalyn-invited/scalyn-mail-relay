@@ -7,13 +7,20 @@
 
 defined( 'ABSPATH' ) || exit;
 ?>
-<div class="wrap scalyn-mail-relay">
+<div class="wrap scalyn-mail-relay scalyn-alerts">
 	<h1><?php esc_html_e( 'Alerts & Recovery', 'scalyn-mail-relay' ); ?></h1>
+	<p class="scalyn-lead"><?php esc_html_e( 'Track operational incidents and notify your team when their state changes.', 'scalyn-mail-relay' ); ?></p>
+	<div class="scalyn-grid scalyn-status-grid">
+		<section class="scalyn-card"><h2><?php esc_html_e( 'Notifications', 'scalyn-mail-relay' ); ?></h2><p class="scalyn-status-value"><?php echo esc_html( $enabled ? __( 'Enabled', 'scalyn-mail-relay' ) : __( 'Disabled', 'scalyn-mail-relay' ) ); ?></p><p><?php esc_html_e( 'Independent webhook channel. This is a preference, not proof of delivery.', 'scalyn-mail-relay' ); ?></p><a href="#scalyn-alert-preferences"><?php esc_html_e( 'Manage notifications', 'scalyn-mail-relay' ); ?></a></section>
+		<section class="scalyn-card"><h2><?php esc_html_e( 'Webhook readiness', 'scalyn-mail-relay' ); ?></h2><p class="scalyn-status-value"><?php echo esc_html( $configured ? __( 'Configuration present', 'scalyn-mail-relay' ) : __( 'Setup required', 'scalyn-mail-relay' ) ); ?></p><p><?php esc_html_e( 'Configuration presence does not verify connectivity. Credentials stay in protected server configuration.', 'scalyn-mail-relay' ); ?></p></section>
+		<section class="scalyn-card"><h2><?php esc_html_e( 'Recovery behavior', 'scalyn-mail-relay' ); ?></h2><p><?php esc_html_e( 'Recovery records an incident resolving after qualifying evidence. It does not repair configuration, resend email or automatically switch providers.', 'scalyn-mail-relay' ); ?></p><a href="#scalyn-incident-history"><?php esc_html_e( 'Review incident history', 'scalyn-mail-relay' ); ?></a></section>
+	</div>
 	<?php if ( $notice ) : ?>
 		<div class="notice notice-info"><p><?php echo esc_html( $notice ); ?></p></div>
 	<?php endif; ?>
 	<p><?php esc_html_e( 'Incidents are evaluated every five minutes when WordPress cron runs. Notifications use an independent webhook, not your email provider. A stopped website or cron runner cannot alert about its own outage; use an external uptime monitor.', 'scalyn-mail-relay' ); ?></p>
 	<p><?php echo esc_html( $next ? __( 'An alert tick is scheduled. This is not proof that the cron runner is working.', 'scalyn-mail-relay' ) : __( 'No alert tick is scheduled. Check WordPress cron before relying on alerts.', 'scalyn-mail-relay' ) ); ?></p>
+	<section class="scalyn-card" id="scalyn-alert-preferences">
 	<h2><?php esc_html_e( 'Webhook notifications', 'scalyn-mail-relay' ); ?></h2>
 	<p><?php esc_html_e( 'Last alert evaluation:', 'scalyn-mail-relay' ); ?> <?php echo esc_html( $execution['state'] ); ?> — <?php echo esc_html( $execution['at'] ? gmdate( 'Y-m-d H:i:s', $execution['at'] ) . ' UTC' : __( 'not recorded', 'scalyn-mail-relay' ) ); ?></p>
 	<?php if ( 'completed' !== $execution['state'] || $execution['at'] < time() - 900 ) : ?>
@@ -27,15 +34,20 @@ defined( 'ABSPATH' ) || exit;
 		<?php submit_button( __( 'Save alert preference', 'scalyn-mail-relay' ) ); ?>
 	</form>
 	<p><?php esc_html_e( 'Disabled notifications are skipped, not replayed later. Failed HTTP attempts retry up to three times. A 2xx response means the webhook acknowledged the request, not that a person read it. Receivers should deduplicate by notification UUID. Recovery cancels an unsent opening notification.', 'scalyn-mail-relay' ); ?></p>
-	<h2><?php esc_html_e( 'Incident rules', 'scalyn-mail-relay' ); ?></h2>
+	</section>
+	<details class="scalyn-card scalyn-disclosure"><summary><?php esc_html_e( 'Incident rules', 'scalyn-mail-relay' ); ?></summary>
 	<ul>
 	<?php foreach ( \Scalyn\MailRelay\Alerts\IncidentRules::TYPES as $incident_type ) : ?>
 		<li><?php echo esc_html( \Scalyn\MailRelay\Alerts\IncidentRules::description( $incident_type ) ); ?></li>
 	<?php endforeach; ?>
 	</ul>
 	<p><?php esc_html_e( 'Missing or stale observations hold existing incidents open; disabling scheduled diagnostics does not resolve a monitoring incident. Health evidence expires after 24 hours. Reopened incidents have a 15-minute notification cooldown.', 'scalyn-mail-relay' ); ?></p>
-	<h2><?php esc_html_e( 'Incident history (UTC)', 'scalyn-mail-relay' ); ?></h2>
+	</details>
+	<section class="scalyn-card scalyn-history-panel" id="scalyn-incident-history">
+	<div class="scalyn-panel-heading"><h2><?php esc_html_e( 'Incident history (UTC)', 'scalyn-mail-relay' ); ?></h2><p class="description"><?php echo esc_html( sprintf( /* translators: %d: displayed incident count, not a lifetime total. */ __( 'Records on this page: %d', 'scalyn-mail-relay' ), count( $history['rows'] ) ) ); ?></p></div>
 	<p><?php esc_html_e( 'Active incidents are retained. Resolved incidents and their notifications expire together under the retention period configured in Settings.', 'scalyn-mail-relay' ); ?></p>
+	<p class="description"><?php esc_html_e( 'On narrow screens, scroll the table horizontally to view all columns.', 'scalyn-mail-relay' ); ?></p>
+	<div class="scalyn-table-scroll" role="region" aria-label="<?php esc_attr_e( 'Incident history', 'scalyn-mail-relay' ); ?>" tabindex="0">
 	<table class="widefat striped">
 		<thead><tr><th scope="col"><?php esc_html_e( 'Incident', 'scalyn-mail-relay' ); ?></th><th scope="col"><?php esc_html_e( 'Status / UTC times', 'scalyn-mail-relay' ); ?></th><th scope="col"><?php esc_html_e( 'Webhook attempts', 'scalyn-mail-relay' ); ?></th></tr></thead>
 		<tbody>
@@ -55,6 +67,7 @@ defined( 'ABSPATH' ) || exit;
 		<?php endforeach; ?>
 		</tbody>
 	</table>
+	</div>
 	<?php if ( $history['next'] ) : ?>
 		<p><a href="
 		<?php
@@ -70,4 +83,5 @@ defined( 'ABSPATH' ) || exit;
 		?>
 					"><?php esc_html_e( 'Older incidents', 'scalyn-mail-relay' ); ?></a></p>
 	<?php endif; ?>
+	</section>
 </div>

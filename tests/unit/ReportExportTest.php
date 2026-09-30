@@ -9,6 +9,15 @@ use Scalyn\MailRelay\Reporting\ReportExporter;
 use Scalyn\MailRelay\Reporting\ReportSnapshot;
 
 final class ReportExportTest extends TestCase {
+	public function test_redesign_groups_controls_without_inventing_report_templates():void {
+		ob_start();(new ReportsPage())->render();$html=(string)ob_get_clean();
+		$this->assertStringContainsString('Build your report',$html);
+		$this->assertSame(3,substr_count($html,'<fieldset '));
+		$this->assertSame(1,substr_count($html,'<form '));
+		$this->assertStringContainsString('Separate deliverability, audit and system report templates are not implemented.',$html);
+		$this->assertStringContainsString('name="action" value="scalyn_export_report"',$html);
+		$this->assertStringContainsString('type="datetime-local"',$html);
+	}
 	protected function setUp(): void {
 		$GLOBALS['_test_current_user_can']=[Capabilities::EXPORT_REPORTS=>true];
 		$GLOBALS['wpdb']=new WpdbStub();

@@ -128,7 +128,14 @@ delivery/bounce integration before repeating the workflow for other providers.
 - [ ] Add reverse-DNS analysis only where the sending infrastructure is known.
 - [ ] Introduce controlled message/header analysis and mailbox testing with explicit privacy boundaries.
 - [ ] Define deliverability assessment coverage, freshness, and scoring policy before displaying a numerical score.
-- [ ] Completion gate: every delivery or placement claim has supporting evidence; provider acceptance remains `Accepted`, and delivery confirmation alone does not imply inbox placement.
+- [ ] Ticket 8: implement Provider Health Assessment (owner: Bernie; after the preceding evidence and assessment-policy tickets).
+  - [ ] Define provider-specific assessment rules for SMTP and SendGrid, including evidence coverage, freshness windows, severity thresholds and configuration-change invalidation. Record any shared-contract or persistence decisions in an ADR before implementation.
+  - [ ] Attribute connection-check outcomes, recent send failures and authenticated delivery/bounce evidence to the correct provider and configuration. Do not reuse the site-wide health score as a provider score or infer the latest attempt from a last-success timestamp.
+  - [ ] Present separate Connection status and Provider health on provider cards. Show timestamped connection evidence and explainable Healthy / Warning / Critical / Unknown health states, with supporting findings and recommended actions. Do not label historical success as a continuously live connection.
+  - [ ] Keep missing, stale, unsupported or insufficient evidence explicit; unavailable checks must not count as passes. Preserve SendGrid sandbox-verification limitations and document SMTP's unavailable out-of-band evidence.
+  - [ ] Use approved services/read models and repositories; enforce capabilities, credential-free evidence and existing retention/privacy boundaries. Multiple saved configurations, routing and automatic recovery remain Milestone 9.
+  - [ ] Test provider/configuration attribution, stale and missing evidence, mixed outcomes, configuration changes, permissions, privacy and status explanations. Complete controlled SMTP/SendGrid verification and desktop/mobile card QA; record limitations and Bernie's review.
+- [ ] Completion gate: every delivery or placement claim has supporting evidence; provider acceptance remains `Accepted`, and delivery confirmation alone does not imply inbox placement. Provider-health states are provider-specific, traceable and freshness-aware; neither a healthy status nor a successful connection check guarantees inbox delivery.
 
 ## Provider expansion A — Remaining Phase 2 providers
 

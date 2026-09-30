@@ -22,7 +22,6 @@
  * @package ScalynMailRelay
  */
 
-use Scalyn\MailRelay\Admin\Components\ActionButton;
 use Scalyn\MailRelay\Admin\Components\EmptyState;
 use Scalyn\MailRelay\Admin\Components\HealthScoreBreakdown;
 use Scalyn\MailRelay\Admin\Components\SetupStepIndicator;
@@ -61,19 +60,17 @@ $setup_steps = array(
 	),
 );
 ?>
-<div class="wrap scalyn-mail-relay">
+<div class="wrap scalyn-mail-relay scalyn-dashboard">
 	<h1><?php esc_html_e( 'Scalyn Mail Relay', 'scalyn-mail-relay' ); ?></h1>
-	<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/monitoring-status.php'; ?>
-	<p><?php esc_html_e( 'Displayed health snapshot:', 'scalyn-mail-relay' ); ?> <?php echo esc_html( $score_freshness ); ?></p>
-	<p><?php esc_html_e( 'Evidence is stale after the configured cadence plus five minutes, or 24 hours plus five minutes when monitoring is disabled.', 'scalyn-mail-relay' ); ?></p>
 	<p class="scalyn-lead"><?php esc_html_e( 'Email delivery, diagnostics, monitoring and remediation.', 'scalyn-mail-relay' ); ?></p>
-	<?php \Scalyn\MailRelay\Admin\Components\VerificationScope::render(); ?>
+	<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/dashboard-actions.php'; ?>
+	<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/activity-summary.php'; ?>
 
 	<div class="scalyn-grid">
-		<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/activity-summary.php'; ?>
 
 		<section class="scalyn-card" aria-labelledby="scalyn-health-heading">
 			<h2 id="scalyn-health-heading"><?php esc_html_e( 'Email Health — configuration score', 'scalyn-mail-relay' ); ?></h2>
+			<p class="description"><?php esc_html_e( 'Configuration checks only. Actual message authentication and inbox placement are not verified.', 'scalyn-mail-relay' ); ?></p>
 			<?php if ( null === $health_score ) : ?>
 				<strong class="scalyn-score" aria-label="<?php esc_attr_e( 'Health score not yet assessed', 'scalyn-mail-relay' ); ?>">—</strong>
 				<?php StatusBadge::render( 'unknown', $health_ui_label ); ?>
@@ -82,14 +79,46 @@ $setup_steps = array(
 				<?php /* translators: %d is the numeric health score out of 100 */ ?>
 				<strong class="scalyn-score" aria-label="<?php echo esc_attr( sprintf( __( 'Configuration score: %d out of 100; authentication and delivery not verified', 'scalyn-mail-relay' ), $health_score ) ); ?>"><?php echo esc_html( $health_score ); ?></strong>
 				<?php StatusBadge::render( $health_ui_status, $health_ui_label ); ?>
-				<?php HealthScoreBreakdown::render( $health_components, $health_summary ); ?>
+				<progress class="scalyn-health-meter" max="100" value="<?php echo esc_attr( (string) $health_score ); ?>" aria-label="<?php esc_attr_e( 'Configuration score', 'scalyn-mail-relay' ); ?>"><?php echo esc_html( $health_score ); ?></progress>
+				<details class="scalyn-disclosure"><summary><?php esc_html_e( 'Score breakdown', 'scalyn-mail-relay' ); ?></summary>
+					<?php HealthScoreBreakdown::render( $health_components, $health_summary ); ?>
+				</details>
 			<?php endif; ?>
+			<p class="description"><?php esc_html_e( 'Displayed health snapshot:', 'scalyn-mail-relay' ); ?> <?php echo esc_html( $score_freshness ); ?></p>
+			<details class="scalyn-disclosure"><summary><?php esc_html_e( 'About evidence freshness', 'scalyn-mail-relay' ); ?></summary>
+				<p><?php esc_html_e( 'Evidence is stale after the configured cadence plus five minutes, or 24 hours plus five minutes when monitoring is disabled.', 'scalyn-mail-relay' ); ?></p>
+			</details>
 		</section>
+		<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/monitoring-status.php'; ?>
 
 		<section class="scalyn-card" aria-labelledby="scalyn-provider-heading">
 			<h2 id="scalyn-provider-heading"><?php esc_html_e( 'Mail Provider', 'scalyn-mail-relay' ); ?></h2>
 			<?php if ( $provider_configured ) : ?>
 				<?php StatusBadge::render( 'connected', __( 'Configured', 'scalyn-mail-relay' ) ); ?>
+				<dl>
+					<dt><?php esc_html_e( 'Active provider', 'scalyn-mail-relay' ); ?></dt>
+					<dd><?php echo esc_html( $active_provider_label ); ?></dd>
+					<dt><?php esc_html_e( 'Transport', 'scalyn-mail-relay' ); ?></dt>
+					<dd><?php echo esc_html( $provider_transport ); ?></dd>
+					<dt><?php esc_html_e( 'Verification', 'scalyn-mail-relay' ); ?></dt>
+					<dd><?php echo esc_html( $provider_verified ? __( 'Successful verification recorded', 'scalyn-mail-relay' ) : __( 'Not verified for the current configuration', 'scalyn-mail-relay' ) ); ?></dd>
+					<?php if ( $provider_verified ) : ?>
+						<dt><?php esc_html_e( 'Last successful verification (site time)', 'scalyn-mail-relay' ); ?></dt>
+						<dd><?php echo esc_html( $provider_verified_at ); ?></dd>
+					<?php endif; ?>
+				</dl>
+				<p class="description"><?php esc_html_e( 'Verification records a successful connection check or accepted send, not current availability or inbox delivery. It is not the latest attempt result; later failures may exist.', 'scalyn-mail-relay' ); ?></p>
+				<?php if ( 'sendgrid' === $active_provider_id ) : ?>
+					<p class="description"><?php esc_html_e( 'SendGrid connection checks use sandbox mode and do not prove real-send permission.', 'scalyn-mail-relay' ); ?></p>
+				<?php endif; ?>
+				<div class="scalyn-actions">
+					<?php if ( current_user_can( \Scalyn\MailRelay\Core\Capabilities::MANAGE_MAIL ) ) : ?>
+						<a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-providers' ) ); ?>"><?php esc_html_e( 'Manage provider', 'scalyn-mail-relay' ); ?></a>
+					<?php endif; ?>
+					<?php if ( current_user_can( \Scalyn\MailRelay\Core\Capabilities::MANAGE_SETTINGS ) ) : ?>
+						<a class="button" href="<?php echo esc_url( add_query_arg( 'step', 4, $wizard_url ) ); ?>"><?php esc_html_e( 'Verify connection', 'scalyn-mail-relay' ); ?></a>
+					<?php endif; ?>
+				</div>
 			<?php else : ?>
 				<?php StatusBadge::render( 'disconnected', __( 'Not configured', 'scalyn-mail-relay' ) ); ?>
 				<p class="scalyn-card__note"><?php esc_html_e( 'No mail provider has been configured. Use the Setup Wizard to get started.', 'scalyn-mail-relay' ); ?></p>
@@ -176,33 +205,6 @@ $setup_steps = array(
 
 	</div>
 
-	<section class="scalyn-card scalyn-actions-card" aria-labelledby="scalyn-actions-heading">
-		<h2 id="scalyn-actions-heading"><?php esc_html_e( 'Quick Actions', 'scalyn-mail-relay' ); ?></h2>
-		<div class="scalyn-actions">
-			<?php ActionButton::render( __( 'Configure Mailer', 'scalyn-mail-relay' ), $wizard_url, false, '', array(), true ); ?>
-			<?php
-			// The id and data attributes let assets/js/admin.js intercept the click
-			// and POST to the REST endpoint (which does not accept GET), then send
-			// the user to the Diagnostics page to view the results.
-			ActionButton::render(
-				__( 'Run Diagnostics', 'scalyn-mail-relay' ),
-				$diagnostics_run_url,
-				! $provider_verified,
-				'scalyn-run-diagnostics',
-				array(
-					'scalyn-action' => 'run-diagnostics',
-					'endpoint'      => $diagnostics_run_url,
-					'redirect'      => $diagnostics_page_url,
-				),
-				false
-			);
-			?>
-			<?php ActionButton::render( __( 'Send Test Email', 'scalyn-mail-relay' ), $test_email_url, ! $provider_verified, '', array(), false ); ?>
-			<?php ActionButton::render( __( 'View Logs', 'scalyn-mail-relay' ), $logs_url, false, '', array(), false ); ?>
-		</div>
-		<?php if ( ! $provider_verified ) : ?>
-			<p class="scalyn-actions__note description"><?php esc_html_e( 'Run Diagnostics and Send Test Email will be enabled after a mail provider is configured and verified through a successful connection or test email.', 'scalyn-mail-relay' ); ?></p>
-		<?php endif; ?>
-	</section>
+	<?php \Scalyn\MailRelay\Admin\Components\VerificationScope::render(); ?>
 
 </div>

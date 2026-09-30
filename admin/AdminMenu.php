@@ -156,7 +156,9 @@ final class AdminMenu {
 		// "toplevel_page_scalyn-mail-relay-diagnostics" comparison never matched,
 		// so the script was never loaded and the Run Diagnostics link navigated
 		// to the POST-only REST endpoint via GET, producing a rest_no_route 404.
-		wp_enqueue_script( 'scalyn-mail-relay-admin', SCALYN_MAIL_RELAY_URL . 'assets/js/admin.js', array(), SCALYN_MAIL_RELAY_VERSION, true );
+		$script_path    = SCALYN_MAIL_RELAY_PATH . 'assets/js/admin.js';
+		$script_version = is_readable( $script_path ) ? (string) filemtime( $script_path ) : SCALYN_MAIL_RELAY_VERSION;
+		wp_enqueue_script( 'scalyn-mail-relay-admin', SCALYN_MAIL_RELAY_URL . 'assets/js/admin.js', array(), $script_version, true );
 
 		// Pass REST API nonce and translatable strings to script.
 		wp_localize_script(
