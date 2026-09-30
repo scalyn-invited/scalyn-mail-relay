@@ -20,6 +20,18 @@ use Scalyn\MailRelay\Mail\TransportFailureCategory;
  */
 class FailureClassifierTest extends TestCase {
 
+	public function test_uncertainty_overrides_smtp_retry_guidance(): void {
+		$result = new SendResult( false, 'smtp', null, null, 'Safe outcome', false, TransportFailureCategory::TIMEOUT, array(), true );
+		$suggestion = ( new FailureClassifier() )->classify( $result );
+		$this->assertSame( TransportFailureCategory::UNKNOWN, $suggestion->category );
+		$this->assertStringContainsString( 'avoid duplicate', $suggestion->suggestion );
+	}
+
+	public function test_http_codes_do_not_use_smtp_classification(): void {
+		$result = new SendResult( false, 'sendgrid', null, '535', null );
+		$this->assertSame( TransportFailureCategory::UNKNOWN, ( new FailureClassifier() )->classify( $result )->category );
+	}
+
 	/**
 	 * The FailureClassifier instance under test.
 	 *

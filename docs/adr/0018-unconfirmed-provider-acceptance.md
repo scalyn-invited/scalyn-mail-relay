@@ -22,8 +22,10 @@ case.
 HTTP 202 alone is `Accepted`; sandbox HTTP 200 verifies request format only.
 
 This is a bounded extension of the existing contract, not a new lifecycle state.
-Milestone 7 ticket 5 must review and normalize all status, rate-limit, timeout,
-and retry semantics across SMTP and SendGrid. Milestone 8 delivery webhooks
+Milestone 7 ticket 5 extends this policy to uncertain HTTP statuses and SMTP
+send exceptions without phase/per-recipient evidence. See [outcome rules](../SENDGRID-OUTCOMES.md).
+This conservative interpretation is implemented and awaits Bernie's review.
+Milestone 8 delivery webhooks
 remain the only basis for confirmed delivery; acceptance never means inbox
 placement.
 

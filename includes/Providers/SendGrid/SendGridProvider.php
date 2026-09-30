@@ -76,8 +76,8 @@ class SendGridProvider implements ProviderInterface {
 		if ( ! $this->validate_config( $config )->valid ) {
 			return new ConnectionResult( false, 'SendGrid configuration is incomplete or invalid.' );
 		}
-		$sender = $config['from_email'];
-		$probe  = array(
+		$sender   = $config['from_email'];
+		$probe    = array(
 			'personalizations' => array( array( 'to' => array( array( 'email' => $sender ) ) ) ),
 			'from'             => array( 'email' => $sender ),
 			'subject'          => 'Scalyn Mail Relay sandbox validation',
@@ -89,10 +89,11 @@ class SendGridProvider implements ProviderInterface {
 			),
 			'mail_settings'    => array( 'sandbox_mode' => array( 'enable' => true ) ),
 		);
-		$code   = $this->request( $probe, $config['api_key'] );
+		$response = $this->request( $probe, $config['api_key'] );
+		$code     = $response['code'];
 		return 200 === $code
 			? new ConnectionResult( true, 'SendGrid accepted the sandbox request format. No email was sent.' )
-			: new ConnectionResult( false, $this->safe_status( $code, true ) );
+			: new ConnectionResult( false, $this->safe_status( $code, true, $response['credits_exceeded'] ) );
 	}
 
 	/**
@@ -113,16 +114,25 @@ class SendGridProvider implements ProviderInterface {
 		} catch ( \Throwable $error ) {
 			return new SendResult( false, 'sendgrid', null, null, 'Message preparation failed before sending.', false, TransportFailureCategory::UNKNOWN );
 		}
-		$code = $this->request( $payload, $config['api_key'] );
+		$response = $this->request( $payload, $config['api_key'] );
+		$code     = $response['code'];
 		if ( 202 === $code ) {
 			return new SendResult( true, 'sendgrid', null, '202', 'Message accepted by SendGrid; delivery is unconfirmed.' );
 		}
-		if ( 0 === $code ) {
-			return new SendResult( false, 'sendgrid', null, null, $this->safe_status( $code, false ), false, TransportFailureCategory::UNKNOWN, array(), true );
-		}
-		// HTTP 401 can also mean exhausted credits or account restrictions. Status alone
-		// cannot establish an authentication failure; detailed normalization is separate.
-		return new SendResult( false, 'sendgrid', null, 0 < $code ? (string) $code : null, $this->safe_status( $code, false ), false, TransportFailureCategory::UNKNOWN );
+		// Only explicit client rejections establish failure. Timeouts, server errors,
+		// redirects and unexpected success codes cannot establish non-acceptance.
+		$rejected = $code >= 400 && $code < 500 && 408 !== $code;
+		return new SendResult(
+			false,
+			'sendgrid',
+			null,
+			0 < $code ? (string) $code : null,
+			$this->safe_status( $code, false, $response['credits_exceeded'] ),
+			false,
+			$rejected ? TransportFailureCategory::PROVIDER_REJECTION : TransportFailureCategory::UNKNOWN,
+			array(),
+			! $rejected
+		);
 	}
 
 	/**
@@ -297,18 +307,22 @@ class SendGridProvider implements ProviderInterface {
 	}
 
 	/**
-	 * Calls a fixed endpoint. Response body and transport errors are discarded.
+	 * Calls a fixed endpoint. Only status and an exact allowlisted signal survive.
 	 *
 	 * @param array  $payload API payload.
 	 * @param string $key Mail Send API key.
-	 * @return int HTTP status or zero when unconfirmed.
+	 * @return array{code: int, credits_exceeded: bool} Credential-free observations.
 	 */
-	private function request( array $payload, #[\SensitiveParameter] string $key ): int {
+	private function request( array $payload, #[\SensitiveParameter] string $key ): array {
+		$unknown = array(
+			'code'             => 0,
+			'credits_exceeded' => false,
+		);
 		try {
 			// phpcs:ignore WordPress.WP.AlternativeFunctions -- Strict encoding is required for a bounded provider request.
 			$body = json_encode( $payload, JSON_THROW_ON_ERROR );
 			if ( strlen( $body ) > self::MAX_JSON_BYTES ) {
-				return 0;
+				return $unknown;
 			}
 			$response = $this->post(
 				array(
@@ -325,13 +339,34 @@ class SendGridProvider implements ProviderInterface {
 				)
 			);
 			if ( is_wp_error( $response ) ) {
-				return 0;
+				return $unknown;
 			}
 			$code = $this->response_code( $response );
-			return $code >= 100 && $code <= 599 ? $code : 0;
+			return array(
+				'code'             => $code >= 100 && $code <= 599 ? $code : 0,
+				'credits_exceeded' => 401 === $code && $this->credits_exceeded( $response ),
+			);
 		} catch ( \Throwable $error ) {
-			return 0;
+			return $unknown;
 		}
+	}
+
+	/**
+	 * Recognizes one documented account restriction without retaining provider text.
+	 *
+	 * @param mixed $response WordPress HTTP response (bounded at the HTTP boundary).
+	 * @return bool Whether the complete, single error exactly matches the allowlist.
+	 */
+	private function credits_exceeded( mixed $response ): bool {
+		$body = is_array( $response ) ? ( $response['body'] ?? null ) : null;
+		if ( ! is_string( $body ) || strlen( $body ) > 1024 ) {
+			return false;
+		}
+		$data = json_decode( $body, true, 8 );
+		return is_array( $data ) && isset( $data['errors'] ) && is_array( $data['errors'] )
+			&& 1 === count( $data['errors'] )
+			&& isset( $data['errors'][0] ) && is_array( $data['errors'][0] )
+			&& 'Maximum credits exceeded' === ( $data['errors'][0]['message'] ?? null );
 	}
 
 	/**
@@ -359,18 +394,22 @@ class SendGridProvider implements ProviderInterface {
 	 *
 	 * @param int  $code Observed HTTP status or zero.
 	 * @param bool $sandbox Whether this was a sandbox probe.
+	 * @param bool $credits_exceeded Exact documented account restriction observed.
 	 * @return string Safe operator guidance.
 	 */
-	private function safe_status( int $code, bool $sandbox ): string {
-		if ( 0 === $code ) {
+	private function safe_status( int $code, bool $sandbox, bool $credits_exceeded = false ): string {
+		if ( $code < 400 || $code >= 500 || 408 === $code ) {
 			return $sandbox ? 'Sandbox validation could not confirm a response.' : 'SendGrid acceptance is unconfirmed. Check provider activity before retrying.';
+		}
+		if ( $credits_exceeded ) {
+			return 'SendGrid rejected the request because Email API credits are exhausted (HTTP 401). Check your Email API plan, sending allowance and billing status. No automatic retry was attempted.';
 		}
 		if ( 401 === $code || 403 === $code ) {
 			return 'SendGrid refused the request (HTTP ' . $code . '). Check API key permissions, Email API credits, billing status and account restrictions. This status alone does not identify the cause.';
 		}
 		if ( 429 === $code ) {
-			return 'SendGrid rate limited the request. Check provider activity before retrying.';
+			return 'SendGrid rejected this request because of rate limiting (HTTP 429). Wait for the provider limit to reset and check provider activity before a manual retry. No automatic retry was attempted.';
 		}
-		return $sandbox ? 'SendGrid did not validate the sandbox request.' : 'SendGrid did not acknowledge this request as accepted.';
+		return 'SendGrid rejected the request (HTTP ' . $code . '). Check the configured sender, supported message format and provider account restrictions. No automatic retry was attempted.';
 	}
 }
