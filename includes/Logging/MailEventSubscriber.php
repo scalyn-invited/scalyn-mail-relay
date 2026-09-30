@@ -132,7 +132,7 @@ final class MailEventSubscriber {
 				$message->uuid,
 				'mail_failed',
 				MailStatus::FAILED,
-				__( 'Message delivery failed', 'scalyn-mail-relay' ),
+				__( 'Message sending failed', 'scalyn-mail-relay' ),
 				$result->response_message,
 				$this->build_failed_event_data( $result )
 			);

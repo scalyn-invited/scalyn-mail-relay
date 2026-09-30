@@ -106,7 +106,7 @@ Outcome: one API provider works through the same operational workflow as SMTP.
 - [x] Build the SendGrid adapter behind `ProviderInterface`; no shared-contract changes were needed for this isolated adapter. See [ticket 3 scope and verification](SENDGRID-ADAPTER.md). Registration and normal WordPress sending remain ticket 4.
 - [x] Connect configuration, sandbox verification, deliberate test sending, and normal WordPress sending through the SendGrid adapter. See [ticket 4 workflow and limitations](SENDGRID-WORKFLOW.md) and [ADR-0018](adr/0018-unconfirmed-provider-acceptance.md). Local automated checks passed; Bernie architecture review, browser QA and controlled live verification remain.
 - [x] Normalize acceptance, failure, rate-limit, and ambiguous-outcome handling. See [ticket 5 outcomes](SENDGRID-OUTCOMES.md); explicit HTTP rejection, safe credits/rate-limit guidance and conservative SMTP/API uncertainty. No automatic retry; Bernie review remains.
-- [ ] Preserve UUID correlation, safe logs, and timeline events.
+- [x] Preserve UUID correlation, safe logs, and timeline events. See [ticket 6 correlation](SENDGRID-CORRELATION.md); early preparation failures, source attribution and observer isolation are covered by integration-style privacy tests. Bernie review remains.
 - [ ] Run equivalent provider-contract tests and live verification for SMTP and the API adapter.
 - [ ] Completion gate: both transports handle their supported formats and attachments, expose safe outcomes, and pass the required verification.
 

@@ -121,4 +121,72 @@ final class WordPressMailBridgeTest extends TestCase {
 		$this->assertFalse( $bridge->maybe_send( null, $this->atts() ) );
 		$this->assertSame( array(), $this->provider->requests );
 	}
+
+	public function test_real_adapter_dispatcher_and_repositories_preserve_uuid_and_privacy(): void {
+		$this->settings->save( array( 'provider' => array( 'active' => 'sendgrid' ) ) );
+		$subscriber = new \Scalyn\MailRelay\Logging\MailEventSubscriber( new \Scalyn\MailRelay\Logging\MailLogRepository(), new \Scalyn\MailRelay\Logging\TimelineRepository() );
+		$subscriber->register();
+		try {
+			foreach ( array( 202 => 'accepted', 401 => 'failed', 429 => 'failed', 500 => 'prepared', 0 => 'prepared' ) as $code => $status ) {
+				$GLOBALS['wpdb'] = $db = new WpdbStub();
+				$this->provider->code = $code;
+				$this->provider->requests = array();
+				$this->assertSame( 202 === $code, $this->bridge->maybe_send( null, $this->atts( array( 'headers' => array( 'Bcc: confidential@example.com' ) ) ) ) );
+				$this->assertCount( 1, $this->provider->requests );
+				$this->assertCount( 2, $db->inserts );
+				$payload = json_decode( $this->provider->requests[0]['body'], true );
+				$log = $db->inserts[0]['data'];
+				$event = $db->inserts[1]['data'];
+				$this->assertSame( $payload['custom_args']['scalyn_message_uuid'], $log['message_uuid'] );
+				$this->assertSame( $log['message_uuid'], $event['message_uuid'] );
+				$this->assertSame( $status, $log['status'] );
+				$this->assertSame( $status, $event['event_status'] );
+				$this->assertSame( 'wordpress', $log['source_type'] );
+				$this->assertSame( 'wp_mail', $log['source_name'] );
+				$this->assertSame( 'sendgrid', $log['provider'] );
+				$this->assertSame( 'prepared' === $status ? 'mail_outcome_unconfirmed' : ( 'accepted' === $status ? 'mail_sent' : 'mail_failed' ), $event['event_type'] );
+				if ( 'prepared' === $status ) {
+					$this->assertNull( $log['sent_at'] );
+					$this->assertNull( $log['failed_at'] );
+				}
+				foreach ( array( self::KEY, 'Subject', 'Body', 'confidential@example.com', 'recipient@example.com', 'sender@example.com' ) as $private ) {
+					$this->assertStringNotContainsString( $private, serialize( $db->inserts ) );
+				}
+			}
+		} finally {
+			unset( $GLOBALS['wpdb'] );
+			$GLOBALS['_test_wp_added_actions'] = array();
+		}
+	}
+
+	public function test_preparation_failure_has_a_private_correlated_log_without_sending(): void {
+		$this->settings->save( array( 'provider' => array( 'active' => 'sendgrid' ) ) );
+		$GLOBALS['wpdb'] = $db = new WpdbStub();
+		( new \Scalyn\MailRelay\Logging\MailEventSubscriber( new \Scalyn\MailRelay\Logging\MailLogRepository(), new \Scalyn\MailRelay\Logging\TimelineRepository() ) )->register();
+		try {
+			$this->assertFalse( $this->bridge->maybe_send( null, $this->atts( array( 'embeds' => array( 'private.png' ) ) ) ) );
+			$this->assertSame( array(), $this->provider->requests );
+			$this->assertCount( 2, $db->inserts );
+			$log = $db->inserts[0]['data'];
+			$this->assertSame( 'failed', $log['status'] );
+			$this->assertMatchesRegularExpression( '/^[a-f0-9-]{36}$/', $log['message_uuid'] );
+			$this->assertSame( $log['message_uuid'], $db->inserts[1]['data']['message_uuid'] );
+			foreach ( array( 'private.png', 'recipient@example.com', 'Subject', 'Body', self::KEY ) as $private ) {
+				$this->assertStringNotContainsString( $private, serialize( $db->inserts ) );
+			}
+		} finally {
+			unset( $GLOBALS['wpdb'] );
+			$GLOBALS['_test_wp_added_actions'] = array();
+		}
+	}
+
+	public function test_observer_exception_cannot_reverse_acceptance_or_send_again(): void {
+		$this->settings->save( array( 'provider' => array( 'active' => 'sendgrid' ) ) );
+		$GLOBALS['_test_wp_actions'][HookNames::MAIL_SENT] = static function(): void { throw new \RuntimeException( 'private observer detail' ); };
+		$failures = 0;
+		$GLOBALS['_test_wp_actions'][HookNames::MAIL_FAILED] = static function() use ( &$failures ): void { ++$failures; };
+		$this->assertTrue( $this->bridge->maybe_send( null, $this->atts() ) );
+		$this->assertCount( 1, $this->provider->requests );
+		$this->assertSame( 0, $failures );
+	}
 }

@@ -324,8 +324,10 @@ final class WizardController {
 				. '<p>' . esc_html__( 'If you received this message, your configured provider accepted the test email.', 'scalyn-mail-relay' ) . '</p>',
 			content_type: 'text/html',
 			context: array(
-				'source' => 'wizard_test',
-				'step'   => 5,
+				'source'      => 'wizard_test',
+				'source_type' => 'admin',
+				'source_name' => 'wizard_test',
+				'step'        => 5,
 			)
 		);
 
