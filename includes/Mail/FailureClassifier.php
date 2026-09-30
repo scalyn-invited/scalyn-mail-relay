@@ -31,13 +31,20 @@ final class FailureClassifier {
 	 * @return RemediationSuggestion The failure category and remediation text.
 	 */
 	public function classify( SendResult $result ): RemediationSuggestion {
+		if ( $result->acceptance_unconfirmed ) {
+			return new RemediationSuggestion(
+				TransportFailureCategory::UNKNOWN,
+				__( 'Provider acceptance is unconfirmed. Inspect provider activity before a manual retry to avoid duplicate messages.', 'scalyn-mail-relay' ),
+				$this->format_evidence( $result )
+			);
+		}
 		// If the provider has already classified it, respect that classification.
 		if ( null !== $result->failure_category ) {
 			return $this->remediation_for_category( $result->failure_category, $result );
 		}
 
 		// Analyze response codes first.
-		if ( null !== $result->response_code ) {
+		if ( 'smtp' === $result->provider && null !== $result->response_code ) {
 			$category = $this->classify_by_response_code( $result->response_code );
 			if ( TransportFailureCategory::UNKNOWN !== $category ) {
 				return $this->remediation_for_category( $category, $result );
@@ -207,7 +214,7 @@ final class FailureClassifier {
 			),
 			TransportFailureCategory::CONFIG => new RemediationSuggestion(
 				TransportFailureCategory::CONFIG,
-				__( 'Configuration error before sending. Verify the SMTP setup in the Setup Wizard and run diagnostics to check for other issues.', 'scalyn-mail-relay' ),
+				__( 'Configuration error before sending. Verify the selected provider setup in the Setup Wizard and run diagnostics to check for other issues.', 'scalyn-mail-relay' ),
 				$evidence
 			),
 			default => new RemediationSuggestion(

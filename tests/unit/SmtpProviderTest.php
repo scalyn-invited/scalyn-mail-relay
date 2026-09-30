@@ -366,8 +366,9 @@ final class SmtpProviderTest extends TestCase {
 
 		$this->assertFalse( $result->success );
 		$this->assertSame( TransportFailureCategory::CONNECTIVITY, $result->failure_category );
-		$this->assertTrue( $result->retryable );
-		$this->assertStringContainsStringIgnoringCase( 'connect', (string) $result->response_message );
+		$this->assertFalse( $result->retryable );
+		$this->assertTrue( $result->acceptance_unconfirmed );
+		$this->assertStringContainsString( 'unconfirmed', $result->response_message );
 	}
 
 	public function test_send_normalises_auth_exception_to_safe_message(): void {
@@ -408,8 +409,9 @@ final class SmtpProviderTest extends TestCase {
 
 		$this->assertFalse( $result->success );
 		$this->assertSame( TransportFailureCategory::TIMEOUT, $result->failure_category );
-		$this->assertTrue( $result->retryable );
-		$this->assertStringContainsStringIgnoringCase( 'timed out', (string) $result->response_message );
+		$this->assertFalse( $result->retryable );
+		$this->assertTrue( $result->acceptance_unconfirmed );
+		$this->assertStringContainsString( 'unconfirmed', $result->response_message );
 	}
 
 	public function test_send_normalises_provider_rejection_exception_to_safe_message(): void {
@@ -419,6 +421,7 @@ final class SmtpProviderTest extends TestCase {
 
 		$this->assertFalse( $result->success );
 		$this->assertSame( TransportFailureCategory::PROVIDER_REJECTION, $result->failure_category );
+		$this->assertTrue( $result->acceptance_unconfirmed, 'Some recipients may already have been accepted.' );
 		$this->assertFalse( $result->retryable );
 		$this->assertStringNotContainsString( 'to@example.com', (string) $result->response_message );
 	}
@@ -436,7 +439,8 @@ final class SmtpProviderTest extends TestCase {
 		$this->assertFalse( $result->success );
 		$this->assertSame( TransportFailureCategory::UNKNOWN, $result->failure_category );
 		$this->assertFalse( $result->retryable );
-		$this->assertSame( 'SMTP transport failed.', $result->response_message );
+		$this->assertTrue( $result->acceptance_unconfirmed );
+		$this->assertStringContainsString( 'unconfirmed', $result->response_message );
 	}
 
 	/**
@@ -464,17 +468,17 @@ final class SmtpProviderTest extends TestCase {
 				'SMTP authentication failed.',
 				'The SMTP server did not accept the message.',
 				'SMTP transport failed.',
+				'SMTP acceptance is unconfirmed. Check provider activity before retrying.',
 			)
 		);
 	}
 
 	/**
-	 * Requirement: the same underlying failure must map to the same sanitized
-	 * message whether it surfaces through send() or test_connection().
+	 * Connection probes cannot submit mail; send exceptions may follow acceptance.
 	 *
 	 * @dataProvider transportFailureMessageProvider
 	 */
-	public function test_connection_message_matches_send_failure_message_for_same_exception( string $raw_message ): void {
+	public function test_connection_probe_does_not_inherit_send_uncertainty( string $raw_message ): void {
 		$send_stub                 = new StubPHPMailer();
 		$send_stub->send_exception = new PHPMailerException( $raw_message );
 		$send_result               = $this->make_provider( $send_stub )->send( $this->make_message(), $this->valid_config() );
@@ -483,7 +487,15 @@ final class SmtpProviderTest extends TestCase {
 		$connect_stub->smtpConnect_exception = new PHPMailerException( $raw_message );
 		$connection_result                   = $this->make_provider( $connect_stub )->test_connection( $this->valid_config() );
 
-		$this->assertSame( $send_result->response_message, $connection_result->message );
+		$this->assertFalse( $connection_result->success );
+		$this->assertStringNotContainsString( 'acceptance is unconfirmed', $connection_result->message );
+		if ( in_array( $send_result->failure_category, array( TransportFailureCategory::AUTH, TransportFailureCategory::TLS, TransportFailureCategory::CERTIFICATE ), true ) ) {
+			$this->assertSame( $send_result->response_message, $connection_result->message );
+			$this->assertFalse( $send_result->acceptance_unconfirmed );
+		} else {
+			$this->assertTrue( $send_result->acceptance_unconfirmed );
+			$this->assertFalse( $send_result->retryable );
+		}
 	}
 
 	/**

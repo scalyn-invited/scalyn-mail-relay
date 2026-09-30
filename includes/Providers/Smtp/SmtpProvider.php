@@ -231,7 +231,8 @@ class SmtpProvider implements ProviderInterface {
 	 * @return SendResult
 	 */
 	public function send( MailMessage $message, array $config ): SendResult {
-		$validation = $this->validate_config( $config );
+		$send_attempted = false;
+		$validation     = $this->validate_config( $config );
 		if ( ! $validation->valid ) {
 			return new SendResult(
 				success: false,
@@ -300,7 +301,10 @@ class SmtpProvider implements ProviderInterface {
 				$mailer->addAttachment( (string) $attachment );
 			}
 
-			$mailer->send();
+			$send_attempted = true;
+			if ( ! $mailer->send() ) {
+				return new SendResult( false, 'smtp', null, null, 'SMTP acceptance is unconfirmed. Check provider activity before retrying.', false, TransportFailureCategory::UNKNOWN, array(), true );
+			}
 
 			// provider_message_id: PHPMailer's internally generated RFC Message-ID
 			// is not a provider-assigned transaction identifier. Set to null.
@@ -317,7 +321,7 @@ class SmtpProvider implements ProviderInterface {
 			);
 
 		} catch ( PHPMailerException $e ) {
-			return $this->normalize_send_failure( $e );
+			return $this->normalize_send_failure( $e, $send_attempted );
 		}
 	}
 
@@ -570,12 +574,19 @@ class SmtpProvider implements ProviderInterface {
 	 * @security Passwords and usernames must never appear in the returned result.
 	 *
 	 * @param PHPMailerException $e The caught exception.
+	 * @param bool               $send_attempted Whether PHPMailer's send operation began.
 	 * @return SendResult
 	 */
-	private function normalize_send_failure( PHPMailerException $e ): SendResult {
+	private function normalize_send_failure( PHPMailerException $e, bool $send_attempted ): SendResult {
 		$category = $this->classify_transport_exception( $e );
 
-		list( $message, $retry ) = $this->message_and_retry_for_category( $category );
+		list( $message ) = $this->message_and_retry_for_category( $category );
+		// PHPMailer can throw after DATA, or after accepting only some recipients.
+		// Without phase/per-recipient evidence, a resend could create duplicates.
+		$unconfirmed = $send_attempted && ! in_array( $category, array( TransportFailureCategory::AUTH, TransportFailureCategory::TLS, TransportFailureCategory::CERTIFICATE ), true );
+		if ( $unconfirmed ) {
+			$message = 'SMTP acceptance is unconfirmed. Check provider activity before retrying.';
+		}
 
 		return new SendResult(
 			success: false,
@@ -583,8 +594,9 @@ class SmtpProvider implements ProviderInterface {
 			provider_message_id: null,
 			response_code: null,
 			response_message: $message,
-			retryable: $retry,
-			failure_category: $category
+			retryable: false,
+			failure_category: $category,
+			acceptance_unconfirmed: $unconfirmed
 		);
 	}
 

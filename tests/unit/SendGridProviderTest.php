@@ -193,12 +193,49 @@ namespace {
 
 		public function test_http_401_does_not_infer_authentication_failure_from_status_alone(): void {
 			$provider = new StubSendGridProvider();
-			$provider->response = array( 'response' => array( 'code' => 401 ), 'body' => '{"errors":[{"message":"Maximum credits exceeded"}]}' );
+			$provider->response = array( 'response' => array( 'code' => 401 ), 'body' => 'unrecognized response' );
 			$result = $provider->send( $this->message(), $this->config() );
-			$this->assertSame( 'unknown', $result->failure_category );
+			$this->assertSame( 'provider-rejection', $result->failure_category );
 			$this->assertSame( '401', $result->response_code );
 			$this->assertStringContainsString( 'Email API credits', $result->response_message );
 			$this->assertStringContainsString( 'HTTP 401', $provider->test_connection( $this->config() )->message );
+		}
+
+		public function test_exact_credit_restriction_has_safe_actionable_guidance(): void {
+			$provider = new StubSendGridProvider();
+			$provider->response = array( 'response' => array( 'code' => 401 ), 'body' => '{"errors":[{"message":"Maximum credits exceeded","field":"private@example.com"}]}' );
+			$result = $provider->send( $this->message(), $this->config() );
+			$this->assertSame( 'provider-rejection', $result->failure_category );
+			$this->assertFalse( $result->acceptance_unconfirmed );
+			$this->assertStringContainsString( 'credits are exhausted', $result->response_message );
+			$this->assertStringContainsString( 'credits are exhausted', $provider->test_connection( $this->config() )->message );
+			$this->assertStringNotContainsString( 'private@example.com', serialize( $result ) );
+		}
+
+		public function test_only_an_exact_bounded_single_error_can_identify_exhausted_credits(): void {
+			foreach ( array( '', 'not json', '{"errors":["Maximum credits exceeded"]}', '{"errors":true}', '{"errors":[{"message":"Maximum credits exceeded secret"}]}', '{"errors":[{"message":"Maximum credits exceeded"},{}]}', str_repeat( ' ', 1025 ) . '{"errors":[{"message":"Maximum credits exceeded"}]}' ) as $body ) {
+				$provider = new StubSendGridProvider();
+				$provider->response = array( 'response' => array( 'code' => 401 ), 'body' => $body );
+				$this->assertStringNotContainsString( 'credits are exhausted', $provider->send( $this->message(), $this->config() )->response_message );
+			}
+		}
+
+		public function test_outcome_matrix_never_retries_or_treats_uncertainty_as_failure(): void {
+			foreach ( array( 0, 100, 200, 201, 202, 204, 301, 400, 401, 403, 404, 405, 408, 413, 429, 451, 500, 502, 503, 504, 599, 600 ) as $code ) {
+				$provider = new StubSendGridProvider();
+				$provider->response = array( 'response' => array( 'code' => $code ), 'body' => 'private recipient and credential' );
+				$result = $provider->send( $this->message(), $this->config() );
+				$accepted = 202 === $code;
+				$rejected = $code >= 400 && $code < 500 && 408 !== $code;
+				$this->assertSame( $accepted, $result->success, (string) $code );
+				$this->assertSame( ! $accepted && ! $rejected, $result->acceptance_unconfirmed, (string) $code );
+				$this->assertFalse( $result->retryable );
+				$this->assertCount( 1, $provider->calls );
+				$this->assertStringNotContainsString( 'private recipient', serialize( $result ) );
+				if ( 429 === $code ) {
+					$this->assertStringContainsString( 'rate limiting', $result->response_message );
+				}
+			}
 		}
 	}
 }
