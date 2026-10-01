@@ -9,6 +9,16 @@ use Scalyn\MailRelay\Diagnostics\HealthScorer;
 use Scalyn\MailRelay\Logging\MailLogRepository;
 
 final class DiagnosticPublicationTest extends TestCase {
+	public function test_scope_is_persisted_and_operational_score_is_provider_filtered(): void {
+		$scope=['configuration_id'=>'revision-1','provider_id'=>'postmark','sending_domain'=>'sender.example'];
+		$result=$this->repository->publish(self::UUID,$this->checks(),$scope);
+		$this->assertSame('revision-1',$result['results'][0]['configuration_id']);
+		$this->assertSame('postmark',$result['results'][0]['provider_id']);
+		$this->assertSame('sender.example',$result['results'][0]['sending_domain']);
+		$queries=array_values(array_filter($this->db->prepare_calls,fn($call)=>str_contains($call['query'],'WHERE provider = %s')));
+		$this->assertCount(1,$queries);
+		$this->assertSame('postmark',$queries[0]['args'][1]);
+	}
 	private PublicationWpdbStub $db;
 	private DiagnosticPublicationRepository $repository;
 	private const UUID = '70000000-0000-4000-8000-000000000001';

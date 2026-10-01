@@ -36,6 +36,7 @@ final class ProvidersPage {
 		$active_provider_id = $settings->get_active_provider_id();
 		$smtp_settings      = $settings->get_smtp_config();
 		$sendgrid_settings  = $settings->get_sendgrid_settings();
+		$postmark_settings  = $settings->get_postmark_settings();
 		$can_configure      = current_user_can( Capabilities::MANAGE_SETTINGS );
 		$verified           = $settings->is_provider_verified();
 		$verified_time      = $verified ? strtotime( $settings->get_provider_verified_at() ?? '' ) : false;
@@ -45,6 +46,7 @@ final class ProvidersPage {
 			$configured = match ( $id ) {
 				'smtp' => '' !== ( $smtp_settings['host'] ?? '' ) && '' !== ( $smtp_settings['from_email'] ?? '' ),
 				'sendgrid' => $sendgrid_settings['has_key'] && '' !== $sendgrid_settings['from_email'],
+				'postmark' => $postmark_settings['has_key'] && '' !== $postmark_settings['from_email'],
 				default => false,
 			};
 			$providers[] = array(
@@ -57,6 +59,7 @@ final class ProvidersPage {
 				'transport'   => match ( $id ) {
 					'smtp' => 'SMTP',
 					'sendgrid' => 'API (HTTPS)',
+					'postmark' => 'API (HTTPS)',
 					default => __( 'Not reported', 'scalyn-mail-relay' ),
 				},
 			);

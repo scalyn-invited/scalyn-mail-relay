@@ -100,6 +100,7 @@ defined( 'ABSPATH' ) || exit;
 		</div>
 	<?php else : ?>
 		<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/diagnostics-overview.php'; ?>
+		<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/diagnostic-scope.php'; ?>
 
 		<!-- DNS Validation Checks -->
 		<section class="scalyn-diagnostics-section" aria-labelledby="scalyn-diagnostics-dns-heading">
@@ -224,6 +225,7 @@ defined( 'ABSPATH' ) || exit;
 		</section>
 
 		<!-- Provider Health Checks -->
+		<?php if ( 'smtp' === ( $diagnostic_scope['provider'] ?? 'smtp' ) ) : ?>
 		<section class="scalyn-diagnostics-section" aria-labelledby="scalyn-diagnostics-provider-heading">
 			<h2 id="scalyn-diagnostics-provider-heading" class="scalyn-diagnostics-section__title"><?php esc_html_e( 'Provider Connection · TLS and Certificates', 'scalyn-mail-relay' ); ?></h2>
 			<p class="scalyn-diagnostics-section__description"><?php esc_html_e( 'Verify SMTP server reachability, TLS support, and certificate validity.', 'scalyn-mail-relay' ); ?></p>
@@ -262,6 +264,12 @@ defined( 'ABSPATH' ) || exit;
 		</section>
 
 		<!-- Overall Health Score -->
+		<?php else : ?>
+		<section class="scalyn-card">
+			<h2 id="scalyn-diagnostics-provider-heading"><?php esc_html_e( 'API provider health: Not assessed', 'scalyn-mail-relay' ); ?></h2>
+			<p><?php esc_html_e( 'SMTP/TLS checks do not apply to this API provider and are excluded from the score. Use Verify Connection in the Setup Wizard for a separate API connection check. DNS checks do not prove API authorization or delivery.', 'scalyn-mail-relay' ); ?></p>
+		</section>
+		<?php endif; ?>
 		<section class="scalyn-diagnostics-section" aria-labelledby="scalyn-diagnostics-health-section-heading">
 			<h2 id="scalyn-diagnostics-health-section-heading" class="scalyn-diagnostics-section__title"><?php esc_html_e( 'Overall Email Health', 'scalyn-mail-relay' ); ?></h2>
 			<p><?php esc_html_e( 'Configuration score only; authentication and delivery not verified.', 'scalyn-mail-relay' ); ?></p>

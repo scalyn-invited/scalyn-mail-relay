@@ -8,6 +8,7 @@
 defined( 'ABSPATH' ) || exit;
 ?>
 <section class="scalyn-wizard-health" aria-labelledby="scalyn-wizard-health-heading">
+	<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/diagnostic-scope.php'; ?>
 	<h3 id="scalyn-wizard-health-heading"><?php esc_html_e( 'Latest recorded configuration health', 'scalyn-mail-relay' ); ?></h3>
 	<p class="scalyn-score"><?php echo esc_html( $wizard_health['label'] ); ?></p>
 	<?php if ( null === $wizard_health['created_at'] ) : ?>

@@ -101,7 +101,7 @@ final class DiagnosticsPageTest extends TestCase {
 	}
 
 	public function set_mock_diagnostic_data( array $data ): void {
-		$this->wpdb_mock_data = $data;
+		$this->wpdb_mock_data = array_map( static fn( $row ) => array_merge( array( 'configuration_id' => 'current-revision', 'provider_id' => 'smtp', 'sending_domain' => 'example.com', 'diagnostic_uuid' => 'current-run' ), $row ), $data );
 	}
 
 	public function get_mock_diagnostic_data(): array {
@@ -111,7 +111,10 @@ final class DiagnosticsPageTest extends TestCase {
 	private ?array $health_row_mock = null;
 
 	public function set_mock_health_row( ?array $row ): void {
-		$this->health_row_mock = $row;
+		$this->health_row_mock = null === $row ? null : array_merge( array( 'score_uuid' => 'current-run' ), $row );
+		if ( null !== $row && empty( $this->wpdb_mock_data ) ) {
+			$this->set_mock_diagnostic_data( array( array( 'check_name' => 'fixture_unknown', 'status' => 'unknown' ) ) );
+		}
 	}
 
 	public function get_mock_health_row(): ?array {
@@ -128,14 +131,15 @@ final class DiagnosticsPageTest extends TestCase {
 
 	private function configure_provider(): void {
 		$GLOBALS['_test_wp_options'][ SettingsRepository::OPTION_KEY ] = array(
-			'provider' => array( 'active' => 'test-provider' ),
+			'provider' => array( 'active' => 'smtp' ),
+			'diagnostic_revision' => 'current-revision',
 		);
 
 		$this->boot_plugin();
 		Plugin::instance()->container()->get( ProviderRegistry::class )->register(
 			new class() implements ProviderInterface {
 				public function get_id(): string {
-					return 'test-provider';
+					return 'smtp';
 				}
 
 				public function get_label(): string {

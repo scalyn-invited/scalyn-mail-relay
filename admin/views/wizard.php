@@ -114,6 +114,7 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 												match ( $provider_key ) {
 													'smtp' => __( 'Use an existing mail server with a host, port and login supplied by your provider.', 'scalyn-mail-relay' ),
 													'sendgrid' => __( 'Send through the SendGrid API using a Mail Send key and a verified sender.', 'scalyn-mail-relay' ),
+													'postmark' => __( 'Send transactional email through Postmark using a Live Server API token and a verified sender.', 'scalyn-mail-relay' ),
 													default => __( 'Use this registered mail provider for your site.', 'scalyn-mail-relay' ),
 												}
 											);
@@ -136,6 +137,13 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 
 			// -----------------------------------------------------------------
 			case 3:
+				if ( 'postmark' === $active_provider_id ) {
+					if ( is_array( $step3_errors ) && in_array( 'postmark', $step3_errors, true ) ) {
+						echo '<div class="notice notice-error inline"><p>' . esc_html__( 'Postmark settings are incomplete or the stored token cannot be read. Check the sender and replace the token below.', 'scalyn-mail-relay' ) . '</p></div>';
+					}
+					$postmark_form->render( true );
+					break;
+				}
 				if ( 'sendgrid' === $active_provider_id ) :
 					?>
 					<?php if ( is_array( $step3_errors ) && in_array( 'sendgrid', $step3_errors, true ) ) : ?>
@@ -299,7 +307,9 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 			case 4:
 				?>
 				<h2><?php esc_html_e( 'Verify Connection', 'scalyn-mail-relay' ); ?></h2>
-				<?php if ( 'sendgrid' === $active_provider_id ) : ?>
+				<?php if ( 'postmark' === $active_provider_id ) : ?>
+					<p><?php esc_html_e( 'Check the Postmark Server API token and Live server type without sending email. This does not verify sender authorization, sending allowance or delivery. Sandbox servers are not supported.', 'scalyn-mail-relay' ); ?></p>
+				<?php elseif ( 'sendgrid' === $active_provider_id ) : ?>
 					<p><?php esc_html_e( 'Validate the SendGrid key and request format in sandbox mode. No email is sent, and this does not prove real-send permission or recipient delivery.', 'scalyn-mail-relay' ); ?></p>
 				<?php else : ?>
 					<p><?php esc_html_e( 'Test the connection to your SMTP server. No email is sent during this step.', 'scalyn-mail-relay' ); ?></p>
@@ -382,7 +392,7 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 			case 6:
 				?>
 				<h2><?php esc_html_e( 'Health Check', 'scalyn-mail-relay' ); ?></h2>
-				<p><?php esc_html_e( 'Run diagnostics to generate a configuration-health snapshot. Checks may contact DNS and your configured SMTP server; no test email is sent by this action.', 'scalyn-mail-relay' ); ?></p>
+				<p><?php esc_html_e( 'Run diagnostics for the selected provider and sending domain. Checks contact DNS and, only for SMTP, the configured SMTP server. No test email is sent.', 'scalyn-mail-relay' ); ?></p>
 				<?php if ( current_user_can( \Scalyn\MailRelay\Core\Capabilities::RUN_DIAGNOSTICS ) ) : ?>
 					<?php require __DIR__ . '/wizard-health.php'; ?>
 					<p>
@@ -392,7 +402,7 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 				<?php else : ?>
 					<p><?php esc_html_e( 'You do not have permission to run diagnostics or view health results. Ask an administrator to complete the health check.', 'scalyn-mail-relay' ); ?></p>
 				<?php endif; ?>
-				<p class="description"><?php esc_html_e( 'You may continue without running a check, but this does not mark email health as verified. Existing snapshots may predate your setup changes.', 'scalyn-mail-relay' ); ?></p>
+				<p class="description"><?php esc_html_e( 'You may continue without running a check, but this does not mark email health as verified. Changing the provider or its configuration requires a fresh check; previous results remain historical.', 'scalyn-mail-relay' ); ?></p>
 				<?php
 				break;
 

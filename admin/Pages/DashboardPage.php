@@ -12,7 +12,6 @@ use Scalyn\MailRelay\Core\Capabilities;
 use Scalyn\MailRelay\Core\Plugin;
 use Scalyn\MailRelay\Core\ProviderRegistry;
 use Scalyn\MailRelay\Core\SettingsRepository;
-use Scalyn\MailRelay\Database\HealthScoreRepository;
 use Scalyn\MailRelay\Logging\MailLogRepository;
 
 defined( 'ABSPATH' ) || exit;
@@ -49,6 +48,7 @@ final class DashboardPage {
 		$provider_transport    = match ( $active_provider_id ) {
 			'smtp' => __( 'SMTP', 'scalyn-mail-relay' ),
 			'sendgrid' => __( 'API (HTTPS)', 'scalyn-mail-relay' ),
+			'postmark' => __( 'API (HTTPS)', 'scalyn-mail-relay' ),
 			default => __( 'Not reported', 'scalyn-mail-relay' ),
 		};
 		$verified_at          = $provider_verified ? $settings->get_provider_verified_at() : null;
@@ -73,7 +73,8 @@ final class DashboardPage {
 
 		// Health score: read the last HealthScorer snapshot — the same source and
 		// presentation the Diagnostics page uses — so both screens agree.
-		$health                    = HealthScorePresenter::present( $container->get( HealthScoreRepository::class )->find_latest() );
+		$diagnostic_scope          = $container->get( \Scalyn\MailRelay\Diagnostics\CurrentDiagnostics::class )->snapshot();
+		$health                    = HealthScorePresenter::present( $diagnostic_scope['health'] );
 		$health_score              = $health['score'];
 		$health_ui_status          = $health['ui_status'];
 		$health_ui_label           = $health['label'];

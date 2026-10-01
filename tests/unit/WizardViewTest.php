@@ -11,7 +11,7 @@ final class WizardViewTest extends TestCase {
 		$step_labels = array( 1 => 'Welcome', 2 => 'Choose Provider', 3 => 'Configure Provider', 4 => 'Verify Connection', 5 => 'Send Test Email', 6 => 'Health Check', 7 => 'Completion' );
 		$wizard_health = \Scalyn\MailRelay\Admin\HealthScorePresenter::present( null );
 		$wizard_freshness = '';
-		$registered_providers = array( 'smtp' => 'SMTP', 'sendgrid' => 'SendGrid API', 'custom' => '<script>unsafe</script>' );
+		$registered_providers = array( 'smtp' => 'SMTP', 'sendgrid' => 'SendGrid API', 'postmark' => 'Postmark API', 'custom' => '<script>unsafe</script>' );
 		$active_provider_id = $provider;
 		$smtp_config = array( 'host' => 'smtp.example.test', 'port' => 587, 'encryption' => 'tls', 'username' => 'example', 'from_name' => 'Example', 'from_email' => 'sender@example.test' );
 		$smtp_has_password = true;
@@ -20,6 +20,14 @@ final class WizardViewTest extends TestCase {
 		$conn_result = $result;
 		$email_result = $result;
 		$prior_options = $GLOBALS['_test_wp_options'] ?? array();
+		if ( 'postmark' === $provider ) {
+			$GLOBALS['_test_wp_options'] = array();
+			$settings = new \Scalyn\MailRelay\Core\SettingsRepository();
+			$cipher = new \Scalyn\MailRelay\Core\CredentialCipher(base64_encode(str_repeat('a',32)));
+			$settings->save(['provider'=>['active'=>'postmark']]);
+			if ($ready) { $settings->save_postmark(['from_email'=>'sender@example.test','from_name'=>'Sender','key_action'=>'replace','api_key'=>'PM.synthetic_test_credential_0123456789'],$cipher); }
+			$postmark_form = new \Scalyn\MailRelay\Admin\Components\PostmarkSettingsForm($settings,$cipher);
+		}
 		if ( 'sendgrid' === $provider ) {
 			$GLOBALS['_test_wp_options'] = array();
 			$settings = new \Scalyn\MailRelay\Core\SettingsRepository();
@@ -45,6 +53,24 @@ final class WizardViewTest extends TestCase {
 			$this->assertStringContainsString( 'Acceptance is not delivery', $output );
 			$this->assertStringNotContainsString( 'verifying delivery', $output );
 		}
+	}
+
+	public function test_postmark_has_inline_configuration_and_truthful_verification(): void {
+		$GLOBALS['_test_current_user_can'] = [Capabilities::MANAGE_SETTINGS=>true,Capabilities::MANAGE_MAIL=>true];
+		$_POST=[]; $_SERVER['REQUEST_METHOD']='GET';
+		$html=$this->render_view(3,'postmark',false);
+		$this->assertStringContainsString('Configure Postmark',$html);
+		$this->assertStringContainsString('name="scalyn_postmark_settings"',$html);
+		$this->assertStringNotContainsString('Continue to verification',$html);
+		$this->assertStringNotContainsString('Configure SMTP',$html);
+		$html=$this->render_view(3,'postmark',true);
+		$this->assertStringContainsString('Continue to verification',$html);
+		$this->assertStringContainsString('wizard&step=4',$html);
+		$this->assertStringNotContainsString('PM.synthetic_test_credential',$html);
+		$html=$this->render_view(4,'postmark',true);
+		$this->assertStringContainsString('without sending email',$html);
+		$this->assertStringContainsString('Sandbox servers are not supported',$html);
+		$this->assertStringNotContainsString('Test the connection to your SMTP server',$html);
 	}
 
 	public function test_provider_cards_preserve_selection_fields_and_escape_labels(): void {

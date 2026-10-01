@@ -13,7 +13,6 @@ use Scalyn\MailRelay\Core\ProviderRegistry;
 use Scalyn\MailRelay\Core\SettingsRepository;
 use Scalyn\MailRelay\Admin\HealthScorePresenter;
 use Scalyn\MailRelay\Admin\MonitoringStatusPresenter;
-use Scalyn\MailRelay\Database\HealthScoreRepository;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -62,6 +61,11 @@ final class WizardPage {
 		}
 		$active_provider_id = $settings->get_active_provider_id();
 		$sendgrid_form      = null;
+		$postmark_form      = null;
+		if ( 3 === $current_step && 'postmark' === $active_provider_id ) {
+			$postmark_form = new \Scalyn\MailRelay\Admin\Components\PostmarkSettingsForm( $settings, $container->get( \Scalyn\MailRelay\Core\CredentialCipher::class ) );
+			$postmark_form->handle();
+		}
 		if ( 3 === $current_step && 'sendgrid' === $active_provider_id ) {
 			$sendgrid_form = new \Scalyn\MailRelay\Admin\Components\SendGridSettingsForm( $settings, $container->get( \Scalyn\MailRelay\Core\CredentialCipher::class ) );
 			$sendgrid_form->handle();
@@ -93,7 +97,8 @@ final class WizardPage {
 		$wizard_health    = HealthScorePresenter::present( null );
 		$wizard_freshness = '';
 		if ( $current_step >= 6 && current_user_can( Capabilities::RUN_DIAGNOSTICS ) ) {
-			$wizard_health    = HealthScorePresenter::present( $container->get( HealthScoreRepository::class )->find_latest() );
+			$diagnostic_scope = $container->get( \Scalyn\MailRelay\Diagnostics\CurrentDiagnostics::class )->snapshot();
+			$wizard_health    = HealthScorePresenter::present( $diagnostic_scope['health'] );
 			$wizard_freshness = MonitoringStatusPresenter::evidence( $wizard_health['created_at'], $settings->get_diagnostic_schedule(), time() );
 		}
 
@@ -149,8 +154,8 @@ final class WizardPage {
 		}
 
 		// Step 3: The selected provider must have its own configuration.
-		if ( 'sendgrid' === $active_provider_id ) {
-			$sendgrid = $settings->get_sendgrid_settings();
+		if ( in_array( $active_provider_id, array( 'sendgrid', 'postmark' ), true ) ) {
+			$sendgrid = 'postmark' === $active_provider_id ? $settings->get_postmark_settings() : $settings->get_sendgrid_settings();
 			if ( ! $sendgrid['has_key'] || '' === $sendgrid['from_email'] ) {
 				return 3;
 			}

@@ -114,12 +114,31 @@ Outcome: one API provider works through the same operational workflow as SMTP.
   - [ ] Controlled plain/HTML-with-attachment sends and recipient confirmation for both transports; no real emails sent in this implementation pass.
 - [ ] Completion gate: both transports handle their supported formats and attachments, expose safe outcomes, and pass the required verification. Automated evidence passes; live SendGrid verification, controlled sends, owner review and release QA remain outstanding.
 
+## 7B. Additional API provider: Postmark
+
+Schedule: before Milestone 8, approved by Bernie after SendGrid registration
+rejections. SendGrid's outstanding live verification remains outstanding.
+See [implementation and QA guide](POSTMARK-PROVIDER.md) and [ADR-0020](adr/0020-postmark-before-delivery-evidence.md).
+
+- [x] Ticket 1: define Postmark transactional scope, Live-only verification, limits and safe outcome policy. Owner review remains pending.
+- [x] Ticket 2: implement encrypted Server API token storage and inline wizard configuration, with keep/replace/remove actions and verification invalidation.
+- [x] Ticket 3: implement and register the API adapter; connect non-sending verification, wizard test sending and normal WordPress mail.
+- [x] Ticket 4: normalize outcomes, retain message UUID correlation and provider MessageID, and preserve private logs/audit behavior without retries.
+- [x] Provider-switch follow-up: scope current diagnostic evidence to the active provider/configuration and sender domain; clear wizard step 6 after changes, retain history, omit SMTP checks/guidance for APIs, and correlate the displayed score to the same run. See [ADR-0021](adr/0021-provider-scoped-diagnostic-evidence.md). Owner review remains pending.
+- [ ] Ticket 5: complete automated and controlled live QA, desktop/mobile review and owner acceptance.
+  - [x] Automated adapter, credential, shared-provider and WordPress-bridge tests.
+  - [x] Live Server verification and recipient receipt confirmation: owner QA on 2026-10-01 confirmed CF7 plain text, plain text with attachment, and HTML with attachment. See POSTMARK-PROVIDER.md. These receipts do not establish automated delivery tracking.
+  - [ ] Final owner review and release QA.
+- [ ] Completion gate: all required live evidence and review are recorded. Webhooks remain Milestone 8; automatic failover remains Milestone 9.
+
 ## 8. Delivery evidence and Deliverability Centre
 
 Outcome: users can distinguish acceptance, confirmed delivery, and observed inbox placement.
 
-Use the first API provider from Milestone 7 to establish and verify the initial
-delivery/bounce integration before repeating the workflow for other providers.
+Use an accessible, live-verified API provider from Milestone 7 or 7B to establish
+the initial delivery/bounce integration, then repeat for the other providers.
+Provider-specific authentication must be researched separately; do not assume
+SendGrid webhook signatures apply to Postmark.
 
 - [ ] Define provider-message correlation and out-of-band event contracts.
 - [ ] Implement webhook authentication, signature verification, replay protection, and duplicate-event handling.
@@ -155,7 +174,7 @@ does not need a duplicate implementation.
 - [ ] SendGrid — transport, evidence coverage and verification complete.
 - [ ] Mailgun — transport, evidence coverage and verification complete.
 - [ ] Brevo — transport, evidence coverage and verification complete.
-- [ ] Postmark — transport, evidence coverage and verification complete.
+- [ ] Postmark — transport and controlled live receipt QA completed in Milestone 7B; Milestone 8 automated delivery evidence remains pending.
 - [ ] SMTP2GO — transport, evidence coverage and verification complete.
 - [ ] Completion gate: each provider has linked implementation and live verification evidence, documented limitations and safe outcomes. Unsupported delivery evidence remains explicitly unavailable.
 

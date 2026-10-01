@@ -45,7 +45,7 @@ $wizard_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 									<span class="scalyn-badge scalyn-badge--connected"><?php esc_html_e( 'Active', 'scalyn-mail-relay' ); ?></span>
 								<?php endif; ?>
 							</div>
-							<p class="scalyn-provider-description"><?php echo esc_html( 'smtp' === $p['id'] ? __( 'Connect an existing mail server using your provider’s host and login details.', 'scalyn-mail-relay' ) : ( 'sendgrid' === $p['id'] ? __( 'Send through the SendGrid API with a Mail Send key and an authorized sender.', 'scalyn-mail-relay' ) : __( 'A registered mail provider extension.', 'scalyn-mail-relay' ) ) ); ?></p>
+							<p class="scalyn-provider-description"><?php echo esc_html( 'smtp' === $p['id'] ? __( 'Connect an existing mail server using your provider’s host and login details.', 'scalyn-mail-relay' ) : ( 'sendgrid' === $p['id'] ? __( 'Send through the SendGrid API with a Mail Send key and an authorized sender.', 'scalyn-mail-relay' ) : ( 'postmark' === $p['id'] ? __( 'Send transactional email through the Postmark API using a Live Server token and a verified sender.', 'scalyn-mail-relay' ) : __( 'A registered mail provider extension.', 'scalyn-mail-relay' ) ) ) ); ?></p>
 							<p>
 								<?php if ( $p['configured'] ) : ?>
 									<span class="scalyn-badge scalyn-badge--connected"><?php esc_html_e( 'Settings saved', 'scalyn-mail-relay' ); ?></span>
@@ -75,7 +75,7 @@ $wizard_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 		</div>
 	<?php endif; ?>
 	<details class="scalyn-provider-evidence scalyn-disclosure"><summary><?php esc_html_e( 'What these statuses mean', 'scalyn-mail-relay' ); ?></summary>
-		<p><?php esc_html_e( 'Saved settings are not proof of authorization or delivery. Verification records a successful check or accepted send, not live availability or the latest attempt. SendGrid sandbox verification does not prove real-send permission. Provider acceptance never guarantees inbox placement.', 'scalyn-mail-relay' ); ?></p>
+		<p><?php esc_html_e( 'Saved settings are not proof of authorization or delivery. Verification records a successful check or accepted send, not live availability or the latest attempt. SendGrid sandbox verification does not prove real-send permission. Postmark verification checks token access and Live server type, not sender authorization or sending allowance. Provider acceptance never guarantees inbox placement.', 'scalyn-mail-relay' ); ?></p>
 	</details>
 		<aside class="scalyn-card" aria-labelledby="scalyn-provider-help"><h2 id="scalyn-provider-help"><?php esc_html_e( 'Before you switch providers', 'scalyn-mail-relay' ); ?></h2>
 			<ol><li><?php esc_html_e( 'Prepare the provider credentials and an authorized sender.', 'scalyn-mail-relay' ); ?></li><li><?php esc_html_e( 'Use the wizard to select and configure the sending route. Selection takes effect immediately.', 'scalyn-mail-relay' ); ?></li><li><?php esc_html_e( 'Verify the connection, send a test to an inbox you control, and check receipt.', 'scalyn-mail-relay' ); ?></li></ol>

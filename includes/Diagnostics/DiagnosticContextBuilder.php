@@ -49,6 +49,20 @@ final class DiagnosticContextBuilder {
 	 * @return DiagnosticContext Context containing host, port, encryption and optional public DKIM selector.
 	 */
 	public function build( SettingsRepository $settings, string $fallback_domain ): DiagnosticContext {
+		$provider = $settings->get_active_provider_id();
+		if ( '' !== $provider && 'smtp' !== $provider ) {
+			$public = match ( $provider ) {
+				'postmark' => $settings->get_postmark_settings(),
+				'sendgrid' => $settings->get_sendgrid_settings(),
+				default => array( 'from_email' => '' ),
+			};
+			$domain = self::domain_from_email( $public['from_email'] );
+			$safe   = array();
+			if ( '' !== $settings->get_dkim_selector() ) {
+				$safe['dkim_selector'] = $settings->get_dkim_selector();
+			}
+			return new DiagnosticContext( '' !== $domain ? $domain : $fallback_domain, $safe );
+		}
 		$smtp = $settings->get_smtp_config();
 
 		$safe = array();

@@ -18,10 +18,14 @@ final class RecommendationEngine {
 	 * @param array  $rows Latest retained diagnostic run rows.
 	 * @param string $cadence Monitoring cadence.
 	 * @param int    $now UTC evaluation timestamp.
+	 * @param string $provider Provider whose checks apply; historical callers default to SMTP.
 	 * @return array Refresh flag and ordered safe items; no raw diagnostic strings.
 	 */
-	public function recommend( array $rows, string $cadence, int $now ): array {
-		$rules    = $this->rules();
+	public function recommend( array $rows, string $cadence, int $now, string $provider = 'smtp' ): array {
+		$rules = $this->rules();
+		if ( 'smtp' !== $provider ) {
+			unset( $rules['smtp_tls'] );
+		}
 		$by_check = array();
 		$refresh  = count( $rows ) > 250;
 		$run      = null;

@@ -174,6 +174,69 @@ final class WizardControllerTest extends TestCase {
 		}
 	}
 
+	private function configure_postmark(): WizardTestProvider {
+		$postmark = new WizardTestProvider();
+		$postmark->id = 'postmark';
+		$this->registry->register( $postmark );
+		$settings = new SettingsRepository( $this->cipher );
+		$settings->save_postmark(
+			array(
+				'key_action' => 'replace',
+				'api_key' => 'PM.synthetic_test_credential_0123456789',
+				'from_email' => 'verified@example.com',
+				'from_name' => 'Scalyn, Studio',
+			),
+			$this->cipher
+		);
+		$settings->save( array( 'provider' => array( 'active' => 'postmark' ) ) );
+		return $postmark;
+	}
+
+	public function test_postmark_wizard_uses_encrypted_config_and_its_own_sender(): void {
+		$postmark = $this->configure_postmark();
+		$this->post_step( 3 );
+		$this->run_handle();
+		$this->assertStringContainsString( 'step=4', (string) $this->get_redirect() );
+		$this->assertSame( 'PM.synthetic_test_credential_0123456789', $postmark->last_validate_config['api_key'] );
+		$this->assertSame( '', ( new SettingsRepository() )->get_smtp_config()['host'] );
+
+		$this->post_step( 4 );
+		$this->run_handle();
+		$this->assertSame( 'PM.synthetic_test_credential_0123456789', $postmark->last_connection_config['api_key'] );
+		$this->assertTrue( ( new SettingsRepository() )->is_provider_verified() );
+
+		$postmark->send_result = new SendResult( true, 'postmark', null, '200', 'Accepted by Postmark.' );
+		$this->post_step( 5, array( 'test_recipient' => 'inbox@example.com' ) );
+		$this->run_handle();
+		$this->assertSame( 'verified@example.com', $postmark->last_sent_message->from );
+		$this->assertSame( 'inbox@example.com', $postmark->last_sent_message->to[0] );
+		$this->assertTrue( ( new SettingsRepository() )->has_accepted_test_email() );
+		$this->assertStringNotContainsString( 'PM.synthetic_test_credential', json_encode( get_transient( 'scalyn_wizard_email_1' ) ) );
+	}
+
+	public function test_postmark_wizard_rejects_unreadable_key_before_verification(): void {
+		$postmark = $this->configure_postmark();
+		$container = Plugin::instance()->container();
+		$container->set( SettingsRepository::class, static fn() => new SettingsRepository( new CredentialCipher( base64_encode( str_repeat( 'z', 32 ) ) ) ) );
+		$this->post_step( 3 );
+		$this->run_handle();
+		$this->assertStringContainsString( 'step=3', (string) $this->get_redirect() );
+		$this->assertSame( array( 'postmark' ), get_transient( 'scalyn_wizard_step3_errors_1' ) );
+		$this->assertSame( array(), $postmark->last_validate_config );
+	}
+
+	public function test_postmark_unconfirmed_test_email_is_not_audited_as_failed(): void {
+		$postmark = $this->configure_postmark();
+		$postmark->send_result = new SendResult( false, 'postmark', null, null, 'Acceptance unconfirmed.', false, 'unknown', array(), true );
+		$events = array();
+		$GLOBALS['_test_wp_actions'][\Scalyn\MailRelay\Core\HookNames::AUDIT_EVENT] = static function( $event ) use ( &$events ): void { $events[] = $event->outcome; };
+		$this->post_step( 5, array( 'test_recipient' => 'inbox@example.com' ) );
+		$this->run_handle();
+		$this->assertSame( array( 'started', 'unconfirmed' ), $events );
+		$this->assertFalse( ( new SettingsRepository() )->has_accepted_test_email() );
+	}
+
+
 	private function configure_sendgrid(): WizardTestProvider {
 		$sendgrid = new WizardTestProvider();
 		$sendgrid->id = 'sendgrid';

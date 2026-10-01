@@ -141,15 +141,16 @@ final class WizardController {
 		}
 
 		check_admin_referer( 'scalyn_wizard_step3' );
-		$settings = $this->get_settings();
-		if ( 'sendgrid' === $settings->get_active_provider_id() ) {
+		$settings    = $this->get_settings();
+		$provider_id = $settings->get_active_provider_id();
+		if ( in_array( $provider_id, array( 'sendgrid', 'postmark' ), true ) ) {
 			try {
-				$valid = $this->get_registry()->get( 'sendgrid' )->validate_config( $settings->get_provider_config( 'sendgrid' ) )->valid;
+				$valid = $this->get_registry()->get( $provider_id )->validate_config( $settings->get_provider_config( $provider_id ) )->valid;
 			} catch ( \Throwable $error ) {
 				$valid = false;
 			}
 			if ( ! $valid ) {
-				set_transient( $this->transient_key( 'step3_errors' ), array( 'sendgrid' ), self::TRANSIENT_TTL );
+				set_transient( $this->transient_key( 'step3_errors' ), array( $provider_id ), self::TRANSIENT_TTL );
 			}
 			wp_safe_redirect( $this->step_url( $valid ? 4 : 3 ) );
 			exit;
@@ -308,10 +309,14 @@ final class WizardController {
 
 		$settings    = $this->get_settings();
 		$provider_id = $settings->get_active_provider_id();
-		$sender      = 'sendgrid' === $provider_id ? $settings->get_sendgrid_settings() : $settings->get_smtp_config();
-		$from_email  = (string) ( $sender['from_email'] ?? '' );
-		$from_name   = (string) ( $sender['from_name'] ?? '' );
-		$from        = 'sendgrid' === $provider_id ? $from_email : ( '' !== $from_name
+		$sender      = match ( $provider_id ) {
+			'postmark' => $settings->get_postmark_settings(),
+			'sendgrid' => $settings->get_sendgrid_settings(),
+			default => $settings->get_smtp_config(),
+		};
+		$from_email = (string) ( $sender['from_email'] ?? '' );
+		$from_name  = (string) ( $sender['from_name'] ?? '' );
+		$from       = in_array( $provider_id, array( 'sendgrid', 'postmark' ), true ) ? $from_email : ( '' !== $from_name
 			? $from_name . ' <' . $from_email . '>'
 			: $from_email );
 

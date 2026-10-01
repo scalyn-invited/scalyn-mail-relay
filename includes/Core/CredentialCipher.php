@@ -49,14 +49,15 @@ final class CredentialCipher {
 	 * Encrypts a credential with a unique nonce and provider-bound authenticated data.
 	 *
 	 * @param string $secret Credential.
+	 * @param string $provider Provider-bound encryption context; defaults preserve existing envelopes.
 	 * @return string Versioned envelope.
 	 * @throws \RuntimeException When encryption fails.
 	 */
-	public function encrypt( #[\SensitiveParameter] string $secret ): string {
+	public function encrypt( #[\SensitiveParameter] string $secret, string $provider = 'sendgrid' ): string {
 		$key   = $this->key();
 		$nonce = random_bytes( 12 );
 		$tag   = '';
-		$data  = openssl_encrypt( $secret, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $nonce, $tag, 'scalyn:sendgrid:api-key:v1', 16 );
+		$data  = openssl_encrypt( $secret, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $nonce, $tag, $this->context( $provider ), 16 );
 		if ( false === $data ) {
 			throw new \RuntimeException( 'Credential could not be protected.' );
 		}
@@ -68,10 +69,11 @@ final class CredentialCipher {
 	 * Authenticates before releasing plaintext; corrupted/rotated keys fail closed.
 	 *
 	 * @param string $envelope Stored encrypted value.
+	 * @param string $provider Expected provider-bound encryption context.
 	 * @return string Credential for transport use only.
 	 * @throws \RuntimeException When authentication or format validation fails.
 	 */
-	public function decrypt( #[\SensitiveParameter] string $envelope ): string {
+	public function decrypt( #[\SensitiveParameter] string $envelope, string $provider = 'sendgrid' ): string {
 		$key = $this->key();
 		if ( ! str_starts_with( $envelope, 'v1:' ) || strlen( $envelope ) > 1024 ) {
 			throw new \RuntimeException( 'Stored credential is unavailable. Replace or remove it.' );
@@ -81,10 +83,24 @@ final class CredentialCipher {
 		if ( false === $data || strlen( $data ) < 29 ) {
 			throw new \RuntimeException( 'Stored credential is unavailable. Replace or remove it.' );
 		}
-		$secret = openssl_decrypt( substr( $data, 28 ), 'aes-256-gcm', $key, OPENSSL_RAW_DATA, substr( $data, 0, 12 ), substr( $data, 12, 16 ), 'scalyn:sendgrid:api-key:v1' );
+		$secret = openssl_decrypt( substr( $data, 28 ), 'aes-256-gcm', $key, OPENSSL_RAW_DATA, substr( $data, 0, 12 ), substr( $data, 12, 16 ), $this->context( $provider ) );
 		if ( false === $secret ) {
 			throw new \RuntimeException( 'Stored credential is unavailable. Replace or remove it.' );
 		}
 		return $secret;
+	}
+
+	/**
+	 * Restricts authenticated context to supported encrypted providers.
+	 *
+	 * @param string $provider Provider identifier.
+	 * @return string Authenticated context.
+	 * @throws \InvalidArgumentException When the context is unsupported.
+	 */
+	private function context( string $provider ): string {
+		if ( ! in_array( $provider, array( 'sendgrid', 'postmark' ), true ) ) {
+			throw new \InvalidArgumentException( 'Unsupported credential context.' );
+		}
+		return 'scalyn:' . $provider . ':api-key:v1';
 	}
 }

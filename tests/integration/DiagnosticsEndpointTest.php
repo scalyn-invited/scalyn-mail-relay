@@ -18,6 +18,45 @@ use Scalyn\MailRelay\Rest\DiagnosticsRunEndpoint;
  * checks when called with proper authentication.
  */
 final class DiagnosticsEndpointTest extends TestCase {
+	public function test_api_runs_use_the_api_sender_and_never_execute_smtp_checks(): void {
+		$GLOBALS['_test_wp_options'][SettingsRepository::OPTION_KEY]=['provider'=>['active'=>'postmark'],'postmark'=>['from_email'=>'sender@postmark.example'],'smtp'=>['from_email'=>'old@smtp.example']];
+		$this->boot_plugin();
+		$smtp=$this->install_context_spy();
+		$response=(new DiagnosticsRunEndpoint())->handle_request();
+		$this->assertSame(200,$response->get_status());
+		$this->assertNull($smtp->context);
+		$rows=$response->get_data()['results'];
+		$this->assertCount(4,$rows);
+		foreach ($rows as $row) {
+			$this->assertSame('postmark',$row['provider_id']);
+			$this->assertSame('postmark.example',$row['sending_domain']);
+			$this->assertNotEmpty($row['configuration_id']);
+			$this->assertSame('dns',$row['check_type']);
+		}
+	}
+
+	public function test_run_finishing_after_provider_switch_is_history_not_current_success(): void {
+		$this->boot_plugin();
+		$this->install_context_spy();
+		$settings=Plugin::instance()->container()->get(SettingsRepository::class);
+		$original=$settings->ensure_diagnostic_revision();
+		Plugin::instance()->container()->get(DiagnosticCheckRegistry::class)->register(new class implements DiagnosticCheckInterface {
+			public function get_id(): string { return 'spf_record'; }
+			public function get_category(): string { return 'dns'; }
+			public function run(DiagnosticContext $context): DiagnosticResult {
+				(new SettingsRepository())->save(['provider'=>['active'=>'postmark']]);
+				return new DiagnosticResult('pass','low','Synthetic');
+			}
+		});
+		$response=(new DiagnosticsRunEndpoint())->handle_request();
+		$this->assertSame(409,$response->get_status());
+		$this->assertFalse($response->get_data()['success']);
+		$this->assertArrayNotHasKey('health_score',$response->get_data());
+		$rows=array_values(array_filter($GLOBALS['wpdb']->inserts,fn($insert)=>str_ends_with($insert['table'],'scalyn_diagnostics')));
+		$this->assertCount(5,$rows);
+		$this->assertSame($original,$rows[0]['data']['configuration_id']);
+		$this->assertNotSame($original,(new SettingsRepository())->get_diagnostic_revision());
+	}
 
 	public function test_diagnostic_audit_records_one_run_without_evidence_payload(): void {
 		$this->boot_plugin();
@@ -46,7 +85,7 @@ final class DiagnosticsEndpointTest extends TestCase {
 	protected function setUp(): void {
 		$GLOBALS['_test_wp_option_write_failures'] = array();
 		$GLOBALS['_test_current_user_can']       = array();
-		$GLOBALS['_test_wp_options']             = array();
+		$GLOBALS['_test_wp_options']             = array( SettingsRepository::OPTION_KEY => array( 'provider' => array( 'active' => 'smtp' ) ) );
 		$GLOBALS['_test_wp_actions']             = array();
 		$GLOBALS['_test_wp_added_actions']       = array();
 		$GLOBALS['_test_registered_rest_routes'] = array();
@@ -379,6 +418,7 @@ final class DiagnosticsEndpointTest extends TestCase {
 		// From address configured: DNS checks target the sending domain, not the site host.
 		$GLOBALS['_test_wp_options'][ SettingsRepository::OPTION_KEY ] = array(
 			'smtp' => array( 'from_email' => 'noreply@sender.example.org' ),
+			'provider' => array( 'active' => 'smtp' ),
 		);
 		$this->boot_plugin();
 		$spy = $this->install_context_spy();

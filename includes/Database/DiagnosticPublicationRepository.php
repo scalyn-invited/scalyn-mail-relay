@@ -34,10 +34,11 @@ final class DiagnosticPublicationRepository {
 	 *
 	 * @param string $uuid Fresh diagnostic run UUID.
 	 * @param array  $checks Bounded normalized runner output.
+	 * @param array  $scope Public configuration attribution captured before execution.
 	 * @return array Published results and score.
 	 * @throws \RuntimeException When validation, reading or publication fails.
 	 */
-	public function publish( string $uuid, array $checks ): array {
+	public function publish( string $uuid, array $checks, array $scope = array() ): array {
 		global $wpdb;
 		$started = false;
 		try {
@@ -64,13 +65,13 @@ final class DiagnosticPublicationRepository {
 			$started = true;
 			$created = current_time( 'mysql' );
 			foreach ( $checks as $check ) {
-				$this->diagnostics->persist_result( $uuid, $check['category'], $check['id'], $check['result'], $created );
+				$this->diagnostics->persist_result( $uuid, $check['category'], $check['id'], $check['result'], $created, $scope );
 			}
 			$rows = $this->diagnostics->find_by_uuid( $uuid );
 			if ( ! empty( $wpdb->last_error ) || count( $rows ) !== count( $checks ) ) {
 				throw new \RuntimeException();
 			}
-			$counts = $this->mail->count_recent_by_status();
+			$counts = $this->mail->count_recent_by_status( 7, $scope['provider_id'] ?? null );
 			if ( ! empty( $wpdb->last_error ) ) {
 				throw new \RuntimeException();
 			}
