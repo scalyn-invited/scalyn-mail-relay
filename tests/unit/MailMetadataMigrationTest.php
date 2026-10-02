@@ -17,13 +17,15 @@ final class MailMetadataMigrationTest extends TestCase {
 	}
 	public function test_additive_upgrade_advances_only_after_column_verification_and_is_idempotent(): void {
 		$GLOBALS['wpdb']->get_col_return=array('id','logged_recipients','logged_subject');
+		$GLOBALS['wpdb']->get_col_returns=array(array('id','logged_recipients','logged_subject'),array('id','configuration_id','provider_id','sending_domain'));
+		$GLOBALS['wpdb']->get_results_return=array(array(),array(),array());
 		Migrator::migrate();
-		$this->assertSame('0.3.0',get_option('scalyn_mail_relay_db_version'));
+		$this->assertSame('0.4.0',get_option('scalyn_mail_relay_db_version'));
 		$this->assertStringContainsString('logged_recipients text NULL',$GLOBALS['_test_dbdelta_queries'][0]);
 		$this->assertStringContainsString('logged_subject varchar(255) NULL',$GLOBALS['_test_dbdelta_queries'][0]);
 		$this->assertStringNotContainsString('DROP',$GLOBALS['_test_dbdelta_queries'][0]);
 		Migrator::migrate();
-		$this->assertCount(1,$GLOBALS['_test_dbdelta_queries']);
+		$this->assertCount(2,$GLOBALS['_test_dbdelta_queries']);
 	}
 	public function test_failed_verification_does_not_advance_version(): void {
 		try { Migrator::migrate(); $this->fail('Expected migration failure'); }

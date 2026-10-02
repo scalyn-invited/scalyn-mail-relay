@@ -23,6 +23,21 @@ defined( 'ABSPATH' ) || exit;
  */
 final class HealthScoreRepository {
 
+	/** Reads the score belonging to one specific diagnostic run, never an older score.
+	 *
+	 * @param string $uuid Diagnostic run UUID.
+	 * @return array|null Correlated score.
+	 */
+	public function find_by_run( string $uuid ): ?array {
+		global $wpdb;
+		if ( '' === $uuid ) {
+			return null;
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Prepared bounded repository read.
+		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE score_uuid = %s LIMIT 1', $wpdb->prefix . 'scalyn_health_scores', $uuid ), ARRAY_A );
+		return is_array( $row ) && empty( $wpdb->last_error ) && ( $row['score_uuid'] ?? '' ) === $uuid ? $row : null;
+	}
+
 	/**
 	 * Maximum number of rows returned by find_recent().
 	 *

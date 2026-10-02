@@ -83,21 +83,43 @@ final class DiagnosticRunService {
 			// host/port/encryption to checks (never username/password) and targets
 			// the sending domain from the From address, falling back to the site host.
 			$site_host = wp_parse_url( home_url(), PHP_URL_HOST );
+			$settings  = $container->get( SettingsRepository::class );
+			$revision  = $settings->ensure_diagnostic_revision();
+			$provider  = $settings->get_active_provider_id();
 			$context   = $container->get( DiagnosticContextBuilder::class )->build(
-				$container->get( SettingsRepository::class ),
+				$settings,
 				is_string( $site_host ) && '' !== $site_host ? $site_host : 'localhost'
 			);
 
 			// Execute all registered diagnostic checks and collect results.
-			$failure       = 'checks_failed';
-			$checks        = $registry->get_all();
+			$failure = 'checks_failed';
+			$checks  = $registry->get_all();
+			if ( 'smtp' !== $provider ) {
+				$checks = array_filter( $checks, static fn( $check ): bool => 'smtp' !== $check->get_category() );
+			}
 			$check_results = $runner->run( array_values( $checks ), $context );
 
 			$failure   = 'publication_failed';
-			$published = $container->get( \Scalyn\MailRelay\Database\DiagnosticPublicationRepository::class )->publish( $run_uuid, $check_results );
+			$published = $container->get( \Scalyn\MailRelay\Database\DiagnosticPublicationRepository::class )->publish(
+				$run_uuid,
+				$check_results,
+				array(
+					'configuration_id' => $revision,
+					'provider_id'      => $provider,
+					'sending_domain'   => $context->domain,
+				)
+			);
 
 			$this->record_finish( $state, $run_uuid );
 			do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'diagnostic_run', 'completed', $run_uuid ) );
+			$current_revision = ( new SettingsRepository() )->get_diagnostic_revision();
+			if ( $revision !== $current_revision ) {
+				return array(
+					'success' => false,
+					'message' => __( 'Configuration changed during diagnostics. Results were retained as history. Run diagnostics for the current provider.', 'scalyn-mail-relay' ),
+					'status'  => 409,
+				);
+			}
 			return array(
 				'success'      => true,
 				'results'      => $published['results'],

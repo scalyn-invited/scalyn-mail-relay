@@ -82,10 +82,11 @@ final class DiagnosticRepository {
 	 * @param string           $check_name      The check's identifier (DiagnosticCheckInterface::get_id()).
 	 * @param DiagnosticResult $result          The normalized result to persist.
 	 * @param string|null      $created_at      Shared publication timestamp, or current site time.
+	 * @param array            $scope Public configuration attribution; empty for historical callers.
 	 * @throws \RuntimeException When the DB write fails. Message is a fixed safe string
 	 *                           with no SQL, last_error, or credential content.
 	 */
-	public function persist_result( string $diagnostic_uuid, string $check_type, string $check_name, DiagnosticResult $result, ?string $created_at = null ): void {
+	public function persist_result( string $diagnostic_uuid, string $check_type, string $check_name, DiagnosticResult $result, ?string $created_at = null, array $scope = array() ): void {
 		global $wpdb;
 
 		$table = $wpdb->prefix . 'scalyn_diagnostics';
@@ -100,6 +101,9 @@ final class DiagnosticRepository {
 		$inserted = $wpdb->insert(
 			$table,
 			array(
+				'configuration_id'   => $scope['configuration_id'] ?? null,
+				'provider_id'        => $scope['provider_id'] ?? null,
+				'sending_domain'     => $scope['sending_domain'] ?? null,
 				'diagnostic_uuid'    => $diagnostic_uuid,
 				'check_type'         => $check_type,
 				'check_name'         => $check_name,
@@ -200,6 +204,39 @@ final class DiagnosticRepository {
 			'results'      => $results,
 			'health_score' => self::average_score( $results ),
 		);
+	}
+
+	/** Reads only evidence produced for this exact current configuration.
+	 *
+	 * @param string $revision Opaque configuration revision.
+	 * @param string $provider Active provider identifier.
+	 * @param string $domain Current sending domain.
+	 * @return array Bounded complete run, or no evidence.
+	 */
+	public function find_current_run( string $revision, string $provider, string $domain ): array {
+		global $wpdb;
+		if ( '' === $revision || '' === $provider ) {
+			return array();
+		}
+		$sql = $wpdb->prepare(
+			'SELECT * FROM %i WHERE diagnostic_uuid = (SELECT diagnostic_uuid FROM %i WHERE configuration_id = %s AND provider_id = %s AND sending_domain = %s ORDER BY created_at DESC, id DESC LIMIT 1) ORDER BY id ASC LIMIT 21',
+			$wpdb->prefix . 'scalyn_diagnostics',
+			$wpdb->prefix . 'scalyn_diagnostics',
+			$revision,
+			$provider,
+			$domain
+		);
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared -- Prepared, indexed, bounded repository read.
+		$rows = $wpdb->get_results( $sql, ARRAY_A );
+		if ( ! is_array( $rows ) || ! empty( $wpdb->last_error ) || count( $rows ) > 20 ) {
+			return array();
+		}
+		foreach ( $rows as $row ) {
+			if ( ( $row['configuration_id'] ?? '' ) !== $revision || ( $row['provider_id'] ?? '' ) !== $provider || ( $row['sending_domain'] ?? '' ) !== $domain ) {
+				return array();
+			}
+		}
+		return $rows;
 	}
 
 	/**

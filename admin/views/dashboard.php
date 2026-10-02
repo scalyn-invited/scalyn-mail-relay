@@ -70,6 +70,7 @@ $setup_steps = array(
 
 		<section class="scalyn-card" aria-labelledby="scalyn-health-heading">
 			<h2 id="scalyn-health-heading"><?php esc_html_e( 'Email Health — configuration score', 'scalyn-mail-relay' ); ?></h2>
+			<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/diagnostic-scope.php'; ?>
 			<p class="description"><?php esc_html_e( 'Configuration checks only. Actual message authentication and inbox placement are not verified.', 'scalyn-mail-relay' ); ?></p>
 			<?php if ( null === $health_score ) : ?>
 				<strong class="scalyn-score" aria-label="<?php esc_attr_e( 'Health score not yet assessed', 'scalyn-mail-relay' ); ?>">—</strong>
@@ -110,6 +111,8 @@ $setup_steps = array(
 				<p class="description"><?php esc_html_e( 'Verification records a successful connection check or accepted send, not current availability or inbox delivery. It is not the latest attempt result; later failures may exist.', 'scalyn-mail-relay' ); ?></p>
 				<?php if ( 'sendgrid' === $active_provider_id ) : ?>
 					<p class="description"><?php esc_html_e( 'SendGrid connection checks use sandbox mode and do not prove real-send permission.', 'scalyn-mail-relay' ); ?></p>
+				<?php elseif ( 'postmark' === $active_provider_id ) : ?>
+					<p class="description"><?php esc_html_e( 'Postmark connection checks verify token access and Live server type only, not sender authorization, sending allowance or delivery.', 'scalyn-mail-relay' ); ?></p>
 				<?php endif; ?>
 				<div class="scalyn-actions">
 					<?php if ( current_user_can( \Scalyn\MailRelay\Core\Capabilities::MANAGE_MAIL ) ) : ?>

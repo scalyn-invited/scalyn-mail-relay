@@ -38,9 +38,39 @@ final class Migrator {
 		if ( version_compare( $installed, '0.3.0', '<' ) ) {
 			self::add_optional_mail_metadata();
 		}
+		if ( version_compare( $installed, '0.4.0', '<' ) ) {
+			self::add_diagnostic_scope();
+		}
 		update_option( 'scalyn_mail_relay_db_version', SCALYN_MAIL_RELAY_DB_VERSION, false );
 		if ( SCALYN_MAIL_RELAY_DB_VERSION !== get_option( 'scalyn_mail_relay_db_version' ) ) {
 			throw new \RuntimeException( 'Database version could not be saved.' );
+		}
+	}
+
+	/** Adds indexed configuration attribution without relabelling old evidence.
+	 *
+	 * @throws \RuntimeException When the additive migration cannot be verified.
+	 */
+	private static function add_diagnostic_scope(): void {
+		global $wpdb;
+		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		$table = $wpdb->prefix . 'scalyn_diagnostics';
+		dbDelta(
+			"CREATE TABLE {$table} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			configuration_id char(36) NULL,
+			provider_id varchar(100) NULL,
+			sending_domain varchar(253) NULL,
+			PRIMARY KEY  (id),
+			KEY configuration_created (configuration_id,created_at,id)
+		) {$wpdb->get_charset_collate()};"
+		);
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Verify additive migration before advancing version.
+		$columns = $wpdb->get_col( $wpdb->prepare( 'SHOW COLUMNS FROM %i', $table ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Verify the scoped read index.
+		$index = $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i WHERE Key_name = %s', $table, 'configuration_created' ), ARRAY_A );
+		if ( array_diff( array( 'configuration_id', 'provider_id', 'sending_domain' ), $columns ?? array() ) || count( $index ?? array() ) !== 3 ) {
+			throw new \RuntimeException( 'Diagnostic scope migration failed.' );
 		}
 	}
 

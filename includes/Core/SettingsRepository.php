@@ -200,14 +200,14 @@ final class SettingsRepository {
 		if ( 'smtp' === $provider_id ) {
 			return $this->get_smtp_config();
 		}
-		if ( 'sendgrid' === $provider_id ) {
-			$config = $this->data['sendgrid'] ?? array();
+		if ( in_array( $provider_id, array( 'sendgrid', 'postmark' ), true ) ) {
+			$config = $this->data[ $provider_id ] ?? array();
 			$stored = $config['key_cipher'] ?? '';
 			if ( ! is_string( $stored ) || '' === $stored ) {
 				return array();
 			}
 			return array(
-				'api_key'    => ( $this->cipher ?? new CredentialCipher() )->decrypt( $stored ),
+				'api_key'    => ( $this->cipher ?? new CredentialCipher() )->decrypt( $stored, $provider_id ),
 				'from_email' => $config['from_email'] ?? '',
 				'from_name'  => $config['from_name'] ?? '',
 			);
@@ -278,6 +278,7 @@ final class SettingsRepository {
 			$next['provider']['verified_at']            = null;
 			$next['provider']['test_email_accepted_at'] = null;
 		}
+		$next = self::with_diagnostic_revision( $before, $next );
 		if ( ! update_option( self::OPTION_KEY, $next ) ) {
 			return false;
 		}
@@ -286,6 +287,88 @@ final class SettingsRepository {
 		foreach ( array( 'from_email', 'from_name', 'key_cipher' ) as $field ) {
 			if ( ( $old[ $field ] ?? null ) !== $config[ $field ] ) {
 				$fields[] = 'sendgrid.' . ( 'key_cipher' === $field ? 'api_key' : $field );
+			}
+		}
+		try {
+			do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'settings_changed', 'changed', '', $fields ) );
+		} catch ( \Throwable $error ) {
+			// Audit observer failure must not repeat or undo an already saved credential.
+			return true;
+		}
+		return true;
+	}
+
+	/**
+	 * Credential-free Postmark configuration for Admin.
+	 *
+	 * @return array Public configuration and credential presence only.
+	 */
+	public function get_postmark_settings(): array {
+		$config = $this->data['postmark'] ?? array();
+		return array(
+			'from_email' => is_string( $config['from_email'] ?? null ) ? sanitize_email( $config['from_email'] ) : '',
+			'from_name'  => is_string( $config['from_name'] ?? null ) ? sanitize_text_field( $config['from_name'] ) : '',
+			'has_key'    => ! empty( $config['key_cipher'] ),
+		);
+	}
+
+	/**
+	 * Saves Postmark configuration, with explicit credential intent.
+	 *
+	 * @param array            $input Strictly validated configuration and action.
+	 * @param CredentialCipher $cipher Credential protection service.
+	 * @return bool Whether the desired settings were persisted (including no-op).
+	 * @throws \InvalidArgumentException When input is invalid.
+	 */
+	public function save_postmark( #[\SensitiveParameter] array $input, CredentialCipher $cipher ): bool {
+		$action = $input['key_action'] ?? null;
+		$secret = $input['api_key'] ?? '';
+		$email  = $input['from_email'] ?? null;
+		$name   = $input['from_name'] ?? null;
+		if ( ! in_array( $action, array( 'keep', 'replace', 'remove' ), true ) || ! is_string( $secret )
+			|| ! is_string( $email ) || strlen( $email ) > 254 || ! filter_var( $email, FILTER_VALIDATE_EMAIL )
+			|| ! is_string( $name ) || strlen( $name ) > 200 || preg_match( '/[\r\n\x00]/', $name )
+			|| ( 'replace' !== $action && '' !== $secret )
+			|| ( 'replace' === $action && ( 'POSTMARK_API_TEST' === $secret || strlen( $secret ) < 16 || strlen( $secret ) > 512 || ! preg_match( '/^[A-Za-z0-9._-]+$/D', $secret ) ) )
+			|| ( 'remove' === $action && true !== ( $input['confirm_remove'] ?? false ) ) ) {
+			throw new \InvalidArgumentException( 'Invalid Postmark settings. No changes were saved.' );
+		}
+		$before = $this->data;
+		$old    = $before['postmark'] ?? array();
+		$stored = $old['key_cipher'] ?? '';
+		if ( 'replace' === $action ) {
+			$stored = $cipher->encrypt( $secret, 'postmark' );
+		} elseif ( 'remove' === $action ) {
+			$stored = '';
+		} elseif ( ! is_string( $stored ) || '' === $stored ) {
+			throw new \InvalidArgumentException( 'Provide a new API key using Replace.' );
+		} else {
+			$cipher->decrypt( $stored, 'postmark' );
+		}
+		$config = array(
+			'from_email' => $email,
+			'from_name'  => sanitize_text_field( $name ),
+			'key_cipher' => $stored,
+		);
+		if ( $config === $old ) {
+			return true;
+		}
+		$next             = $before;
+		$next['postmark'] = $config;
+		if ( 'postmark' === $this->get_active_provider_id() ) {
+			$next['provider']['verified']               = false;
+			$next['provider']['verified_at']            = null;
+			$next['provider']['test_email_accepted_at'] = null;
+		}
+		$next = self::with_diagnostic_revision( $before, $next );
+		if ( ! update_option( self::OPTION_KEY, $next ) ) {
+			return false;
+		}
+		$this->data = $next;
+		$fields     = array();
+		foreach ( array( 'from_email', 'from_name', 'key_cipher' ) as $field ) {
+			if ( ( $old[ $field ] ?? null ) !== $config[ $field ] ) {
+				$fields[] = 'postmark.' . ( 'key_cipher' === $field ? 'api_key' : $field );
 			}
 		}
 		try {
@@ -370,7 +453,8 @@ final class SettingsRepository {
 			$this->data['provider']['verified_at']            = null;
 			$this->data['provider']['test_email_accepted_at'] = null;
 		}
-		$saved = update_option( self::OPTION_KEY, $this->data );
+		$this->data = self::with_diagnostic_revision( $before, $this->data );
+		$saved      = update_option( self::OPTION_KEY, $this->data );
 		if ( ! $saved ) {
 			$this->data = $before;
 		}
@@ -392,6 +476,39 @@ final class SettingsRepository {
 			}
 		}
 		return $saved;
+	}
+
+	/** Returns the opaque current diagnostic configuration revision. */
+	public function get_diagnostic_revision(): string {
+		return (string) ( $this->data['diagnostic_revision'] ?? '' );
+	}
+
+	/** Initializes upgraded installations before their first scoped run.
+	 *
+	 * @throws \RuntimeException When the revision cannot be saved.
+	 */
+	public function ensure_diagnostic_revision(): string {
+		if ( '' === $this->get_diagnostic_revision() && ! $this->save( array() ) ) {
+			throw new \RuntimeException( 'Diagnostic configuration could not be saved.' );
+		}
+		return $this->get_diagnostic_revision();
+	}
+
+	/** Rotates an opaque revision, never a credential-derived fingerprint.
+	 *
+	 * @param array $before Previous private settings.
+	 * @param array $next New private settings.
+	 * @return array Settings with their diagnostic revision.
+	 */
+	private static function with_diagnostic_revision( array $before, array $next ): array {
+		$provider = (string) ( $next['provider']['active'] ?? '' );
+		if ( empty( $before['diagnostic_revision'] )
+			|| ( $before['provider']['active'] ?? '' ) !== $provider
+			|| ( $before[ $provider ] ?? array() ) !== ( $next[ $provider ] ?? array() )
+			|| ( $before['advanced']['dkim_selector'] ?? '' ) !== ( $next['advanced']['dkim_selector'] ?? '' ) ) {
+			$next['diagnostic_revision'] = wp_generate_uuid4();
+		}
+		return $next;
 	}
 
 	/**

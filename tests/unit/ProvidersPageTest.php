@@ -24,7 +24,7 @@ final class ProvidersPageTest extends TestCase {
 	}
 	private function render_page(): string {
 		Plugin::instance()->boot();
-		foreach (array('smtp'=>'SMTP', 'sendgrid'=>'SendGrid API') as $id=>$label) {
+		foreach (array('smtp'=>'SMTP', 'sendgrid'=>'SendGrid API', 'postmark'=>'Postmark API') as $id=>$label) {
 			$provider = $this->createMock(\Scalyn\MailRelay\Contracts\ProviderInterface::class);
 			$provider->method('get_id')->willReturn($id);
 			$provider->method('get_label')->willReturn($label);
@@ -43,6 +43,8 @@ final class ProvidersPageTest extends TestCase {
 		$this->assertStringNotContainsString('Configure in wizard', $html);
 		$this->assertStringNotContainsString('Edit SendGrid settings', $html);
 		$this->assertStringNotContainsString('<form', $html);
+		$this->assertStringContainsString('Postmark API', $html);
+		$this->assertStringContainsString('Live Server token', $html);
 	}
 	public function test_active_route_uses_recorded_verification_without_credentials(): void {
 		$GLOBALS['_test_current_user_can'][Capabilities::MANAGE_SETTINGS] = true;

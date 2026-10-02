@@ -146,7 +146,7 @@ final class DashboardPageTest extends TestCase {
 					return $this->parent->activity_counts;
 				}
 				// Check if this is a diagnostic query by checking if diagnostics table is referenced.
-				if ( strpos( $sql, 'scalyn_diagnostics' ) !== false ) {
+				if ( strpos( $sql, 'scalyn_diagnostics' ) !== false || str_contains( $sql, 'configuration_id' ) ) {
 					// This is a diagnostic query, use mock data.
 					return $this->parent->get_mock_diagnostic_data();
 				}
@@ -600,7 +600,10 @@ final class DashboardPageTest extends TestCase {
 	 * scalyn_diagnostics, which no check populates.
 	 */
 	private function store_health_row( int $overall, ?int $dns, ?int $provider, ?int $failure, string $summary ): void {
+		$GLOBALS['_test_wp_options'][ SettingsRepository::OPTION_KEY ] = array( 'provider' => array( 'active' => 'smtp' ), 'diagnostic_revision' => 'current-revision' );
+		$this->mock_diagnostic_data = array( array( 'diagnostic_uuid' => 'current-run', 'configuration_id' => 'current-revision', 'provider_id' => 'smtp', 'sending_domain' => 'example.com' ) );
 		$this->wpdb->get_row_return = array(
+			'score_uuid'     => 'current-run',
 			'overall_score'  => $overall,
 			'dns_score'      => $dns,
 			'provider_score' => $provider,

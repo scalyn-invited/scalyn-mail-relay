@@ -1,6 +1,6 @@
 <?php
 /**
- * Routes ordinary WordPress mail through the selected SendGrid provider.
+ * Routes ordinary WordPress mail through the selected API provider.
  *
  * @package ScalynMailRelay
  */
@@ -13,7 +13,7 @@ use Scalyn\MailRelay\Core\HookNames;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Intercepts wp_mail only when SendGrid is active. SMTP behavior is unchanged.
+ * Intercepts wp_mail only when SendGrid or Postmark is active. SMTP behavior is unchanged.
  * Unsupported mail shapes fail closed instead of silently falling back to PHP mail.
  */
 final class WordPressMailBridge {
@@ -35,14 +35,14 @@ final class WordPressMailBridge {
 	}
 
 	/**
-	 * Preserves an earlier short-circuit and leaves non-SendGrid mail untouched.
+	 * Preserves an earlier short-circuit and leaves non-API mail untouched.
 	 *
 	 * @param mixed $pre  Prior pre_wp_mail result.
 	 * @param mixed $atts Filtered WordPress mail arguments.
-	 * @return mixed Null for core mail, otherwise the SendGrid acknowledgement boolean.
+	 * @return mixed Null for core mail, otherwise the provider acknowledgement boolean.
 	 */
 	public function maybe_send( mixed $pre, mixed $atts ): mixed {
-		if ( null !== $pre || 'sendgrid' !== $this->settings->get_active_provider_id() ) {
+		if ( null !== $pre || ! in_array( $this->settings->get_active_provider_id(), array( 'sendgrid', 'postmark' ), true ) ) {
 			return $pre;
 		}
 		$uuid = wp_generate_uuid4();
@@ -61,7 +61,7 @@ final class WordPressMailBridge {
 					'source_name' => 'wp_mail',
 				)
 			);
-			$result  = new SendResult( false, 'sendgrid', null, null, 'WordPress mail preparation failed before sending. Check supported sender, headers, content type and attachments.', false, TransportFailureCategory::CONFIG );
+			$result  = new SendResult( false, $this->settings->get_active_provider_id(), null, null, 'WordPress mail preparation failed before sending. Check supported sender, headers, content type and attachments.', false, TransportFailureCategory::CONFIG );
 			try {
 				do_action( HookNames::MAIL_FAILED, $result, $message );
 			} catch ( \Throwable $observer_error ) {
@@ -80,7 +80,7 @@ final class WordPressMailBridge {
 
 	/**
 	 * Maps the common wp_mail shape without dropping unsupported headers or embeds.
-	 * The SendGrid adapter performs the final address, size and attachment checks.
+	 * The selected adapter performs the final address, size and attachment checks.
 	 *
 	 * @param mixed  $atts WordPress arguments after the wp_mail filter.
 	 * @param string $uuid Correlation allocated before preparation.
@@ -110,12 +110,13 @@ final class WordPressMailBridge {
 		if ( ! is_array( $headers ) ) {
 			throw new \InvalidArgumentException( 'Unsupported mail headers.' );
 		}
-		$config       = $this->settings->get_sendgrid_settings();
+		$config       = 'postmark' === $this->settings->get_active_provider_id() ? $this->settings->get_postmark_settings() : $this->settings->get_sendgrid_settings();
 		$from_email   = $config['from_email'];
 		$content_type = apply_filters( 'wp_mail_content_type', 'text/plain' );
 		$forwarded    = array();
 		$from_seen    = false;
 		$type_seen    = false;
+		$cf7_type     = null;
 		foreach ( $headers as $header ) {
 			if ( ! is_string( $header ) || preg_match( '/[\r\n\x00]/', $header ) ) {
 				throw new \InvalidArgumentException( 'Unsupported mail header.' );
@@ -130,7 +131,7 @@ final class WordPressMailBridge {
 			$name = strtolower( $parts[1] );
 			if ( 'from' === $name ) {
 				if ( $from_seen || ! $this->matches_sender( trim( $parts[2] ), $from_email ) ) {
-					throw new \InvalidArgumentException( 'WordPress sender does not match SendGrid sender.' );
+					throw new \InvalidArgumentException( 'WordPress sender does not match configured sender.' );
 				}
 				$from_seen = true;
 			} elseif ( 'content-type' === $name ) {
@@ -139,6 +140,14 @@ final class WordPressMailBridge {
 				}
 				$content_type = trim( $parts[2] );
 				$type_seen    = true;
+			} elseif ( 'x-wpcf7-content-type' === $name ) {
+				// CF7 consumes this internal marker in phpmailer_init, which API sends bypass.
+				// Do not forward it or broaden the provider's custom-header allowlist.
+				$value = strtolower( trim( $parts[2] ) );
+				if ( null !== $cf7_type || ! in_array( $value, array( 'text/plain', 'text/html' ), true ) ) {
+					throw new \InvalidArgumentException( 'Unsupported or repeated Contact Form 7 content type.' );
+				}
+				$cf7_type = $value;
 			} else {
 				// Unknown headers reach the adapter, which rejects rather than drops them.
 				$forwarded[] = $header;
@@ -146,6 +155,9 @@ final class WordPressMailBridge {
 		}
 		if ( ! is_string( $content_type ) || ! preg_match( '~^(text/plain|text/html)(?:;[ \t]*charset=["\']?UTF-8["\']?)?$~iD', $content_type, $parts ) ) {
 			throw new \InvalidArgumentException( 'Unsupported content type.' );
+		}
+		if ( null !== $cf7_type && strtolower( $parts[1] ) !== $cf7_type ) {
+			throw new \InvalidArgumentException( 'Conflicting Contact Form 7 content type.' );
 		}
 		$attachments = $atts['attachments'] ?? array();
 		$attachments = is_string( $attachments ) ? preg_split( '/\r\n|\r|\n/', $attachments ) : $attachments;
@@ -175,7 +187,7 @@ final class WordPressMailBridge {
 	}
 
 	/**
-	 * Only a configured exact sender can be used for this SendGrid identity.
+	 * Only a configured exact sender can be used for this provider identity.
 	 *
 	 * @param string $header Sender from the mail header.
 	 * @param string $configured Configured sender address.

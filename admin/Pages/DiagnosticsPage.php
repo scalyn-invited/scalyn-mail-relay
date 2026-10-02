@@ -12,8 +12,6 @@ use Scalyn\MailRelay\Core\Capabilities;
 use Scalyn\MailRelay\Core\Plugin;
 use Scalyn\MailRelay\Core\ProviderRegistry;
 use Scalyn\MailRelay\Core\SettingsRepository;
-use Scalyn\MailRelay\Database\DiagnosticRepository;
-use Scalyn\MailRelay\Database\HealthScoreRepository;
 use Scalyn\MailRelay\Logging\MailLogRepository;
 use Scalyn\MailRelay\Mail\FailureClassifier;
 
@@ -49,17 +47,16 @@ final class DiagnosticsPage {
 		$diagnostics_run_url = rest_url( 'scalyn-mail-relay/v1/diagnostics/run' );
 
 		// Fetch and organize diagnostic results from Y1's repository.
-		$container       = Plugin::instance()->container();
-		$diagnostic_repo = $container->get( DiagnosticRepository::class );
-		$score_repo      = $container->get( HealthScoreRepository::class );
-		$mail_log_repo   = $container->get( MailLogRepository::class );
-		$classifier      = $container->get( FailureClassifier::class );
-		$run_data        = $diagnostic_repo->find_latest_run();
-		$diagnostics     = $this->organize_diagnostics( $run_data['results'] );
+		$container        = Plugin::instance()->container();
+		$mail_log_repo    = $container->get( MailLogRepository::class );
+		$classifier       = $container->get( FailureClassifier::class );
+		$diagnostic_scope = $container->get( \Scalyn\MailRelay\Diagnostics\CurrentDiagnostics::class )->snapshot();
+		$run_data         = $diagnostic_scope;
+		$diagnostics      = $this->organize_diagnostics( $run_data['results'] );
 
 		// Read the last HealthScorer snapshot from HealthScoreRepository and present it
 		// exactly as the Dashboard does (same source, same thresholds, same breakdown).
-		$health            = HealthScorePresenter::present( $score_repo->find_latest() );
+		$health            = HealthScorePresenter::present( $diagnostic_scope['health'] );
 		$health_score      = $health['score'];
 		$health_ui_status  = $health['ui_status'];
 		$health_ui_label   = $health['label'];
@@ -68,7 +65,7 @@ final class DiagnosticsPage {
 		$cadence           = $container->get( SettingsRepository::class )->get_diagnostic_schedule();
 		$score_freshness   = \Scalyn\MailRelay\Admin\MonitoringStatusPresenter::evidence( $health['created_at'], $cadence, time() );
 		$results_freshness = \Scalyn\MailRelay\Admin\MonitoringStatusPresenter::evidence( $run_data['results'][0]['created_at'] ?? null, $cadence, time() );
-		$recommendations   = ( new \Scalyn\MailRelay\Diagnostics\RecommendationEngine() )->recommend( $run_data['results'], $cadence, time() );
+		$recommendations   = ( new \Scalyn\MailRelay\Diagnostics\RecommendationEngine() )->recommend( $run_data['results'], $cadence, time(), $diagnostic_scope['provider'] );
 
 		// Fetch and classify recent mail failures.
 		$recent_failures = $this->get_recent_failures( $mail_log_repo, $classifier );
@@ -207,7 +204,8 @@ final class DiagnosticsPage {
 		// Fetch recent logs using the repository's public interface.
 		// find_recent( limit, offset ) returns the most recent $limit rows.
 		try {
-			$recent_logs = $repo->find_recent( 5, 0 );
+			$provider    = Plugin::instance()->container()->get( SettingsRepository::class )->get_active_provider_id();
+			$recent_logs = '' === $provider ? array() : $repo->search( array( 'provider' => $provider ), 'failed', 5 );
 		} catch ( \Exception $e ) {
 			// If there's an error fetching logs, return empty array gracefully.
 			return array();

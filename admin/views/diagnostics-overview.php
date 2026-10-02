@@ -26,6 +26,10 @@ $categories = array(
 		'description' => __( 'One combined SMTP/TLS check, not a complete provider-health assessment.', 'scalyn-mail-relay' ),
 	),
 );
+if ( 'smtp' !== ( $diagnostic_scope['provider'] ?? 'smtp' ) ) {
+	$categories[2]['title']       = __( 'API Provider', 'scalyn-mail-relay' );
+	$categories[2]['description'] = __( 'API provider health is not assessed by these DNS checks. SMTP/TLS does not apply.', 'scalyn-mail-relay' );
+}
 ?>
 <nav class="scalyn-grid scalyn-diagnostic-categories" aria-label="<?php esc_attr_e( 'Diagnostic categories', 'scalyn-mail-relay' ); ?>">
 	<?php foreach ( $categories as $category ) : ?>

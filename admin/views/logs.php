@@ -91,7 +91,7 @@ $next_page_url     = add_query_arg( $next_page_args, $logs_base_url );
 					</div>
 			</fieldset>
 		</form>
-		<p class="description"><?php esc_html_e( 'Dates include both selected days in site time. Search and recipient filters cover only metadata retained with administrator consent; older or unrecorded values cannot match. Provider examples: smtp, sendgrid.', 'scalyn-mail-relay' ); ?></p>
+		<p class="description"><?php esc_html_e( 'Dates include both selected days in site time. Search and recipient filters cover only metadata retained with administrator consent; older or unrecorded values cannot match. Provider examples: smtp, sendgrid, postmark.', 'scalyn-mail-relay' ); ?></p>
 		<details class="scalyn-disclosure scalyn-log-lookup">
 			<summary><?php esc_html_e( 'Have a message ID?', 'scalyn-mail-relay' ); ?></summary>
 			<form method="get" action="<?php echo esc_url( $logs_form_url ); ?>">

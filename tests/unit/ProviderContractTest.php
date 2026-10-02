@@ -14,7 +14,7 @@ final class ProviderContractTest extends TestCase {
 	private const SECRET = 'synthetic-credential-never-persist';
 
 	public static function providers(): array {
-		return array( 'SMTP' => array( 'smtp' ), 'SendGrid' => array( 'sendgrid' ) );
+		return array( 'SMTP' => array( 'smtp' ), 'SendGrid' => array( 'sendgrid' ), 'Postmark' => array( 'postmark' ) );
 	}
 
 	private function fixture( string $id ): array {
@@ -26,6 +26,18 @@ final class ProviderContractTest extends TestCase {
 				protected function create_mailer(): PHPMailer { return $this->boundary; }
 			};
 			$config += array( 'host' => 'smtp.example.com', 'port' => 587, 'encryption' => 'tls', 'username' => 'sender@example.com', 'password' => self::SECRET );
+		} elseif ( 'postmark' === $id ) {
+			$provider = new class() extends \Scalyn\MailRelay\Providers\Postmark\PostmarkProvider {
+				public array $requests = array();
+				public int $code = 200;
+				public int $probes = 0;
+				protected function http(string $path, array $args): mixed {
+					if ('/server' === $path) { ++$this->probes; return ['response'=>['code'=>200],'body'=>'{"ID":1,"DeliveryType":"Live"}']; }
+					$this->requests[]=$args;
+					return ['response'=>['code'=>$this->code],'body'=>'{"ErrorCode":0,"MessageID":"12345678-1234-4234-8234-123456789abc"}'];
+				}
+			};
+			$boundary=$provider; $config += ['api_key'=>self::SECRET];
 		} else {
 			$provider = new class() extends SendGridProvider {
 				public array $requests = array();
@@ -73,6 +85,9 @@ final class ProviderContractTest extends TestCase {
 			$this->assertSame( 0, $boundary->send_calls );
 			$this->assertSame( 1, $boundary->connect_calls );
 			$this->assertTrue( $boundary->smtpClose_was_called );
+		} elseif ('postmark' === $id) {
+			$this->assertSame(1,$boundary->probes);
+			$this->assertSame(0,$this->send_count($id,$boundary));
 		} else {
 			$this->assertCount( 1, $boundary->requests );
 			$payload = json_decode( $boundary->requests[0]['body'], true );
@@ -108,6 +123,19 @@ final class ProviderContractTest extends TestCase {
 					$this->assertSame( 'blind@example.com', $boundary->bcc[0]['address'] );
 					$this->assertSame( 'support@example.com', $boundary->reply_to[0]['address'] );
 					$this->assertSame( array( $path ), $boundary->attachments );
+				} elseif ('postmark' === $id) {
+					$payload=json_decode($boundary->requests[0]['body'],true);
+					$this->assertSame($message->body,$payload['text/html' === $type ? 'HtmlBody' : 'TextBody']);
+					$this->assertSame($message->subject,$payload['Subject']);
+					$this->assertSame(self::UUID,$payload['Metadata']['scalyn_message_uuid']);
+					$this->assertSame('"Copy" <copy@example.com>',$payload['Cc']);
+					$this->assertSame('blind@example.com',$payload['Bcc']);
+					$this->assertSame('"Support" <support@example.com>',$payload['ReplyTo']);
+					$this->assertSame('Synthetic attachment bytes.',base64_decode($payload['Attachments'][0]['Content'],true));
+					$this->assertSame('outbound',$payload['MessageStream']);
+					$this->assertFalse($payload['TrackOpens']);
+					$this->assertSame('None',$payload['TrackLinks']);
+					$this->assertStringNotContainsString('internal-secret-context',$boundary->requests[0]['body']);
 				} else {
 					$payload = json_decode( $boundary->requests[0]['body'], true );
 					$this->assertSame( $type, $payload['content'][0]['type'] );

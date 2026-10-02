@@ -369,10 +369,11 @@ final class MailLogRepository {
 	 * the recent window. Statuses with zero rows in the window are omitted
 	 * from the returned array rather than reported as zero.
 	 *
-	 * @param int $days Size of the recent window in days; clamped to a minimum of 1.
+	 * @param int         $days Size of the recent window in days; clamped to a minimum of 1.
+	 * @param string|null $provider Exact provider scope, or all for historical callers.
 	 * @return array<string, int> Status value => row count.
 	 */
-	public function count_recent_by_status( int $days = 7 ): array {
+	public function count_recent_by_status( int $days = 7, ?string $provider = null ): array {
 		global $wpdb;
 
 		$days  = max( 1, $days );
@@ -380,6 +381,9 @@ final class MailLogRepository {
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $table is derived from $wpdb->prefix, not user input.
 		$sql = $wpdb->prepare( "SELECT status, COUNT(*) as row_count FROM {$table} WHERE created_at >= DATE_SUB(%s, INTERVAL %d DAY) GROUP BY status", current_time( 'mysql' ), $days );
+		if ( null !== $provider ) {
+			$sql = $wpdb->prepare( 'SELECT status, COUNT(*) as row_count FROM %i WHERE provider = %s AND created_at >= DATE_SUB(%s, INTERVAL %d DAY) GROUP BY status', $table, $provider, current_time( 'mysql' ), $days );
+		}
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- $sql is the output of $wpdb->prepare(); log rows are write-heavy and must not be cached.
 		$rows = $wpdb->get_results( $sql, ARRAY_A );
 

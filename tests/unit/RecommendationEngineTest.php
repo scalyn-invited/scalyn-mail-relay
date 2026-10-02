@@ -4,6 +4,15 @@ use PHPUnit\Framework\TestCase;
 use Scalyn\MailRelay\Diagnostics\RecommendationEngine;
 
 final class RecommendationEngineTest extends TestCase {
+	public function test_api_scope_does_not_recommend_missing_smtp_configuration(): void {
+		$rows=array_slice($this->rows(),0,4);
+		foreach (['postmark','sendgrid'] as $provider) {
+			$result=(new RecommendationEngine())->recommend($rows,'hourly',self::NOW,$provider);
+			$this->assertFalse($result['refresh']);
+			$this->assertSame([],$result['items']);
+		}
+		$this->assertSame('smtp_tls',$this->run_rules($rows)['items'][0]['check']);
+	}
 
 	private const NOW = 1790128800;
 	private const UUID = '11111111-1111-4111-8111-111111111111';
