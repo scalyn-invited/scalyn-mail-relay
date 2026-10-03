@@ -470,6 +470,9 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
 	 */
 	class WP_REST_Request {
 		private array $params = array();
+		private array $headers = array();
+		private string $body = '';
+		private string $method = 'POST';
 
 		public function get_param( string $key ) {
 			return $this->params[ $key ] ?? null;
@@ -477,6 +480,31 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
 
 		public function set_param( string $key, mixed $value ): void {
 			$this->params[ $key ] = $value;
+		}
+
+		/** Mirrors core canonicalization: lowercase names, '-' becomes '_'. */
+		public function set_header( string $name, string $value ): void {
+			$this->headers[ str_replace( '-', '_', strtolower( $name ) ) ] = array( $value );
+		}
+
+		public function get_headers(): array {
+			return $this->headers;
+		}
+
+		public function set_body( string $body ): void {
+			$this->body = $body;
+		}
+
+		public function get_body(): string {
+			return $this->body;
+		}
+
+		public function set_method( string $method ): void {
+			$this->method = $method;
+		}
+
+		public function get_method(): string {
+			return $this->method;
 		}
 	}
 }
@@ -495,6 +523,30 @@ if ( ! class_exists( 'WP_REST_Response' ) ) {
 		public function get_status(): int {
 			return $this->status;
 		}
+
+		public array $headers = array();
+
+		public function header( string $name, string $value ): void {
+			$this->headers[ $name ] = $value;
+		}
+	}
+}
+
+if ( ! function_exists( 'wp_cache_delete' ) ) {
+	function wp_cache_delete( $key, $group = '' ) {
+		return true;
+	}
+}
+
+if ( ! function_exists( 'is_ssl' ) ) {
+	function is_ssl() {
+		return $GLOBALS['_test_is_ssl'] ?? true;
+	}
+}
+
+if ( ! function_exists( '_n' ) ) {
+	function _n( $single, $plural, $number, $domain = 'default' ) {
+		return 1 === (int) $number ? $single : $plural;
 	}
 }
 

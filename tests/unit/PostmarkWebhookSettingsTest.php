@@ -30,7 +30,11 @@ final class PostmarkWebhookSettingsTest extends TestCase {
 		$row=get_option(PostmarkWebhookSettings::OPTION);
 		$this->assertFalse($row['enabled']);
 		$this->assertStringNotContainsString('synthetic',json_encode($row));
-		$this->assertSame(['configured'=>true,'enabled'=>false,'verified'=>false,'server_id'=>1,'stream'=>'outbound','allowed_ips'=>['192.0.2.1']],$this->settings->public_settings());
+		$public=$this->settings->public_settings();
+		$this->assertSame(['configured'=>true,'enabled'=>false,'verified'=>false,'collecting'=>false,'server_id'=>1,'stream'=>'outbound','allowed_ips'=>['192.0.2.1']],array_intersect_key($public,array_flip(['configured','enabled','verified','collecting','server_id','stream','allowed_ips'])));
+		$this->assertStringEndsWith('/webhooks/postmark/'.$row['id'],$public['endpoint']);
+		$this->assertStringNotContainsString('synthetic',json_encode($public));
+		$this->assertArrayNotHasKey('credentials',$public);
 		$this->assertSame(['provider'=>['active'=>'smtp']],get_option('scalyn_mail_relay_settings'));
 		$secret=json_decode($this->cipher->decrypt($row['credentials'],'postmark-webhook'),true);
 		$this->assertSame($this->input()['password'],$secret['password']);

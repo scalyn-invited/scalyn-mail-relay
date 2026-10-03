@@ -26,7 +26,7 @@ final readonly class AuditEvent {
 		'alert_incident'           => array( 'opened', 'resolved' ),
 		'alert_notification'       => array( 'sent', 'failed', 'skipped', 'retry' ),
 		'settings_changed'         => array( 'changed' ),
-		'webhook_configuration'    => array( 'saved_disabled', 'removed' ),
+		'webhook_configuration'    => array( 'saved_disabled', 'removed', 'verified', 'verification_failed', 'enabled', 'disabled' ),
 		'retention_changed'        => array( 'changed' ),
 		'uninstall_policy_changed' => array( 'changed' ),
 		'provider_verification'    => array( 'started', 'verified', 'failed' ),

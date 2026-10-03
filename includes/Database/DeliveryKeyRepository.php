@@ -73,10 +73,24 @@ final class DeliveryKeyRepository {
 	 * @throws \RuntimeException When the version or matching inputs are unavailable.
 	 */
 	public function token( string $version, string $source, string $attempt, #[\SensitiveParameter] string $address ): string {
+		return $this->tokens( $version, $source, $attempt, array( $address ) )[0];
+	}
+
+	/**
+	 * Derives tokens for several parsed recipients with one key decryption.
+	 *
+	 * @param string   $version Retained key UUID.
+	 * @param string   $source Source UUID.
+	 * @param string   $attempt Attempt UUID.
+	 * @param string[] $addresses Transient parsed recipients, 1..50.
+	 * @return string[] Internal pseudonymous tokens in input order.
+	 * @throws \RuntimeException When the version or matching inputs are unavailable.
+	 */
+	public function tokens( string $version, string $source, string $attempt, #[\SensitiveParameter] array $addresses ): array {
 		global $wpdb;
 		$suppressed = $wpdb->suppress_errors( true );
 		try {
-			if ( ! preg_match( '/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/D', $version ) ) {
+			if ( ! preg_match( '/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/D', $version ) || ! $addresses || count( $addresses ) > 50 ) {
 				throw new \RuntimeException();
 			}
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Fresh key lookup; never expose or cache plaintext.
@@ -93,7 +107,14 @@ final class DeliveryKeyRepository {
 			if ( ! is_string( $key ) || 32 !== strlen( $key ) ) {
 				throw new \RuntimeException();
 			}
-			return RecipientTokens::create( $key, $version, $source, $attempt, $address );
+			$tokens = array();
+			foreach ( $addresses as $address ) {
+				if ( ! is_string( $address ) ) {
+					throw new \RuntimeException();
+				}
+				$tokens[] = RecipientTokens::create( $key, $version, $source, $attempt, $address );
+			}
+			return $tokens;
 		} catch ( \Throwable $error ) {
 			throw new \RuntimeException( 'Recipient matching is unavailable.' );
 		} finally {
