@@ -98,6 +98,12 @@ final class CredentialCipher {
 	 * @throws \InvalidArgumentException When the context is unsupported.
 	 */
 	private function context( string $provider ): string {
+		if ( 'delivery-matching' === $provider ) {
+			return 'scalyn:delivery:recipient-matching:v1';
+		}
+		if ( 'postmark-webhook' === $provider ) {
+			return 'scalyn:postmark:webhook-credentials:v1';
+		}
 		if ( ! in_array( $provider, array( 'sendgrid', 'postmark' ), true ) ) {
 			throw new \InvalidArgumentException( 'Unsupported credential context.' );
 		}
