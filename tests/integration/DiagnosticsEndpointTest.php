@@ -26,7 +26,8 @@ final class DiagnosticsEndpointTest extends TestCase {
 		$this->assertSame(200,$response->get_status());
 		$this->assertNull($smtp->context);
 		$rows=$response->get_data()['results'];
-		$this->assertCount(4,$rows);
+		// Four DNS checks plus reverse DNS, which reports API infrastructure as not assessed.
+		$this->assertCount(5,$rows);
 		foreach ($rows as $row) {
 			$this->assertSame('postmark',$row['provider_id']);
 			$this->assertSame('postmark.example',$row['sending_domain']);
@@ -53,7 +54,7 @@ final class DiagnosticsEndpointTest extends TestCase {
 		$this->assertFalse($response->get_data()['success']);
 		$this->assertArrayNotHasKey('health_score',$response->get_data());
 		$rows=array_values(array_filter($GLOBALS['wpdb']->inserts,fn($insert)=>str_ends_with($insert['table'],'scalyn_diagnostics')));
-		$this->assertCount(5,$rows);
+		$this->assertCount(6,$rows);
 		$this->assertSame($original,$rows[0]['data']['configuration_id']);
 		$this->assertNotSame($original,(new SettingsRepository())->get_diagnostic_revision());
 	}
@@ -191,7 +192,7 @@ final class DiagnosticsEndpointTest extends TestCase {
 		$response = (new DiagnosticsRunEndpoint())->handle_request();
 		$this->assertSame(200,$response->get_status());
 		$rows = $response->get_data()['results'];
-		$this->assertCount(5,$rows);
+		$this->assertCount(6,$rows);
 		$this->assertSame(1,count(array_filter($rows,static fn($row)=>$row['status']==='error')));
 		$this->assertStringNotContainsString('private-secret',json_encode($response->get_data()));
 		$this->assertSame(array('START TRANSACTION','COMMIT'),$GLOBALS['wpdb']->queries);

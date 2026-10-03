@@ -50,8 +50,9 @@ final class DiagnosticsServiceWiringTest extends TestCase {
 		$container = $this->booted_container();
 		$registry  = $container->get( DiagnosticCheckRegistry::class );
 
-		// 5 core checks: SPF, MX, DKIM, DMARC, SMTP/TLS
-		$this->assertCount( 5, $registry->get_all() );
+		// 6 core checks: SPF, MX, DKIM, DMARC, SMTP/TLS, reverse DNS
+		$this->assertCount( 6, $registry->get_all() );
+		$this->assertNotNull( $registry->get( 'reverse_dns' ) );
 		$this->assertNotNull( $registry->get( 'spf_record' ) );
 		$this->assertNotNull( $registry->get( 'mx_record' ) );
 		$this->assertNotNull( $registry->get( 'dkim_record' ) );
@@ -163,8 +164,8 @@ final class DiagnosticsServiceWiringTest extends TestCase {
 		// Verify third-party check was registered.
 		$this->assertInstanceOf( DiagnosticCheckRegistry::class, $captured_registry );
 		$this->assertTrue( $captured_registry->has( 'third_party_check' ) );
-		// 6 total: 5 core (SPF, MX, DKIM, DMARC, SMTP/TLS) + 1 third-party
-		$this->assertCount( 6, $captured_registry->get_all() );
+		// 7 total: 6 core (SPF, MX, DKIM, DMARC, SMTP/TLS, reverse DNS) + 1 third-party
+		$this->assertCount( 7, $captured_registry->get_all() );
 	}
 }
 
