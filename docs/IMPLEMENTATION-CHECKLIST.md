@@ -146,8 +146,8 @@ SendGrid webhook signatures apply to Postmark.
 - [ ] Extend authentication diagnostics with deeper SPF evaluation, DKIM selector configuration, and DMARC alignment analysis.
 - [ ] Add reverse-DNS analysis only where the sending infrastructure is known.
 - [ ] Introduce controlled message/header analysis and mailbox testing with explicit privacy boundaries.
-- [ ] Define deliverability assessment coverage, freshness, and scoring policy before displaying a numerical score.
-- [ ] Ticket 8: implement Provider Health Assessment (owner: Bernie; after the preceding evidence and assessment-policy tickets).
+- [ ] Define deliverability assessment coverage, freshness, and scoring policy before displaying a numerical score. Proposal: [ADR-0026](adr/0026-deliverability-assessment-policy.md) (Proposed; decisions D1–D5 pending Bernie).
+- [ ] Ticket 8: implement Provider Health Assessment (owner: Bernie; after the preceding evidence and assessment-policy tickets). Proposal: [ADR-0027](adr/0027-provider-health-assessment.md) (Proposed; attribution option and thresholds pending Bernie).
   - [ ] Define provider-specific assessment rules for SMTP and SendGrid, including evidence coverage, freshness windows, severity thresholds and configuration-change invalidation. Record any shared-contract or persistence decisions in an ADR before implementation.
   - [ ] Attribute connection-check outcomes, recent send failures and authenticated delivery/bounce evidence to the correct provider and configuration. Do not reuse the site-wide health score as a provider score or infer the latest attempt from a last-success timestamp.
   - [ ] Present separate Connection status and Provider health on provider cards. Show timestamped connection evidence and explainable Healthy / Warning / Critical / Unknown health states, with supporting findings and recommended actions. Do not label historical success as a continuously live connection.
