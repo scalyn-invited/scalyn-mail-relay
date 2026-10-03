@@ -21,7 +21,7 @@ final class VerificationScopeTest extends TestCase {
 	}
 
 	public function test_spf_record_presence_does_not_claim_ip_authorization(): void {
-		$check  = new SpfCheck( static fn() => array( array( 'txt' => 'v=spf1 include:example.net -all' ) ) );
+		$check  = new SpfCheck( static fn( string $domain ) => array( array( 'txt' => 'example.com' === $domain ? 'v=spf1 include:example.net -all' : 'v=spf1 ip4:192.0.2.0/24 -all' ) ) );
 		$result = $check->run( new DiagnosticContext( 'example.com' ) );
 
 		$this->assertSame( 'pass', $result->status );
@@ -29,11 +29,11 @@ final class VerificationScopeTest extends TestCase {
 	}
 
 	public function test_dkim_nonempty_key_does_not_claim_signature_verification(): void {
-		$check  = new DkimCheck( static fn() => array( array( 'txt' => 'v=DKIM1; p=not-a-verified-key' ) ) );
+		$check  = new DkimCheck( static fn() => array( array( 'txt' => 'v=DKIM1; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwAFJg9Cbu86ewrAa/2O8PYIFucFPL9zAbytaHN6uPSeZh2/P6ELDN3uuKMVgunoVh+grXbbSyZTroHTLDZs/0/YYdoWtFxHGEklOKsvopq7ysX5uVCsGPP7TLtd+zM90VXgoQ6A5Yb2KLb+Lg4aP1oyBK4RX/ELaiHwBMmfCPtfrF2VKI/yjJvj0JiQUcDZazZXnw/jmva81UUNFK8jpXl99I8tYCsd43nDZnMsh8I74STDDW55JWENUyKIvMXx+C4TlqdMQeVDggDJcS8caZMaulyfTAEHUNqqng35JReAiG2wO0CqzjeKzT3Rs0d12NwcuUvFgdvkEEL5+cQl7MQIDAQAB' ) ) );
 		$result = $check->run( new DiagnosticContext( 'example.com', array( 'dkim_selector' => 'default' ) ) );
 
 		$this->assertSame( 'pass', $result->status );
-		$this->assertStringContainsString( 'non-empty public-key value', $result->message );
+		$this->assertStringContainsString( 'usable 2048-bit RSA public key', $result->message );
 		$this->assertStringContainsString( 'Message signatures have not been verified', $result->message );
 	}
 

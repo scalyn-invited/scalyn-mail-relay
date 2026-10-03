@@ -143,7 +143,7 @@ SendGrid webhook signatures apply to Postmark.
 - [ ] Define provider-message correlation and out-of-band event contracts.
 - [ ] Implement webhook authentication, signature verification, replay protection, and duplicate-event handling.
 - [ ] Preserve delivery/bounce evidence alongside original send-attempt history.
-- [ ] Extend authentication diagnostics with deeper SPF evaluation, DKIM selector configuration, and DMARC alignment analysis.
+- [x] Extend authentication diagnostics with deeper SPF evaluation, DKIM selector configuration, and DMARC alignment analysis. Published-policy evaluation (RFC 7208 lookup limits, DKIM key analysis, DMARC inheritance, tag validation and configuration-based alignment); see [ADR-0023](adr/0023-deeper-authentication-diagnostics.md). Message-level alignment remains for the header-analysis ticket.
 - [ ] Add reverse-DNS analysis only where the sending infrastructure is known.
 - [ ] Introduce controlled message/header analysis and mailbox testing with explicit privacy boundaries.
 - [ ] Define deliverability assessment coverage, freshness, and scoring policy before displaying a numerical score.

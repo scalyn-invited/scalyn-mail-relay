@@ -179,4 +179,60 @@ final class DmarcCheckTest extends TestCase {
 
 		$this->assertSame( $dmarc, $result->evidence );
 	}
+
+	// -------------------------------------------------------------------------
+	// Deeper analysis: inheritance, enforcement tags and alignment assessment
+	// -------------------------------------------------------------------------
+
+	private function map_check( array $map ): DmarcCheck {
+		return new DmarcCheck( static fn( string $name ): array|false => array_key_exists( $name, $map ) ? $map[ $name ] : array() );
+	}
+
+	public function test_subdomain_inherits_organizational_policy_using_sp(): void {
+		$check  = $this->map_check( array( '_dmarc.example.com' => array( $this->txt( 'v=DMARC1; p=reject; sp=none; rua=mailto:r@example.com' ) ) ) );
+		$result = $check->run( $this->make_context( 'mail.example.com' ) );
+		$this->assertSame( 'warn', $result->status, 'sp=none applies to the subdomain' );
+		$this->assertStringContainsString( 'inherited from "example.com"', $result->message );
+		$this->assertTrue( $result->raw['inherited'] );
+		$this->assertSame( 'example.com', $result->raw['policy_from'] );
+		$this->assertStringContainsString( 'Inherited from: _dmarc.example.com', $result->evidence );
+		$enforced = $this->map_check( array( '_dmarc.example.com' => array( $this->txt( 'v=DMARC1; p=quarantine; rua=mailto:r@example.com' ) ) ) )->run( $this->make_context( 'mail.example.com' ) );
+		$this->assertSame( 'pass', $enforced->status );
+		$this->assertSame( 'quarantine', $enforced->raw['policy'] );
+	}
+
+	public function test_exact_record_takes_precedence_and_parent_failure_is_unknown(): void {
+		$check = new DmarcCheck( static fn( string $name ): array|false => '_dmarc.mail.example.com' === $name ? array() : false );
+		$this->assertSame( 'unknown', $check->run( $this->make_context( 'mail.example.com' ) )->status );
+		$exact = $this->map_check( array( '_dmarc.mail.example.com' => array( $this->txt( 'v=DMARC1; p=reject' ) ), '_dmarc.example.com' => array( $this->txt( 'v=DMARC1; p=none' ) ) ) )->run( $this->make_context( 'mail.example.com' ) );
+		$this->assertSame( 'pass', $exact->status );
+		$this->assertFalse( $exact->raw['inherited'] );
+	}
+
+	/** @dataProvider limitedPolicyProvider */
+	public function test_enforcing_policy_with_limitations_warns( string $record, string $text ): void {
+		$result = $this->make_check( array( $this->txt( $record ) ) )->run( $this->make_context( 'example.com' ) );
+		$this->assertSame( 'warn', $result->status );
+		$this->assertStringContainsString( $text, $result->message );
+	}
+
+	public static function limitedPolicyProvider(): array {
+		return array(
+			'partial pct'  => array( 'v=DMARC1; p=reject; pct=25', 'only 25%' ),
+			'invalid pct'  => array( 'v=DMARC1; p=reject; pct=150', 'pct= value is invalid' ),
+			'invalid mode' => array( 'v=DMARC1; p=quarantine; adkim=x', 'adkim=' ),
+			'invalid sp'   => array( 'v=DMARC1; p=reject; sp=block', 'sp= value' ),
+		);
+	}
+
+	public function test_alignment_is_a_configuration_assessment_never_a_claim(): void {
+		$record = 'v=DMARC1; p=reject; adkim=s';
+		$none   = $this->make_check( array( $this->txt( $record ) ) )->run( $this->make_context( 'example.com' ) );
+		$this->assertSame( array( 'dkim_mode' => 'strict', 'spf_mode' => 'relaxed', 'dkim' => 'not_assessed', 'spf' => 'not_assessed', 'reporting' => false, 'subdomain' => false ), $none->raw['alignment'] );
+		$this->assertStringContainsString( 'rua=', $none->recommended_action );
+		$with = $this->make_check( array( $this->txt( $record ) ) )->run( new DiagnosticContext( 'example.com', array( 'dkim_selector' => 'pm' ) ) );
+		$this->assertSame( 'possible_with_configured_selector', $with->raw['alignment']['dkim'] );
+		$this->assertStringContainsString( 'confirm with message headers', $with->recommended_action );
+		$this->assertStringContainsString( 'have not been verified', $with->message );
+	}
 }
