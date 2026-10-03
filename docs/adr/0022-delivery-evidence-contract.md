@@ -4,8 +4,10 @@ Date: 2026-10-02. Owner/reviewer: Bernie.
 Status: Approved by Bernie on 2026-10-02 after alignment refinements and the
 instruction to start implementation. Bernie subsequently approved including ticket
 3 persistence to resolve ticket 2's dependency. Schema versions 0.5.0/0.6.0 and internal
-repositories are implemented; no receiver, transport collection or lifecycle
-rewrite is enabled.
+repositories are implemented. On 2026-10-03 the opt-in activation path (source
+verification, dispatch association, receiver route, coverage read model) was
+implemented for Bernie's review; collection stays off until an administrator
+enables it, and no lifecycle rewrite is introduced.
 
 ## Current implementation evidence
 
@@ -341,6 +343,38 @@ separate optional wizard form. The audit contract adds `webhook_configuration`
 with `saved_disabled` and `removed` outcomes, correlated to source UUID only. This
 does not represent collection enablement. Credentials remain external-input-only
 and are never populated back into UI markup. No callback endpoint is registered.
+
+### Activation path implementation, 2026-10-03
+
+Implemented for review (contract changes listed for Bernie's sign-off):
+
+- **REST contract:** `POST scalyn-mail-relay/v1/webhooks/postmark/{source UUID}` is
+  the documented server-to-server exception. `permission_callback` is open; the
+  handler authenticates with source credentials, TLS and exact-IP rules, and the
+  route is excluded from core Application Password handling only for this path.
+  It is registered only while a source exists, returns empty bodies, and never
+  returns 403.
+- **Service container:** `MailDispatcher` gains an optional `DeliveryTracker`.
+  New shared services: `DeliveryTracker`, `DeliveryCoverage`, `PostmarkWebhookEndpoint`
+  and the attempt, event, coverage and rate-limit repositories.
+- **Source identity:** verification compares the configured server ID with the
+  `GET /server` ID of the active Live sending token (`PostmarkProvider::live_server_id`,
+  read-only) and is bound to the configuration revision current at verification.
+  `configuration_id` on an attempt is that revision. Collection is limited to the
+  `outbound` stream used by the transport and pauses on any revision change.
+- **Audit contract:** `webhook_configuration` adds `verified`, `verification_failed`,
+  `enabled` and `disabled`.
+- **Recipient parsing:** `PostmarkProvider::recipient_addresses` applies the same
+  To/Cc/Bcc parsing as payload construction, so dispatch and receipt match.
+- **Failure policy:** association failure sends the message untracked and the read
+  model reports coverage as Unavailable; tracking never blocks or retries mail.
+
+Residual risks: enablement is re-read before each write, but a disable committed
+while an already-authenticated request holds the attempt lock may still store that
+one event. Duplicate-header detection depends on the server, because WordPress
+merges repeated headers. Proxy deployments need trusted peer-address handling
+upstream. Application Password coexistence and live retry behaviour require the
+staging QA in the handoff.
 
 This approved contract is not itself executable webhook support. Further changes
 to identity, pseudonymous-recipient storage or retention require Bernie's review.

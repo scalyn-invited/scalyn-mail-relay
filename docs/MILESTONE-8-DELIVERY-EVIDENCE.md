@@ -1,7 +1,14 @@
 # Milestone 8: delivery evidence implementation handoff
 
 Owner: Bernie. Started 2026-10-02 from merged PR #61 (`f1f6ff6`).
-Current branch: `feature/m8-t2-postmark-webhook-auth` (ticket 1 documentation preserved).
+Current branch: `feature/m8-t2-postmark-webhook-auth` (ticket 1 documentation preserved), draft PR #62.
+
+**Current status (2026-10-03):** the dispatch association, opt-in source lifecycle,
+receiver route and coverage read model are implemented and locally verified; see
+[Activation path](#activation-path-2026-10-03). Dated sections below are kept as
+history, so earlier "not wired" / "no receiver" statements describe that point in
+time. Collection remains off until an administrator explicitly enables it, and
+tickets 2 and 3 stay open pending owner-approved live HTTPS callback QA.
 
 ## Ticket 1 status
 
@@ -158,6 +165,82 @@ membership/timeline rollback. Disposable `scalyn_qa_` tables and their triggers
 were removed. No live provider settings, sends or webhook registrations changed.
 The normal administrator migration path may now create the empty 0.5.0 tables;
 this is not tracking enablement. Hosted CI and live callback QA remain pending.
+
+### Activation path, 2026-10-03
+
+Checkpoint commits and draft PR #62 were created first. The remaining offline
+work for tickets 2 and 3 is now implemented; only owner-approved live callback QA
+remains before the tickets can be checked done.
+
+- **Source lifecycle** (`PostmarkWebhookSettings`): explicit verify, enable,
+  disable and remove actions, each capability/nonce protected and audited with
+  fixed outcomes only (`verified`, `verification_failed`, `enabled`, `disabled`).
+  Verification is a read-only `GET /server` check that the saved server ID is the
+  Live server of the configured sending token; no email is sent. It is bound to the
+  current configuration revision, so a provider, token, sender or DKIM selector
+  change pauses collection until re-verification. Collection also requires the
+  `outbound` stream that the transport actually uses.
+- **Opt-in**: enabling requires the unchecked acknowledgement with the ADR notice
+  and the effective retention period, current verification and schema 0.6.0. The
+  first enablement provisions a matching-key version; re-enabling reuses it.
+  Credential rotation for the same source keeps verification and key version.
+  Removal requires a disabled source and retires its key before deleting the
+  source, so retained attempts remain matchable until normal cleanup.
+- **Dispatch** (`DeliveryTracker`, optional `MailDispatcher` collaborator): for an
+  enabled, currently verified Postmark source, recipients are parsed with the same
+  rules as the adapter (`PostmarkProvider::recipient_addresses`), tokenized with one
+  key decryption, and stored atomically before submission. The provider message ID
+  is bound after acceptance. Any tracking failure sends the message untracked; it
+  never blocks, retries or changes the outcome.
+- **Receiver** (`PostmarkWebhookEndpoint`): `POST scalyn-mail-relay/v1/webhooks/postmark/{source}`,
+  registered only while a source exists. Authentication uses the webhook
+  credentials, never a WordPress user; the route opts out of core Application
+  Password handling, which would otherwise reject any Basic header. Responses are
+  empty with `Cache-Control: no-store`: 200 only after a committed store/duplicate,
+  or for an authenticated disabled/unsupported/uncorrelated event; 401/4xx for
+  rejected requests; 503 for temporary storage failure (never 403). Enablement is
+  re-read immediately before the write.
+- **Read model** (`DeliveryCoverage` over `DeliveryCoverageRepository`): token-free
+  per-recipient aggregates drive the separate "Delivery evidence" card on the log
+  detail page (drawer and full page): Not enabled, Unavailable (with reason),
+  Awaiting evidence, Partially confirmed, Delivered (recipient server), Bounce
+  reported and Mixed evidence, e.g. "Delivery confirmed for 1 of 2 recipients;
+  bounce reported for 1". Timeline report entries show the provider event time in
+  UTC and label the receipt time. The transport status is never changed.
+- **Providers page**: the Postmark card shows delivery-evidence status (Not
+  enabled / Collecting / Enabled but paused); SMTP and SendGrid show it as
+  unavailable for that provider.
+
+Validation, 2026-10-03:
+
+- Full PHPUnit: 1,264 tests / 4,520 assertions. Full WPCS, PHP lint (parallel; the
+  Composer lint script exceeds its 300-second timeout on this host) and
+  `git diff --check` passed.
+- New focused suites: source lifecycle (9 tests), tracker and dispatcher order and
+  failure isolation (5), coverage states (10), provider helpers, receiver pre-storage
+  paths and evidence rendering (6).
+- `tests/manual/delivery-pipeline-smoke.php` passed on real MySQL with disposable
+  tables and in-memory settings: association before submission, acknowledgement
+  binding, wrong password / plain HTTP / disallowed IP rejected without storage,
+  store and duplicate, bounce, unmatched and case-mismatched recipients ignored,
+  wrong server rejected, mixed coverage, no addresses/provider text/credentials in
+  stored rows, disabled source acknowledged without storage or new associations.
+  Tables and the synthetic budget row were removed.
+- Real WordPress routing on the local site, with a temporary disabled synthetic
+  source that was removed afterwards: the route is registered and returns the
+  handler's empty 401 over plain HTTP (local HTTPS is unavailable). Core
+  Application Password interception could not be reproduced locally even with it
+  forced on, so the exclusion is verified by unit/smoke tests and core code review
+  only; confirm it on the HTTPS staging endpoint.
+- Read-only browser QA at 1440px and 390px: wizard webhook section (empty and
+  saved-source states), Providers cards and log-detail evidence card rendered
+  without JavaScript errors or horizontal overflow; credential inputs were empty
+  and no secret appeared in markup. No settings were submitted and no mail was sent.
+
+Remaining before checking tickets 2 and 3 done: owner-approved public HTTPS
+staging endpoint and Postmark Live server QA (controlled delivery and bounce,
+duplicate retry, delayed callback after a provider switch, Application Password
+coexistence, proxy/peer-IP behaviour), plus hosted CI on PR #62 and Bernie's review.
 
 ### Retention and concurrency follow-up
 

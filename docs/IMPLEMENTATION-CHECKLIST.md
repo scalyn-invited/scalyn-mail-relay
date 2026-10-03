@@ -147,13 +147,15 @@ SendGrid webhook signatures apply to Postmark.
   - [x] Unregistered database budget repository: per-source fixed-minute counters, advisory-lock serialization and fail-closed storage handling, tested with a database double. Live concurrency, wiring and source lifecycle cleanup remain pending.
   - [x] Disabled source draft service: capability/nonce checks, purpose-separated encrypted credentials, keep/replace actions, explicit removal with budget cleanup, and retain/delete uninstall tests.
   - [x] Optional disabled-draft form in Postmark wizard step 3, shared service registration and credential-free save/remove audit events; rendered form tests and read-only desktop/mobile keyboard visual QA passed. Source verification and collection opt-in activation remain pending.
-  - [ ] HTTP ingress controls, source/credential setup, durable replay/duplicate handling and controlled live verification. Endpoint stays disabled until ticket 3 persistence is ready; SendGrid signature verification remains separate.
+  - [x] Receiver route with source-bound authentication, Application Password opt-out, empty fixed-status responses, re-checked enablement and durable duplicate handling; source verification against the Live sending server, explicit opt-in/disable/remove with key retirement. Unit, disposable real-database pipeline and real-routing checks passed (2026-10-03).
+  - [ ] Controlled live verification on an owner-approved HTTPS staging endpoint with a Postmark Live server. SendGrid signature verification remains separate.
 - [ ] Preserve delivery/bounce evidence alongside original send-attempt history.
   - [x] Approved persistence dependency: additive schema 0.5.0, encrypted versioned matching keys, strict HMAC recipient matching, transactional attempt membership and immutable provider-ID binding.
   - [x] Internal atomic event/timeline writer with semantic duplicate checks; unit tests and disposable real-database rollback smoke checks passed. Not wired into a live receiver.
   - [x] Bounded atomic delivery retention and explicit referenced-key retirement, schema 0.6.0, hourly cleanup integration, and disposable real-database deletion/rollback checks.
   - [x] Real two-process duplicate callback check: one event and one timeline projection committed; repeated callback acknowledged as duplicate.
-  - [ ] Complete dispatch integration, source/consent/key-selection coordination, coverage read models, limiter/source lifecycle races and live callback QA before enabling collection.
+  - [x] Dispatch integration (pre-submission association, acknowledgement binding, failure isolation), consent and key-selection coordination, coverage read model and log-detail evidence card, Providers status. See [activation path](MILESTONE-8-DELIVERY-EVIDENCE.md#activation-path-2026-10-03).
+  - [ ] Live callback QA, including limiter and source-lifecycle behaviour under real provider retries.
 - [ ] Extend authentication diagnostics with deeper SPF evaluation, DKIM selector configuration, and DMARC alignment analysis.
 - [ ] Add reverse-DNS analysis only where the sending infrastructure is known.
 - [ ] Introduce controlled message/header analysis and mailbox testing with explicit privacy boundaries.
