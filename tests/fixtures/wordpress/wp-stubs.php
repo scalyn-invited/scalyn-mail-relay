@@ -1,7 +1,16 @@
 <?php
 
+if ( ! function_exists( 'esc_textarea' ) ) {
+	function esc_textarea( $text ) {
+		return htmlspecialchars( (string) $text, ENT_QUOTES, 'UTF-8' );
+	}
+}
+
 if ( ! function_exists( 'wp_verify_nonce' ) ) {
 	function wp_verify_nonce( $nonce, $action = -1 ) {
+		if ( 'scalyn_postmark_webhook' === $action ) {
+			return 'valid' === $nonce && ( $GLOBALS['_test_wp_nonce_valid'] ?? false ) ? 1 : false;
+		}
 		return 'scalyn_export_report' === $action && 'valid-export-nonce' === $nonce ? 1 : false;
 	}
 }
@@ -807,6 +816,12 @@ class WpRolesStub {
  * $wpdb as a global — tests configure the global, repositories consume it.
  */
 class WpdbStub {
+	public bool $errors_suppressed = false;
+	public function suppress_errors( bool $suppress = true ): bool {
+		$previous = $this->errors_suppressed;
+		$this->errors_suppressed = $suppress;
+		return $previous;
+	}
 	public function esc_like( string $text ): string {
 		return addcslashes( $text, '_%\\' );
 	}
