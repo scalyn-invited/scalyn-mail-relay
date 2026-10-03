@@ -120,16 +120,16 @@ Schedule: before Milestone 8, approved by Bernie after SendGrid registration
 rejections. SendGrid's outstanding live verification remains outstanding.
 See [implementation and QA guide](POSTMARK-PROVIDER.md) and [ADR-0020](adr/0020-postmark-before-delivery-evidence.md).
 
-- [x] Ticket 1: define Postmark transactional scope, Live-only verification, limits and safe outcome policy. Owner review remains pending.
+- [x] Ticket 1: define Postmark transactional scope, Live-only verification, limits and safe outcome policy. Owner review completed on 2026-10-02.
 - [x] Ticket 2: implement encrypted Server API token storage and inline wizard configuration, with keep/replace/remove actions and verification invalidation.
 - [x] Ticket 3: implement and register the API adapter; connect non-sending verification, wizard test sending and normal WordPress mail.
 - [x] Ticket 4: normalize outcomes, retain message UUID correlation and provider MessageID, and preserve private logs/audit behavior without retries.
-- [x] Provider-switch follow-up: scope current diagnostic evidence to the active provider/configuration and sender domain; clear wizard step 6 after changes, retain history, omit SMTP checks/guidance for APIs, and correlate the displayed score to the same run. See [ADR-0021](adr/0021-provider-scoped-diagnostic-evidence.md). Owner review remains pending.
-- [ ] Ticket 5: complete automated and controlled live QA, desktop/mobile review and owner acceptance.
+- [x] Provider-switch follow-up: scope current diagnostic evidence to the active provider/configuration and sender domain; clear wizard step 6 after changes, retain history, omit SMTP checks/guidance for APIs, and correlate the displayed score to the same run. See [ADR-0021](adr/0021-provider-scoped-diagnostic-evidence.md). Owner review completed on 2026-10-02.
+- [x] Ticket 5: complete automated and controlled live QA, desktop/mobile review and owner acceptance.
   - [x] Automated adapter, credential, shared-provider and WordPress-bridge tests.
   - [x] Live Server verification and recipient receipt confirmation: owner QA on 2026-10-01 confirmed CF7 plain text, plain text with attachment, and HTML with attachment. See POSTMARK-PROVIDER.md. These receipts do not establish automated delivery tracking.
-  - [ ] Final owner review and release QA.
-- [ ] Completion gate: all required live evidence and review are recorded. Webhooks remain Milestone 8; automatic failover remains Milestone 9.
+  - [x] Final owner review and release QA: Bernie confirmed QA passed and reviewed PR #61 was merged on 2026-10-02.
+- [x] Completion gate: all required live evidence and review are recorded; completion confirmed by Bernie on 2026-10-02. Webhooks remain Milestone 8; automatic failover remains Milestone 9.
 
 ## 8. Delivery evidence and Deliverability Centre
 
@@ -140,9 +140,20 @@ the initial delivery/bounce integration, then repeat for the other providers.
 Provider-specific authentication must be researched separately; do not assume
 SendGrid webhook signatures apply to Postmark.
 
-- [ ] Define provider-message correlation and out-of-band event contracts.
+- [x] Ticket 1: define provider-message correlation and out-of-band event contracts. [ADR-0022](adr/0022-delivery-evidence-contract.md) and [Milestone 8 handoff](MILESTONE-8-DELIVERY-EVIDENCE.md) approved by Bernie after alignment refinements on 2026-10-02. No webhook receiver enabled.
 - [ ] Implement webhook authentication, signature verification, replay protection, and duplicate-event handling.
+  - [x] Offline Postmark Basic/TLS/exact-IP authentication and bounded event normalization with synthetic tests.
+  - [x] Unregistered request gate: method/content/header/body validation, authentication-before-parsing, disabled-source handling, injected budget enforcement and safe internal outcomes.
+  - [x] Unregistered database budget repository: per-source fixed-minute counters, advisory-lock serialization and fail-closed storage handling, tested with a database double. Live concurrency, wiring and source lifecycle cleanup remain pending.
+  - [x] Disabled source draft service: capability/nonce checks, purpose-separated encrypted credentials, keep/replace actions, explicit removal with budget cleanup, and retain/delete uninstall tests.
+  - [x] Optional disabled-draft form in Postmark wizard step 3, shared service registration and credential-free save/remove audit events; rendered form tests and read-only desktop/mobile keyboard visual QA passed. Source verification and collection opt-in activation remain pending.
+  - [ ] HTTP ingress controls, source/credential setup, durable replay/duplicate handling and controlled live verification. Endpoint stays disabled until ticket 3 persistence is ready; SendGrid signature verification remains separate.
 - [ ] Preserve delivery/bounce evidence alongside original send-attempt history.
+  - [x] Approved persistence dependency: additive schema 0.5.0, encrypted versioned matching keys, strict HMAC recipient matching, transactional attempt membership and immutable provider-ID binding.
+  - [x] Internal atomic event/timeline writer with semantic duplicate checks; unit tests and disposable real-database rollback smoke checks passed. Not wired into a live receiver.
+  - [x] Bounded atomic delivery retention and explicit referenced-key retirement, schema 0.6.0, hourly cleanup integration, and disposable real-database deletion/rollback checks.
+  - [x] Real two-process duplicate callback check: one event and one timeline projection committed; repeated callback acknowledged as duplicate.
+  - [ ] Complete dispatch integration, source/consent/key-selection coordination, coverage read models, limiter/source lifecycle races and live callback QA before enabling collection.
 - [ ] Extend authentication diagnostics with deeper SPF evaluation, DKIM selector configuration, and DMARC alignment analysis.
 - [ ] Add reverse-DNS analysis only where the sending infrastructure is known.
 - [ ] Introduce controlled message/header analysis and mailbox testing with explicit privacy boundaries.
