@@ -60,6 +60,20 @@ $wizard_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 								if ( $p['verified'] ) :
 									?>
 									<dt><?php esc_html_e( 'Last success (site time)', 'scalyn-mail-relay' ); ?></dt><dd><?php echo esc_html( $p['verified_at'] ); ?></dd><?php endif; ?>
+								<dt><?php esc_html_e( 'Delivery evidence', 'scalyn-mail-relay' ); ?></dt>
+								<dd>
+									<?php
+									echo esc_html(
+										match ( $p['evidence'] ?? 'unsupported' ) {
+											'collecting' => __( 'Collecting for new sends', 'scalyn-mail-relay' ),
+											'paused' => __( 'Enabled but paused — review in wizard', 'scalyn-mail-relay' ),
+											'off' => __( 'Not enabled', 'scalyn-mail-relay' ),
+											'unavailable' => __( 'Status unavailable', 'scalyn-mail-relay' ),
+											default => __( 'Unavailable for this provider', 'scalyn-mail-relay' ),
+										}
+									);
+									?>
+								</dd>
 							</dl>
 							<div class="scalyn-actions scalyn-provider-actions">
 								<?php if ( $can_configure ) : ?>

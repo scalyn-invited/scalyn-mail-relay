@@ -36,8 +36,8 @@ final class PostmarkWebhookFormTest extends TestCase {
 		$events=[];
 		$GLOBALS['_test_wp_actions'][HookNames::AUDIT_EVENT]=static function($event) use (&$events) { $events[]=$event; };
 		$this->post(); $html=$this->render();
-		$this->assertStringContainsString('Webhook draft saved.',$html);
-		$this->assertStringContainsString('disabled and unverified',$html);
+		$this->assertStringContainsString('Webhook source saved.',$html);
+		$this->assertStringContainsString('Collection remains disabled',$html);
 		$this->assertStringContainsString('name="wh_password" type="password"',$html);
 		$this->assertStringNotContainsString('synthetic',$html);
 		$this->assertFalse(get_option(PostmarkWebhookSettings::OPTION)['enabled']);
@@ -46,21 +46,21 @@ final class PostmarkWebhookFormTest extends TestCase {
 		$this->assertStringNotContainsString('synthetic',serialize($events));
 		$this->assertStringNotContainsString('192.0.2.1',serialize($events));
 		$this->post(['wh_action'=>'remove','wh_confirm_remove'=>'1']);
-		$this->assertStringContainsString('Webhook draft removed.',$this->render());
+		$this->assertStringContainsString('Webhook source removed.',$this->render());
 		$this->assertSame('removed',$events[1]->outcome);
 		$this->assertFalse(get_option(PostmarkWebhookSettings::OPTION,false));
 	}
 	public function test_bad_input_never_echoes_payload_and_cannot_save(): void {
 		$this->post(['wh_stream'=>'<script>private</script>']);
 		$html=$this->render();
-		$this->assertStringContainsString('No draft changes saved.',$html);
+		$this->assertStringContainsString('No source changes saved.',$html);
 		$this->assertStringNotContainsString('<script>',$html);
 		$this->assertStringNotContainsString('synthetic',$html);
 		$this->assertFalse(get_option(PostmarkWebhookSettings::OPTION,false));
 	}
 	public function test_get_has_no_side_effects_and_no_secret_values(): void {
 		$html=$this->render();
-		$this->assertStringContainsString('No webhook draft saved.',$html);
+		$this->assertStringContainsString('Off — no source saved',$html);
 		$this->assertStringContainsString('Skip this section',$html);
 		$this->assertFalse(get_option(PostmarkWebhookSettings::OPTION,false));
 	}
@@ -74,13 +74,13 @@ final class PostmarkWebhookFormTest extends TestCase {
 	public function test_bad_nonce_cannot_save(): void {
 		$this->post(['_wpnonce'=>'invalid']);
 		$html=$this->render();
-		$this->assertStringContainsString('No draft changes saved.',$html);
+		$this->assertStringContainsString('No source changes saved.',$html);
 		$this->assertFalse(get_option(PostmarkWebhookSettings::OPTION,false));
 	}
 	public function test_audit_failure_cannot_reverse_save(): void {
 		$GLOBALS['_test_wp_actions'][HookNames::AUDIT_EVENT]=static function() { throw new RuntimeException('private'); };
 		$this->post();
-		$this->assertStringContainsString('Webhook draft saved.',$this->render());
+		$this->assertStringContainsString('Webhook source saved.',$this->render());
 		$this->assertFalse(get_option(PostmarkWebhookSettings::OPTION)['enabled']);
 	}
 }
