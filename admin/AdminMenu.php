@@ -241,7 +241,8 @@ final class AdminMenu {
 		$container = Plugin::instance()->container();
 		( new LogsPage(
 			$container->get( MailLogRepository::class ),
-			$container->get( TimelineRepository::class )
+			$container->get( TimelineRepository::class ),
+			$container->get( \Scalyn\MailRelay\Delivery\DeliveryCoverage::class )
 		) )->render();
 	}
 

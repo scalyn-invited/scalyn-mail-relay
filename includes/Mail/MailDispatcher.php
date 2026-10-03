@@ -10,6 +10,7 @@ namespace Scalyn\MailRelay\Mail;
 use Scalyn\MailRelay\Core\HookNames;
 use Scalyn\MailRelay\Core\ProviderRegistry;
 use Scalyn\MailRelay\Core\SettingsRepository;
+use Scalyn\MailRelay\Delivery\DeliveryTracker;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -35,12 +36,14 @@ final class MailDispatcher {
 	/**
 	 * Creates a new mail dispatcher.
 	 *
-	 * @param ProviderRegistry   $registry The registry of available mail providers.
-	 * @param SettingsRepository $settings The repository for reading plugin settings.
+	 * @param ProviderRegistry     $registry The registry of available mail providers.
+	 * @param SettingsRepository   $settings The repository for reading plugin settings.
+	 * @param DeliveryTracker|null $tracker Optional opted-in delivery evidence associations.
 	 */
 	public function __construct(
 		private readonly ProviderRegistry $registry,
-		private readonly SettingsRepository $settings
+		private readonly SettingsRepository $settings,
+		private readonly ?DeliveryTracker $tracker = null
 	) {}
 
 	/**
@@ -75,10 +78,23 @@ final class MailDispatcher {
 			$this->publish( HookNames::MAIL_FAILED, $result, $message );
 			return $result;
 		}
+		// Optional tracking must be associated before submission and can never block it.
+		$association = null;
+		try {
+			$association = $this->tracker?->prepare( $message, $provider_id );
+		} catch ( \Throwable $error ) {
+			$association = null;
+		}
 		try {
 			$result = $provider->send( $message, $config );
 		} catch ( \Throwable $error ) {
 			$result = new SendResult( false, $provider_id, null, null, 'Provider acceptance is unconfirmed. Check provider activity before retrying.', false, 'unknown', array(), true );
+		}
+		try {
+			$this->tracker?->acknowledge( $association, $result );
+		} catch ( \Throwable $error ) {
+			// Acknowledgement binding is evidence metadata; it never changes the outcome.
+			unset( $error );
 		}
 
 		if ( $result->success ) {

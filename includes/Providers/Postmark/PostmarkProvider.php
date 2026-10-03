@@ -111,6 +111,50 @@ class PostmarkProvider implements ProviderInterface {
 	}
 
 	/**
+	 * Returns the live server ID for this token, or null; never sends a message.
+	 * Used only to verify a webhook source against the configured sending server.
+	 *
+	 * @param array $config Decrypted transport settings.
+	 * @return int|null Postmark server ID when the token belongs to a Live server.
+	 */
+	public function live_server_id( #[\SensitiveParameter] array $config ): ?int {
+		if ( ! $this->validate_config( $config )->valid ) {
+			return null;
+		}
+		$response = $this->request( '/server', $config['api_key'] );
+		return $response['live'] ? $response['server_id'] : null;
+	}
+
+	/**
+	 * Parses the deduplicated To/Cc/Bcc addresses exactly as send() would.
+	 * Delivery matching depends on identical parsing at dispatch and receipt.
+	 *
+	 * @param MailMessage $message Prepared message.
+	 * @return string[] Bare addresses; transient, never logged or persisted.
+	 * @throws \InvalidArgumentException When any recipient is unsupported.
+	 */
+	public function recipient_addresses( MailMessage $message ): array {
+		if ( array() === $message->to || count( $message->to ) > self::MAX_RECIPIENTS ) {
+			throw new \InvalidArgumentException( 'The recipient count is unsupported.' );
+		}
+		$addresses = array();
+		foreach ( $message->to as $raw ) {
+			$addresses[] = $this->address( $raw )['email'];
+		}
+		foreach ( $message->headers as $header ) {
+			if ( is_string( $header ) && preg_match( '/^(cc|bcc):[ \t]*(.+)$/iD', $header, $parts ) ) {
+				foreach ( explode( ',', trim( $parts[2] ) ) as $item ) {
+					$addresses[] = $this->address( trim( $item ) )['email'];
+				}
+			}
+		}
+		if ( count( $addresses ) > self::MAX_RECIPIENTS ) {
+			throw new \InvalidArgumentException( 'The recipient count is unsupported.' );
+		}
+		return array_values( array_unique( $addresses ) );
+	}
+
+	/**
 	 * Constructs a bounded Postmark payload. Rejected input never reaches HTTP.
 	 *
 	 * @param MailMessage $message Prepared message.
@@ -303,10 +347,11 @@ class PostmarkProvider implements ProviderInterface {
 	 */
 	private function request( string $path, #[\SensitiveParameter] string $key, ?array $payload = null ): array {
 		$unknown = array(
-			'code'  => 0,
-			'error' => null,
-			'id'    => null,
-			'live'  => false,
+			'code'      => 0,
+			'error'     => null,
+			'id'        => null,
+			'live'      => false,
+			'server_id' => null,
 		);
 		try {
 			$args = array(
@@ -338,11 +383,13 @@ class PostmarkProvider implements ProviderInterface {
 			$body = $response['body'] ?? '';
 			$data = is_string( $body ) && strlen( $body ) <= 16384 ? json_decode( $body, true, 8 ) : null;
 			$data = is_array( $data ) ? $data : array();
+			$live = '/server' === $path && 200 === $code && is_int( $data['ID'] ?? null ) && $data['ID'] > 0 && 'Live' === ( $data['DeliveryType'] ?? null ) && ! isset( $data['ErrorCode'] );
 			return array(
-				'code'  => $code,
-				'error' => is_int( $data['ErrorCode'] ?? null ) ? $data['ErrorCode'] : null,
-				'id'    => is_string( $data['MessageID'] ?? null ) && preg_match( self::UUID_PATTERN, $data['MessageID'] ) ? $data['MessageID'] : null,
-				'live'  => '/server' === $path && 200 === $code && is_int( $data['ID'] ?? null ) && $data['ID'] > 0 && 'Live' === ( $data['DeliveryType'] ?? null ) && ! isset( $data['ErrorCode'] ),
+				'code'      => $code,
+				'error'     => is_int( $data['ErrorCode'] ?? null ) ? $data['ErrorCode'] : null,
+				'id'        => is_string( $data['MessageID'] ?? null ) && preg_match( self::UUID_PATTERN, $data['MessageID'] ) ? $data['MessageID'] : null,
+				'live'      => $live,
+				'server_id' => $live ? $data['ID'] : null,
 			);
 		} catch ( \Throwable $error ) {
 			return $unknown;

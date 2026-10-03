@@ -472,6 +472,7 @@
 .scalyn-mail-relay .scalyn-wizard-body .form-table th { padding: 18px 0 6px; }
 .scalyn-mail-relay .scalyn-wizard-body .form-table td { padding: 0; margin: 0; }
 .scalyn-mail-relay .scalyn-wizard-body input, .scalyn-mail-relay .scalyn-wizard-body select { box-sizing: border-box; max-width: 100%; }
+.scalyn-mail-relay .scalyn-wizard-body #wh-action { width: 100%; padding-right: 36px; }
 .scalyn-mail-relay .scalyn-wizard-body .regular-text { width: 100%; max-width: 480px; }
 .scalyn-mail-relay .scalyn-wizard-body .submit { margin: 24px 0 0; padding: 0; }
 .scalyn-mail-relay .scalyn-wizard-footer { margin-top: 24px; border-top: 1px solid var(--scalyn-line); padding-top: 20px; justify-content: space-between; flex-wrap: wrap; }
