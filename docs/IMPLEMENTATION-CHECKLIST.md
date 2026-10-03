@@ -144,7 +144,7 @@ SendGrid webhook signatures apply to Postmark.
 - [ ] Implement webhook authentication, signature verification, replay protection, and duplicate-event handling.
 - [ ] Preserve delivery/bounce evidence alongside original send-attempt history.
 - [ ] Extend authentication diagnostics with deeper SPF evaluation, DKIM selector configuration, and DMARC alignment analysis.
-- [ ] Add reverse-DNS analysis only where the sending infrastructure is known.
+- [x] Add reverse-DNS analysis only where the sending infrastructure is known. Forward-confirmed reverse DNS for the configured SMTP host's public addresses; API providers and private relays are reported as not assessed; not scored. See [ADR-0024](adr/0024-reverse-dns-known-infrastructure.md).
 - [ ] Introduce controlled message/header analysis and mailbox testing with explicit privacy boundaries.
 - [ ] Define deliverability assessment coverage, freshness, and scoring policy before displaying a numerical score.
 - [ ] Ticket 8: implement Provider Health Assessment (owner: Bernie; after the preceding evidence and assessment-policy tickets).

@@ -209,10 +209,10 @@ final class DiagnosticsPageTest extends TestCase {
 
 		$output = $this->render_and_capture();
 
-		// 6 cards: SPF, MX, DKIM, DMARC, SMTP/TLS, Health Score (all unknown when no data)
-		$this->assertSame( 6, substr_count( $output, 'class="scalyn-card scalyn-diagnostic-card"' ) );
-		// Six detail cards plus three category summaries remain unknown.
-		$this->assertSame( 9, substr_count( $output, 'scalyn-badge--unknown' ) );
+		// 7 cards: SPF, MX, DKIM, DMARC, SMTP/TLS, reverse DNS, Health Score (all unknown when no data)
+		$this->assertSame( 7, substr_count( $output, 'class="scalyn-card scalyn-diagnostic-card"' ) );
+		// Seven detail cards plus three category summaries remain unknown.
+		$this->assertSame( 10, substr_count( $output, 'scalyn-badge--unknown' ) );
 		$this->assertStringContainsString( 'SPF Record', $output );
 		$this->assertStringContainsString( 'MX Records', $output );
 		$this->assertStringContainsString( 'DKIM Records', $output );
@@ -465,8 +465,8 @@ final class DiagnosticsPageTest extends TestCase {
 		$this->assertStringContainsString( 'Health score based on: Operational reliability.', $output );
 		$this->assertStringContainsString( 'Message authentication and delivery: not verified', $output );
 		$this->assertStringNotContainsString( 'based on the results of all diagnostic checks', $output );
-		// Five checks and three categories remain unknown; only the score has evidence.
-		$this->assertSame( 8, substr_count( $output, 'scalyn-badge--unknown' ) );
+		// Six checks and three categories remain unknown; only the score has evidence.
+		$this->assertSame( 9, substr_count( $output, 'scalyn-badge--unknown' ) );
 		$this->assertSame( 1, substr_count( $output, 'scalyn-badge--healthy' ) );
 	}
 
