@@ -41,6 +41,12 @@ final class Migrator {
 		if ( version_compare( $installed, '0.4.0', '<' ) ) {
 			self::add_diagnostic_scope();
 		}
+		if ( version_compare( $installed, '0.5.0', '<' ) ) {
+			DeliveryEvidenceSchema::migrate();
+		}
+		if ( version_compare( $installed, '0.6.0', '<' ) ) {
+			DeliveryEvidenceSchema::migrate_key_retirement();
+		}
 		update_option( 'scalyn_mail_relay_db_version', SCALYN_MAIL_RELAY_DB_VERSION, false );
 		if ( SCALYN_MAIL_RELAY_DB_VERSION !== get_option( 'scalyn_mail_relay_db_version' ) ) {
 			throw new \RuntimeException( 'Database version could not be saved.' );

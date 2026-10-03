@@ -16,6 +16,10 @@ use Scalyn\MailRelay\Core\Capabilities;
 final class UninstallTest extends TestCase {
 
 	private const OWNED_TABLES = array(
+		'wp_scalyn_delivery_events',
+		'wp_scalyn_delivery_recipients',
+		'wp_scalyn_delivery_attempts',
+		'wp_scalyn_delivery_keys',
 		'wp_scalyn_mail_logs',
 		'wp_scalyn_mail_timeline',
 		'wp_scalyn_diagnostics',
@@ -91,6 +95,19 @@ final class UninstallTest extends TestCase {
 
 	private function administrator(): RoleStub {
 		return $GLOBALS['_test_wp_roles']['administrator'];
+	}
+
+	public function test_webhook_draft_and_its_budget_follow_explicit_uninstall_policy(): void {
+		$id='12345678-1234-4234-8234-123456789abc';
+		$GLOBALS['_test_wp_options']['scalyn_mail_relay_postmark_webhook']=['id'=>$id,'credentials'=>'synthetic envelope','enabled'=>false];
+		$GLOBALS['_test_wp_options']['scalyn_webhook_budget_'.$id]='counter';
+		$this->run_uninstall(false);
+		$this->assertArrayHasKey('scalyn_mail_relay_postmark_webhook',$GLOBALS['_test_wp_options']);
+		$this->assertArrayHasKey('scalyn_webhook_budget_'.$id,$GLOBALS['_test_wp_options']);
+		$this->run_uninstall(true);
+		$this->assertArrayNotHasKey('scalyn_mail_relay_postmark_webhook',$GLOBALS['_test_wp_options']);
+		$this->assertArrayNotHasKey('scalyn_webhook_budget_'.$id,$GLOBALS['_test_wp_options']);
+		$this->assertSame('keep me',$GLOBALS['_test_wp_options']['unrelated_plugin_option']);
 	}
 
 	// -------------------------------------------------------------------------

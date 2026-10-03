@@ -117,6 +117,7 @@ final class Plugin {
 		$this->container->set( AuditRecorder::class, static fn( Container $c ): AuditRecorder => new AuditRecorder( $c->get( AuditRepository::class ) ) );
 		$this->container->set( AdminMenu::class, static fn(): AdminMenu => new AdminMenu() );
 		$this->container->set( CredentialCipher::class, static fn(): CredentialCipher => new CredentialCipher() );
+		$this->container->set( PostmarkWebhookSettings::class, static fn( Container $c ): PostmarkWebhookSettings => new PostmarkWebhookSettings( $c->get( CredentialCipher::class ) ) );
 		$this->container->set( SettingsRepository::class, static fn( Container $c ): SettingsRepository => new SettingsRepository( $c->get( CredentialCipher::class ) ) );
 		$this->container->set( ProviderRegistry::class, static fn(): ProviderRegistry => new ProviderRegistry() );
 		$this->container->set(
@@ -130,6 +131,8 @@ final class Plugin {
 
 		$this->container->set( MailLogRepository::class, static fn(): MailLogRepository => new MailLogRepository() );
 		$this->container->set( MailRetentionRepository::class, static fn(): MailRetentionRepository => new MailRetentionRepository() );
+		$this->container->set( \Scalyn\MailRelay\Database\DeliveryRetentionRepository::class, static fn(): \Scalyn\MailRelay\Database\DeliveryRetentionRepository => new \Scalyn\MailRelay\Database\DeliveryRetentionRepository() );
+		$this->container->set( \Scalyn\MailRelay\Database\DeliveryKeyRepository::class, static fn( Container $c ): \Scalyn\MailRelay\Database\DeliveryKeyRepository => new \Scalyn\MailRelay\Database\DeliveryKeyRepository( $c->get( CredentialCipher::class ) ) );
 		$this->container->set( TimelineRepository::class, static fn(): TimelineRepository => new TimelineRepository() );
 		$this->container->set( FailureClassifier::class, static fn(): FailureClassifier => new FailureClassifier() );
 		$this->container->set(
@@ -157,7 +160,9 @@ final class Plugin {
 				$c->get( MailRetentionRepository::class ),
 				$c->get( DiagnosticRetentionRepository::class ),
 				$c->get( RetentionStateRepository::class ),
-				$c->get( AuditRepository::class )
+				$c->get( AuditRepository::class ),
+				$c->get( \Scalyn\MailRelay\Database\DeliveryRetentionRepository::class ),
+				$c->get( \Scalyn\MailRelay\Database\DeliveryKeyRepository::class )
 			)
 		);
 		$this->container->set( HealthScorer::class, static fn(): HealthScorer => new HealthScorer() );
