@@ -117,9 +117,46 @@ final class SpfCheck implements DiagnosticCheckInterface {
 			);
 		}
 
-		$spf = $spf_values[0];
+		$spf        = $spf_values[0];
+		$evaluation = ( new SpfEvaluator( $this->lookup_txt_records ) )->evaluate( $domain, $spf );
+		$raw        = array(
+			'record'     => $spf,
+			'evaluation' => array(
+				'lookups'      => $evaluation['lookups'],
+				'lookup_limit' => SpfEvaluator::LOOKUP_LIMIT,
+				'void_lookups' => $evaluation['void_lookups'],
+				'includes'     => array_slice( $evaluation['includes'], 0, 25 ),
+				'macros'       => $evaluation['macros'],
+				'incomplete'   => array_slice( $evaluation['incomplete'], 0, 25 ),
+			),
+		);
+		$chain      = $evaluation['includes'] ? "\nIncludes/redirects: " . implode( ', ', array_slice( $evaluation['includes'], 0, 25 ) ) : '';
 
-		if ( ! self::has_terminal_mechanism( $spf ) ) {
+		if ( $evaluation['errors'] ) {
+			return new DiagnosticResult(
+				status: 'fail',
+				severity: 'high',
+				message: sprintf( 'The SPF record for "%s" would fail evaluation: %s', $domain, $evaluation['errors'][0] ),
+				evidence: $spf . $chain . "\n" . implode( "\n", $evaluation['errors'] ),
+				impact: 'Receivers return an SPF permanent error or authorize unintended senders, so SPF cannot help authenticate your mail and DMARC must rely on DKIM alone.',
+				recommended_action: 'Fix the listed SPF problems: remove unused includes, flatten nested includes or replace them with ip4/ip6 ranges to stay within 10 DNS lookups, and end the record with "~all" or "-all".',
+				raw: $raw
+			);
+		}
+
+		if ( $evaluation['incomplete'] ) {
+			return new DiagnosticResult(
+				status: 'unknown',
+				severity: 'low',
+				message: sprintf( 'The SPF record for "%s" was found, but %d included polic%s could not be resolved, so evaluation is incomplete.', $domain, count( $evaluation['incomplete'] ), 1 === count( $evaluation['incomplete'] ) ? 'y' : 'ies' ),
+				evidence: $spf . $chain,
+				impact: 'An incomplete evaluation is not evidence of a working or broken SPF policy.',
+				recommended_action: 'Run diagnostics again later. If the include keeps failing, confirm the included domain with its provider.',
+				raw: $raw
+			);
+		}
+
+		if ( ! self::has_terminal_mechanism( $spf ) && null === $evaluation['all'] ) {
 			return new DiagnosticResult(
 				status: 'warn',
 				severity: 'medium',
@@ -127,18 +164,34 @@ final class SpfCheck implements DiagnosticCheckInterface {
 				evidence: $spf,
 				impact: 'Without an "all" mechanism or a "redirect", SPF evaluation may not behave as intended for senders not explicitly listed.',
 				recommended_action: 'End the SPF record with "~all", "-all" or a "redirect=" modifier.',
-				raw: array( 'record' => $spf )
+				raw: $raw
+			);
+		}
+
+		$warnings = $evaluation['warnings'];
+		if ( $evaluation['macros'] ) {
+			$warnings[] = 'The SPF policy uses macros that depend on each message, so the lookup count is a lower bound.';
+		}
+		if ( $warnings ) {
+			return new DiagnosticResult(
+				status: 'warn',
+				severity: 'medium',
+				message: sprintf( 'The SPF record for "%s" is valid but weak: %s', $domain, $warnings[0] ),
+				evidence: $spf . $chain . "\n" . implode( "\n", $warnings ),
+				impact: 'A weak SPF policy gives receivers little protection against spoofing and can reduce trust in your domain.',
+				recommended_action: 'Replace "?all" with "~all" or "-all", and remove deprecated "ptr" mechanisms.',
+				raw: $raw
 			);
 		}
 
 		return new DiagnosticResult(
 			status: 'pass',
 			severity: 'low',
-			message: sprintf( 'An SPF record was found for "%s" with a recognized terminal mechanism. Sending-IP authorization has not been evaluated.', $domain ),
-			impact: 'This is a basic DNS-record check, not an SPF authentication result. It does not evaluate the actual outbound IP, envelope sender, include chains, or lookup limits.',
-			recommended_action: 'Confirm the actual outbound IP and envelope-sender domain with your mail provider, then verify SPF for that sending identity. A receiver can reject a message even when this record check passes.',
-			evidence: $spf,
-			raw: array( 'record' => $spf )
+			message: sprintf( 'The SPF record for "%s" is within the published-policy limits (%d of %d DNS lookups). Sending-IP authorization has not been evaluated.', $domain, $evaluation['lookups'], SpfEvaluator::LOOKUP_LIMIT ),
+			impact: 'This evaluates the published policy, not an SPF authentication result. It does not test the actual outbound IP or envelope-sender (Return-Path) domain your provider uses.',
+			recommended_action: 'Confirm the envelope-sender domain your provider uses. Many API providers use their own bounce domain unless you configure a custom Return-Path, in which case DMARC relies on DKIM alignment.',
+			evidence: $spf . $chain,
+			raw: $raw
 		);
 	}
 
