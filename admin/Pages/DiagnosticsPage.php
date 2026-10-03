@@ -40,6 +40,9 @@ final class DiagnosticsPage {
 			wp_die( esc_html__( 'You do not have permission to run diagnostics.', 'scalyn-mail-relay' ) );
 		}
 
+		$header_analysis = new \Scalyn\MailRelay\Admin\Components\HeaderAnalysisForm();
+		$header_analysis->handle();
+
 		$provider_configured = $this->is_provider_configured();
 		$wizard_url          = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 

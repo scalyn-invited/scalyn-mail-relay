@@ -340,5 +340,10 @@ defined( 'ABSPATH' ) || exit;
 		<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/recommendations.php'; ?>
 		<?php \Scalyn\MailRelay\Admin\Components\VerificationScope::render(); ?>
 	</div>
+	<?php
+	if ( isset( $header_analysis ) ) {
+		$header_analysis->render();
+	}
+	?>
 	<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/diagnostics-guide.php'; ?>
 </div>

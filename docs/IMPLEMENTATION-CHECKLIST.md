@@ -145,7 +145,7 @@ SendGrid webhook signatures apply to Postmark.
 - [ ] Preserve delivery/bounce evidence alongside original send-attempt history.
 - [ ] Extend authentication diagnostics with deeper SPF evaluation, DKIM selector configuration, and DMARC alignment analysis.
 - [ ] Add reverse-DNS analysis only where the sending infrastructure is known.
-- [ ] Introduce controlled message/header analysis and mailbox testing with explicit privacy boundaries.
+- [x] Introduce controlled message/header analysis and mailbox testing with explicit privacy boundaries. Administrator-controlled test message to their own mailbox, with transient analysis of pasted headers (receiver verdicts and message-level alignment, domains only, nothing stored). See [ADR-0025](adr/0025-transient-header-analysis.md).
 - [ ] Define deliverability assessment coverage, freshness, and scoring policy before displaying a numerical score.
 - [ ] Ticket 8: implement Provider Health Assessment (owner: Bernie; after the preceding evidence and assessment-policy tickets).
   - [ ] Define provider-specific assessment rules for SMTP and SendGrid, including evidence coverage, freshness windows, severity thresholds and configuration-change invalidation. Record any shared-contract or persistence decisions in an ADR before implementation.
