@@ -40,6 +40,9 @@ final class DiagnosticsPage {
 			wp_die( esc_html__( 'You do not have permission to run diagnostics.', 'scalyn-mail-relay' ) );
 		}
 
+		$header_analysis = new \Scalyn\MailRelay\Admin\Components\HeaderAnalysisForm();
+		$header_analysis->handle();
+
 		$provider_configured = $this->is_provider_configured();
 		$wizard_url          = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 
@@ -85,6 +88,7 @@ final class DiagnosticsPage {
 
 		$smtp_tls_ui_status = $diagnostics['smtp_tls'] ? $this->get_ui_status( $diagnostics['smtp_tls']['status'] ) : 'unknown';
 		$smtp_tls_severity  = $diagnostics['smtp_tls'] ? $this->get_severity_class( $diagnostics['smtp_tls']['severity'] ?? '' ) : '';
+		$rdns_ui_status     = $diagnostics['rdns'] ? $this->get_ui_status( $diagnostics['rdns']['status'] ) : 'unknown';
 
 		require SCALYN_MAIL_RELAY_PATH . 'admin/views/diagnostics.php';
 	}
@@ -128,6 +132,7 @@ final class DiagnosticsPage {
 			'dkim'     => null,
 			'dmarc'    => null,
 			'smtp_tls' => null,
+			'rdns'     => null,
 		);
 
 		foreach ( $raw_results as $result ) {
@@ -143,6 +148,8 @@ final class DiagnosticsPage {
 				$organized['dmarc'] = $result;
 			} elseif ( 'smtp_tls' === $check_name ) {
 				$organized['smtp_tls'] = $result;
+			} elseif ( 'reverse_dns' === $check_name ) {
+				$organized['rdns'] = $result;
 			}
 		}
 

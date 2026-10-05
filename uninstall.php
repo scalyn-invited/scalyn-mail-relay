@@ -36,7 +36,19 @@ if ( ! $delete ) {
 
 global $wpdb;
 
+// Disabled webhook drafts use a separate credential envelope and a single source budget.
+$scalyn_webhook_draft = get_option( 'scalyn_mail_relay_postmark_webhook', array() );
+$scalyn_webhook_id    = is_array( $scalyn_webhook_draft ) ? ( $scalyn_webhook_draft['id'] ?? '' ) : '';
+if ( is_string( $scalyn_webhook_id ) && preg_match( '/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/D', $scalyn_webhook_id ) ) {
+	delete_option( 'scalyn_webhook_budget_' . $scalyn_webhook_id );
+}
+delete_option( 'scalyn_mail_relay_postmark_webhook' );
+
 $owned_tables = array(
+	'scalyn_delivery_events',
+	'scalyn_delivery_recipients',
+	'scalyn_delivery_attempts',
+	'scalyn_delivery_keys',
 	'scalyn_mail_logs',
 	'scalyn_mail_timeline',
 	'scalyn_diagnostics',

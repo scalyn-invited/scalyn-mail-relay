@@ -62,7 +62,12 @@ final class MailRetentionRepository {
 				return new MailRetentionCleanupResult( $cutoff, 0, 0, 0 );
 			}
 
-			$placeholders = implode( ', ', array_fill( 0, count( $uuids ), '%s' ) );
+			$placeholders              = implode( ', ', array_fill( 0, count( $uuids ), '%s' ) );
+			$delivery_timeline_deleted = 0;
+			if ( version_compare( (string) get_option( 'scalyn_mail_relay_db_version', '0.0.0' ), '0.5.0', '>=' ) ) {
+				// Take delivery-attempt locks before touching projections, in this same transaction.
+				$delivery_timeline_deleted = ( new \Scalyn\MailRelay\Database\DeliveryRetentionRepository() )->delete_for_messages( $uuids );
+			}
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Table and placeholder list are internal; UUID values are prepared.
 			$timeline_sql = $wpdb->prepare( "DELETE FROM {$timeline_table} WHERE message_uuid IN ({$placeholders})", ...$uuids );
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Repository-owned bounded delete.
@@ -86,7 +91,7 @@ final class MailRetentionRepository {
 			return new MailRetentionCleanupResult(
 				$cutoff,
 				count( $uuids ),
-				(int) $timeline_deleted,
+				(int) $timeline_deleted + $delivery_timeline_deleted,
 				(int) $mail_deleted
 			);
 		} catch ( \Throwable $error ) {

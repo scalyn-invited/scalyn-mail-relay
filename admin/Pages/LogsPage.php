@@ -8,6 +8,7 @@
 namespace Scalyn\MailRelay\Admin\Pages;
 
 use Scalyn\MailRelay\Core\Capabilities;
+use Scalyn\MailRelay\Delivery\DeliveryCoverage;
 use Scalyn\MailRelay\Logging\MailLogRepository;
 use Scalyn\MailRelay\Logging\TimelineRepository;
 
@@ -40,12 +41,14 @@ final class LogsPage {
 	/**
 	 * Creates a new LogsPage with the required repository dependencies.
 	 *
-	 * @param MailLogRepository  $log_repo      Repository for reading mail log rows.
-	 * @param TimelineRepository $timeline_repo Repository for reading timeline events.
+	 * @param MailLogRepository     $log_repo      Repository for reading mail log rows.
+	 * @param TimelineRepository    $timeline_repo Repository for reading timeline events.
+	 * @param DeliveryCoverage|null $coverage      Delivery evidence read model.
 	 */
 	public function __construct(
 		private readonly MailLogRepository $log_repo,
-		private readonly TimelineRepository $timeline_repo
+		private readonly TimelineRepository $timeline_repo,
+		private readonly ?DeliveryCoverage $coverage = null
 	) {}
 
 	/**
@@ -145,6 +148,7 @@ final class LogsPage {
 	 *   bool       $uuid_error   True when the supplied UUID failed format validation.
 	 *   array|null $log          Mail log row, or null when not found or UUID invalid.
 	 *   array      $timeline     Timeline events; empty array when not found or UUID invalid.
+	 *   array|null $delivery     Delivery evidence summary; null without a log or read model.
 	 *
 	 * @param string $raw_uuid Untrusted UUID string from GET; must not be echoed directly.
 	 */
@@ -154,10 +158,14 @@ final class LogsPage {
 		$message_uuid = null !== $validated ? $validated : '';
 		$log          = null;
 		$timeline     = array();
+		$delivery     = null;
 
 		if ( ! $uuid_error ) {
 			$log      = $this->log_repo->find_by_uuid( $message_uuid );
 			$timeline = $this->timeline_repo->find_by_uuid( $message_uuid );
+			if ( null !== $log && null !== $this->coverage ) {
+				$delivery = $this->coverage->summarize( $message_uuid, (string) ( $log['status'] ?? '' ) );
+			}
 		}
 
 		require SCALYN_MAIL_RELAY_PATH . 'admin/views/logs-detail.php';

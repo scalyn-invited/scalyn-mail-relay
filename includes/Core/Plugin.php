@@ -31,6 +31,16 @@ use Scalyn\MailRelay\Mail\FailureClassifier;
 use Scalyn\MailRelay\Mail\MailDispatcher;
 use Scalyn\MailRelay\Mail\WordPressMailBridge;
 use Scalyn\MailRelay\Rest\DiagnosticsRunEndpoint;
+use Scalyn\MailRelay\Rest\PostmarkWebhookEndpoint;
+use Scalyn\MailRelay\Database\DeliveryAttemptRepository;
+use Scalyn\MailRelay\Database\DeliveryCoverageRepository;
+use Scalyn\MailRelay\Database\DeliveryEventRepository;
+use Scalyn\MailRelay\Database\DeliveryKeyRepository;
+use Scalyn\MailRelay\Database\DeliveryRetentionRepository;
+use Scalyn\MailRelay\Database\WebhookRateLimitRepository;
+use Scalyn\MailRelay\Delivery\DeliveryCoverage;
+use Scalyn\MailRelay\Delivery\DeliveryTracker;
+use Scalyn\MailRelay\Providers\Postmark\PostmarkProvider;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -117,19 +127,30 @@ final class Plugin {
 		$this->container->set( AuditRecorder::class, static fn( Container $c ): AuditRecorder => new AuditRecorder( $c->get( AuditRepository::class ) ) );
 		$this->container->set( AdminMenu::class, static fn(): AdminMenu => new AdminMenu() );
 		$this->container->set( CredentialCipher::class, static fn(): CredentialCipher => new CredentialCipher() );
+		$this->container->set( PostmarkWebhookSettings::class, static fn( Container $c ): PostmarkWebhookSettings => new PostmarkWebhookSettings( $c->get( CredentialCipher::class ), $c->get( DeliveryKeyRepository::class ), $c->get( SettingsRepository::class ) ) );
+		$this->container->set( DeliveryAttemptRepository::class, static fn(): DeliveryAttemptRepository => new DeliveryAttemptRepository() );
+		$this->container->set( DeliveryEventRepository::class, static fn(): DeliveryEventRepository => new DeliveryEventRepository() );
+		$this->container->set( DeliveryCoverageRepository::class, static fn(): DeliveryCoverageRepository => new DeliveryCoverageRepository() );
+		$this->container->set( WebhookRateLimitRepository::class, static fn(): WebhookRateLimitRepository => new WebhookRateLimitRepository() );
+		$this->container->set( DeliveryTracker::class, static fn( Container $c ): DeliveryTracker => new DeliveryTracker( $c->get( PostmarkWebhookSettings::class ), $c->get( DeliveryKeyRepository::class ), $c->get( DeliveryAttemptRepository::class ), new PostmarkProvider() ) );
+		$this->container->set( DeliveryCoverage::class, static fn( Container $c ): DeliveryCoverage => new DeliveryCoverage( $c->get( DeliveryCoverageRepository::class ), $c->get( PostmarkWebhookSettings::class ) ) );
+		$this->container->set( PostmarkWebhookEndpoint::class, static fn( Container $c ): PostmarkWebhookEndpoint => new PostmarkWebhookEndpoint( $c->get( PostmarkWebhookSettings::class ), $c->get( SettingsRepository::class ), $c->get( WebhookRateLimitRepository::class ), $c->get( DeliveryAttemptRepository::class ), $c->get( DeliveryKeyRepository::class ), $c->get( DeliveryEventRepository::class ) ) );
 		$this->container->set( SettingsRepository::class, static fn( Container $c ): SettingsRepository => new SettingsRepository( $c->get( CredentialCipher::class ) ) );
 		$this->container->set( ProviderRegistry::class, static fn(): ProviderRegistry => new ProviderRegistry() );
 		$this->container->set(
 			MailDispatcher::class,
 			static fn( Container $c ): MailDispatcher => new MailDispatcher(
 				$c->get( ProviderRegistry::class ),
-				$c->get( SettingsRepository::class )
+				$c->get( SettingsRepository::class ),
+				$c->get( DeliveryTracker::class )
 			)
 		);
 		$this->container->set( WordPressMailBridge::class, static fn( Container $c ): WordPressMailBridge => new WordPressMailBridge( $c->get( SettingsRepository::class ), $c->get( MailDispatcher::class ) ) );
 
 		$this->container->set( MailLogRepository::class, static fn(): MailLogRepository => new MailLogRepository() );
 		$this->container->set( MailRetentionRepository::class, static fn(): MailRetentionRepository => new MailRetentionRepository() );
+		$this->container->set( DeliveryRetentionRepository::class, static fn(): DeliveryRetentionRepository => new DeliveryRetentionRepository() );
+		$this->container->set( DeliveryKeyRepository::class, static fn( Container $c ): DeliveryKeyRepository => new DeliveryKeyRepository( $c->get( CredentialCipher::class ) ) );
 		$this->container->set( TimelineRepository::class, static fn(): TimelineRepository => new TimelineRepository() );
 		$this->container->set( FailureClassifier::class, static fn(): FailureClassifier => new FailureClassifier() );
 		$this->container->set(
@@ -157,7 +178,9 @@ final class Plugin {
 				$c->get( MailRetentionRepository::class ),
 				$c->get( DiagnosticRetentionRepository::class ),
 				$c->get( RetentionStateRepository::class ),
-				$c->get( AuditRepository::class )
+				$c->get( AuditRepository::class ),
+				$c->get( DeliveryRetentionRepository::class ),
+				$c->get( DeliveryKeyRepository::class )
 			)
 		);
 		$this->container->set( HealthScorer::class, static fn(): HealthScorer => new HealthScorer() );
@@ -174,6 +197,7 @@ final class Plugin {
 		$this->container->set( DkimCheck::class, static fn(): DkimCheck => new DkimCheck() );
 		$this->container->set( DmarcCheck::class, static fn(): DmarcCheck => new DmarcCheck() );
 		$this->container->set( SmtpTlsCheck::class, static fn(): SmtpTlsCheck => new SmtpTlsCheck() );
+		$this->container->set( \Scalyn\MailRelay\Diagnostics\Checks\ReverseDnsCheck::class, static fn(): \Scalyn\MailRelay\Diagnostics\Checks\ReverseDnsCheck => new \Scalyn\MailRelay\Diagnostics\Checks\ReverseDnsCheck() );
 	}
 
 	/**
@@ -187,6 +211,7 @@ final class Plugin {
 		$registry->register( $this->container->get( DkimCheck::class ) );
 		$registry->register( $this->container->get( DmarcCheck::class ) );
 		$registry->register( $this->container->get( SmtpTlsCheck::class ) );
+		$registry->register( $this->container->get( \Scalyn\MailRelay\Diagnostics\Checks\ReverseDnsCheck::class ) );
 	}
 
 	/**
@@ -207,6 +232,9 @@ final class Plugin {
 
 		// Register REST endpoints.
 		add_action( 'rest_api_init', array( $this->container->get( DiagnosticsRunEndpoint::class ), 'register' ) );
+		$container = $this->container;
+		add_action( 'rest_api_init', static fn() => $container->get( PostmarkWebhookEndpoint::class )->register() );
+		add_filter( 'application_password_is_api_request', array( PostmarkWebhookEndpoint::class, 'exclude_application_passwords' ) );
 
 		if ( is_admin() ) {
 			$this->container->get( AdminMenu::class )->register();
