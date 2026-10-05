@@ -146,8 +146,8 @@ final class HeaderAnalyzer {
 		} else {
 			$findings[] = $this->finding(
 				'DMARC',
-				$computed ? 'pass' : 'unknown',
-				$computed ? 'The receiver reported no DMARC verdict, but an aligned SPF or DKIM pass was observed, which satisfies DMARC.' : 'The receiver reported no DMARC verdict, and no aligned pass was observed.'
+				'unknown',
+				$computed ? 'The receiver reported no DMARC verdict. An SPF or DKIM pass with a matching or related domain was observed, but the applicable DMARC policy and alignment mode are not known; DMARC is not assessed.' : 'The receiver reported no DMARC verdict, and no aligned pass was observed.'
 			);
 		}
 		$findings[] = $this->finding( 'Transport', $tls ? 'pass' : 'unknown', $tls ? sprintf( 'TLS was observed on the delivery path (%d %s recorded).', count( $received ), 1 === count( $received ) ? 'hop' : 'hops' ) : sprintf( 'TLS was not identifiable in %d Received %s. This is not proof that TLS was absent.', count( $received ), 1 === count( $received ) ? 'header' : 'headers' ) );

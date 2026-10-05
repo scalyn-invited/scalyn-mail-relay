@@ -48,10 +48,12 @@ final class HeaderAnalyzerTest extends TestCase {
 		$this->assertSame( 'fail', $by['DMARC']['status'] );
 	}
 
-	public function test_no_receiver_verdict_computes_from_aligned_pass_and_sibling_domains_are_only_possible(): void {
+	public function test_no_receiver_verdict_stays_unknown_and_sibling_domains_are_only_possible(): void {
 		$computed = ( new HeaderAnalyzer() )->analyze( $this->postmark_gmail( 'mx.example.net; dkim=pass header.d=mail.example.com' ) );
 		$by       = array_column( $computed['findings'], null, 'label' );
-		$this->assertSame( 'pass', $by['DMARC']['status'] );
+		$this->assertSame( 'unknown', $by['DMARC']['status'] );
+		$this->assertSame( 'unknown', $computed['status'] );
+		$this->assertStringContainsString( 'alignment mode are not known', $by['DMARC']['text'] );
 		$this->assertStringContainsString( 'relaxed', $by['DKIM']['text'] );
 		$sibling = str_replace( 'From: "Private Sender" <secret.sender@example.com>', 'From: <a@news.example.com>', $this->postmark_gmail( 'mx.example.net; dkim=pass header.d=mail.example.com' ) );
 		$by      = array_column( ( new HeaderAnalyzer() )->analyze( $sibling )['findings'], null, 'label' );
@@ -63,6 +65,15 @@ final class HeaderAnalyzerTest extends TestCase {
 		$result = ( new HeaderAnalyzer() )->analyze( "From: a@example.com\nTo: b@example.net\nSubject: hi\n" );
 		$this->assertSame( 'unknown', $result['status'] );
 		$this->assertStringContainsString( 'recipient mailbox', $result['findings'][0]['text'] );
+	}
+
+	public function test_even_exact_domain_passes_cannot_invent_a_missing_dmarc_verdict(): void {
+		foreach ( array( 'dkim=pass header.d=example.com', 'spf=pass smtp.mailfrom=sender@example.com', 'spf=pass smtp.mailfrom=sender@mail.example.com' ) as $mechanism ) {
+			$result = ( new HeaderAnalyzer() )->analyze( $this->postmark_gmail( 'mx.example.net; ' . $mechanism ) );
+			$by = array_column( $result['findings'], null, 'label' );
+			$this->assertSame( 'unknown', $by['DMARC']['status'] );
+			$this->assertSame( 'unknown', $result['status'] );
+		}
 	}
 
 	public function test_output_never_contains_private_header_content(): void {

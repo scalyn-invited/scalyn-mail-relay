@@ -31,6 +31,9 @@ test message". No external seed-list or inbox-placement service is used.
   are "possibly aligned", because an exact organizational-domain decision needs
   the public suffix list. When present, the receiver's own DMARC verdict is
   authoritative.
+- Without a receiver DMARC verdict, DMARC stays **Not assessable**, even when
+  SPF or DKIM passes for an exact or related domain. Headers alone do not
+  establish the applicable published policy or strict/relaxed alignment mode.
 - An SPF pass for the provider's bounce domain is shown as not aligned, without
   lowering an overall result that passed DMARC through aligned DKIM.
 - Results describe one message at one receiver. They are **not** persisted, not
