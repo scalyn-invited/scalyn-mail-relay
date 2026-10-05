@@ -19,6 +19,10 @@ defined( 'ABSPATH' ) || exit;
  *
  * Hook argument documentation is listed per constant. Subscriber callbacks
  * must treat all passed objects as read-only value objects.
+ * MAIL_SENT, MAIL_FAILED and MAIL_OUTCOME_UNCONFIRMED also carry an optional
+ * third argument (?string $configuration_id), captured before dispatch. Legacy
+ * two-argument publishers remain valid and unattributed. Consumers must never
+ * substitute the current revision after transport or infer one from metadata.
  *
  * @see MailDispatcher for the hooks fired during mail dispatch.
  */

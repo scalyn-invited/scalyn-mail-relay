@@ -131,6 +131,7 @@ final class WizardControllerTest extends TestCase {
 		// SettingsRepository factory so each get() produces a fresh instance.
 		$cipher_ref = $this->cipher;
 		$container->set( SettingsRepository::class, static fn() => new SettingsRepository( $cipher_ref ) );
+		$container->set( \Scalyn\MailRelay\Core\ConnectionVerification::class, static fn( $c ) => new \Scalyn\MailRelay\Core\ConnectionVerification( $c->get( SettingsRepository::class ), $registry_ref, new \Scalyn\MailRelay\Database\ConnectionEvidenceRepository() ) );
 		// MailDispatcher constructed with our stub registry and fresh settings.
 		$container->set(
 			MailDispatcher::class,

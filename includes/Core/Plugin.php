@@ -137,6 +137,8 @@ final class Plugin {
 		$this->container->set( PostmarkWebhookEndpoint::class, static fn( Container $c ): PostmarkWebhookEndpoint => new PostmarkWebhookEndpoint( $c->get( PostmarkWebhookSettings::class ), $c->get( SettingsRepository::class ), $c->get( WebhookRateLimitRepository::class ), $c->get( DeliveryAttemptRepository::class ), $c->get( DeliveryKeyRepository::class ), $c->get( DeliveryEventRepository::class ) ) );
 		$this->container->set( SettingsRepository::class, static fn( Container $c ): SettingsRepository => new SettingsRepository( $c->get( CredentialCipher::class ) ) );
 		$this->container->set( ProviderRegistry::class, static fn(): ProviderRegistry => new ProviderRegistry() );
+		$this->container->set( \Scalyn\MailRelay\Database\ConnectionEvidenceRepository::class, static fn(): \Scalyn\MailRelay\Database\ConnectionEvidenceRepository => new \Scalyn\MailRelay\Database\ConnectionEvidenceRepository() );
+		$this->container->set( ConnectionVerification::class, static fn( Container $c ): ConnectionVerification => new ConnectionVerification( $c->get( SettingsRepository::class ), $c->get( ProviderRegistry::class ), $c->get( \Scalyn\MailRelay\Database\ConnectionEvidenceRepository::class ) ) );
 		$this->container->set(
 			MailDispatcher::class,
 			static fn( Container $c ): MailDispatcher => new MailDispatcher(

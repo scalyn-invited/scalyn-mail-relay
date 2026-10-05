@@ -240,13 +240,7 @@ final class WizardController {
 			exit;
 		}
 
-		$provider = $registry->get( $provider_id );
-		try {
-			$config = $settings->get_provider_config( $provider_id );
-			$result = $provider->test_connection( $config );
-		} catch ( \Throwable $error ) {
-			$result = new ConnectionResult( false, __( 'The connection test could not complete. Check your provider configuration.', 'scalyn-mail-relay' ) );
-		}
+		$result = Plugin::instance()->container()->get( \Scalyn\MailRelay\Core\ConnectionVerification::class )->verify();
 		do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'provider_verification', $result->success ? 'verified' : 'failed', $audit_uuid ) );
 
 		// A successful connection test verifies the provider. WizardPage clamps

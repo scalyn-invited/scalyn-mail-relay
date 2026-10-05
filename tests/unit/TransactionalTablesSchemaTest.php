@@ -38,11 +38,11 @@ final class TransactionalTablesSchemaTest extends TestCase {
 		$db=$GLOBALS['wpdb'];
 		$db->engines['wp_unrelated']='MyISAM';
 		Migrator::migrate();
-		$this->assertSame('0.7.0',get_option('scalyn_mail_relay_db_version'));
+		$this->assertSame('0.9.0',get_option('scalyn_mail_relay_db_version'));
 		$this->assertSame(['wp_scalyn_diagnostics','wp_scalyn_health_scores','wp_scalyn_mail_logs','wp_scalyn_mail_timeline'],$db->altered);
 		$this->assertSame('MyISAM',$db->engines['wp_unrelated']);
 		foreach ($db->prepare_calls as $call) {
-			$this->assertContains($call['query'],['ALTER TABLE %i ENGINE=InnoDB','SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=%s']);
+			$this->assertContains($call['query'],['ALTER TABLE %i ENGINE=InnoDB','SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=%s','SHOW COLUMNS FROM %i','SHOW INDEX FROM %i WHERE Key_name = %s']);
 		}
 		Migrator::migrate();
 		$this->assertCount(4,$db->altered);
@@ -52,7 +52,7 @@ final class TransactionalTablesSchemaTest extends TestCase {
 		$db->engines=array_fill_keys(array_keys($db->engines),'InnoDB');
 		Migrator::migrate();
 		$this->assertSame([],$db->altered);
-		$this->assertSame('0.7.0',get_option('scalyn_mail_relay_db_version'));
+		$this->assertSame('0.9.0',get_option('scalyn_mail_relay_db_version'));
 	}
 	public function test_partial_failure_keeps_version_and_resumes_without_reconverting_success(): void {
 		$db=$GLOBALS['wpdb'];
@@ -62,7 +62,7 @@ final class TransactionalTablesSchemaTest extends TestCase {
 		$db->failure=null;
 		Migrator::migrate();
 		$this->assertSame(['wp_scalyn_diagnostics','wp_scalyn_health_scores','wp_scalyn_health_scores','wp_scalyn_mail_logs','wp_scalyn_mail_timeline'],$db->altered);
-		$this->assertSame('0.7.0',get_option('scalyn_mail_relay_db_version'));
+		$this->assertSame('0.9.0',get_option('scalyn_mail_relay_db_version'));
 	}
 	public function test_missing_or_unexpected_engine_fails_closed(): void {
 		foreach ([null,'MEMORY'] as $engine) {

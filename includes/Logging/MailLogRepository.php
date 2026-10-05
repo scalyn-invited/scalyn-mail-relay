@@ -126,10 +126,11 @@ final class MailLogRepository {
 	 * @param MailMessage $message The dispatched message.
 	 * @param SendResult  $result  The normalized send result.
 	 * @param string      $status  A MailStatus constant value.
+	 * @param string|null $configuration_id Captured dispatch revision; never inferred at logging time.
 	 * @throws \RuntimeException When the DB write fails. Message is a fixed safe string
 	 *                           with no SQL, last_error, or credential content.
 	 */
-	public function upsert( MailMessage $message, SendResult $result, string $status ): void {
+	public function upsert( MailMessage $message, SendResult $result, string $status, ?string $configuration_id = null ): void {
 		global $wpdb;
 
 		$table = $wpdb->prefix . 'scalyn_mail_logs';
@@ -163,7 +164,8 @@ final class MailLogRepository {
 						'sent_at'          => MailStatus::ACCEPTED === $status ? $now : null,
 						'failed_at'        => MailStatus::FAILED === $status ? $now : null,
 					),
-					$this->optional_metadata( $message )
+					$this->optional_metadata( $message ),
+					$this->configuration_metadata( $configuration_id )
 				)
 			);
 			if ( false === $inserted ) {
@@ -218,6 +220,21 @@ final class MailLogRepository {
 		return array(
 			'logged_recipients' => implode( ', ', array_unique( $addresses ) ),
 			'logged_subject'    => mb_substr( sanitize_text_field( $message->subject ), 0, 255 ),
+		);
+	}
+
+	/**
+	 * Adds attribution only on insert, after migration. Never backfills old rows.
+	 *
+	 * @param string|null $configuration_id Captured revision.
+	 * @return array Schema-safe nullable column data.
+	 */
+	private function configuration_metadata( ?string $configuration_id ): array {
+		if ( version_compare( (string) get_option( 'scalyn_mail_relay_db_version', '0.0.0' ), '0.8.0', '<' ) ) {
+			return array();
+		}
+		return array(
+			'configuration_id' => null !== $configuration_id && preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/D', $configuration_id ) ? $configuration_id : null,
 		);
 	}
 

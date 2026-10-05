@@ -45,6 +45,7 @@ if ( is_string( $scalyn_webhook_id ) && preg_match( '/^[a-f0-9]{8}-[a-f0-9]{4}-[
 delete_option( 'scalyn_mail_relay_postmark_webhook' );
 
 $owned_tables = array(
+	'scalyn_connection_evidence',
 	'scalyn_delivery_events',
 	'scalyn_delivery_recipients',
 	'scalyn_delivery_attempts',
