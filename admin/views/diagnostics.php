@@ -258,6 +258,30 @@ defined( 'ABSPATH' ) || exit;
 					'scalyn-diagnostics-smtp-tls-heading',
 					$smtp_tls ?? array()
 				);
+
+				$rdns          = $diagnostics['rdns'] ?? null;
+				$rdns_ui_label = $rdns ? ucfirst( $rdns['status'] ) : __( 'Unknown', 'scalyn-mail-relay' );
+				DiagnosticResultCard::render(
+					__( 'Reverse DNS (submission server)', 'scalyn-mail-relay' ),
+					$rdns_ui_status ?? 'unknown',
+					$rdns_ui_label,
+					function () use ( $rdns ) {
+						if ( null === $rdns ) {
+							EmptyState::render(
+								__( 'Reverse DNS has not yet been checked. Run diagnostics to check the SMTP server’s addresses.', 'scalyn-mail-relay' )
+							);
+							return;
+						}
+						echo '<p class="scalyn-finding__message">' . esc_html( $rdns['result_message'] ) . '</p>';
+						EvidenceDisplay::render( $rdns, 'Reverse DNS', true );
+						if ( $rdns['recommended_action'] ) {
+							echo '<p class="scalyn-finding__action"><strong>' . esc_html__( 'Recommended action: ', 'scalyn-mail-relay' ) . '</strong>' . esc_html( $rdns['recommended_action'] ) . '</p>';
+						}
+						echo '<p class="scalyn-card__note">' . esc_html__( 'Informational: not included in the configuration score.', 'scalyn-mail-relay' ) . '</p>';
+					},
+					'scalyn-diagnostics-rdns-heading',
+					$rdns ?? array()
+				);
 				?>
 
 			</div>

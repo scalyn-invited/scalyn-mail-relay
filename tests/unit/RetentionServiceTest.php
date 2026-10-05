@@ -97,6 +97,22 @@ final class RetentionServiceTest extends TestCase {
 		$this->assertSame( 0, $this->state->get()['mail_logs'] );
 	}
 
+	public function test_delivery_expiry_uses_same_site_calendar_cutoff_converted_to_utc(): void {
+		$GLOBALS['_test_wp_options']['scalyn_mail_relay_db_version']='0.6.0';
+		$db=new class extends WpdbStub {
+			public function get_var(string $query): mixed {
+				if(str_contains($query,'information_schema')) { return str_contains($query,'(%s,%s)') ? '2' : '4'; }
+				return '1';
+			}
+		};
+		$GLOBALS['wpdb']=$db;
+		$this->service->run();
+		$this->assertSame('complete',$this->state->get()['state']);
+		$delivery=array_values(array_filter($db->prepare_calls,fn($q)=>str_contains($q['query'],'SELECT message_uuid FROM %i WHERE created_at <')));
+		$this->assertSame(['wp_scalyn_delivery_attempts','2026-08-22 04:00:00',100],$delivery[0]['args']);
+		$this->assertSame(5,count(array_filter($db->queries,fn($q)=>$q==='COMMIT')));
+	}
+
 	public function test_legacy_daily_schedule_is_replaced(): void {
 		wp_schedule_event( 123, 'daily', ScheduledHooks::CLEANUP );
 		RetentionService::ensure_scheduled();

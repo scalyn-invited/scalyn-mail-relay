@@ -9,6 +9,7 @@ namespace Scalyn\MailRelay\Admin\Pages;
 
 use Scalyn\MailRelay\Core\Capabilities;
 use Scalyn\MailRelay\Core\Plugin;
+use Scalyn\MailRelay\Core\PostmarkWebhookSettings;
 use Scalyn\MailRelay\Core\ProviderRegistry;
 use Scalyn\MailRelay\Core\SettingsRepository;
 
@@ -41,7 +42,13 @@ final class ProvidersPage {
 		$verified           = $settings->is_provider_verified();
 		$verified_time      = $verified ? strtotime( $settings->get_provider_verified_at() ?? '' ) : false;
 		$verified_date      = false !== $verified_time ? wp_date( 'Y-m-d H:i:s', $verified_time ) : __( 'Not recorded', 'scalyn-mail-relay' );
-		$providers          = array();
+		$evidence_status    = 'off';
+		try {
+			$evidence_status = $container->get( PostmarkWebhookSettings::class )->collection_status();
+		} catch ( \Throwable $error ) {
+			$evidence_status = 'unavailable';
+		}
+		$providers = array();
 		foreach ( $registry->all() as $id => $provider ) {
 			$configured = match ( $id ) {
 				'smtp' => '' !== ( $smtp_settings['host'] ?? '' ) && '' !== ( $smtp_settings['from_email'] ?? '' ),
@@ -56,6 +63,10 @@ final class ProvidersPage {
 				'configured'  => $configured,
 				'verified'    => $id === $active_provider_id && $verified,
 				'verified_at' => $verified_date,
+				'evidence'    => match ( $id ) {
+					'postmark' => $evidence_status,
+					default => 'unsupported',
+				},
 				'transport'   => match ( $id ) {
 					'smtp' => 'SMTP',
 					'sendgrid' => 'API (HTTPS)',
