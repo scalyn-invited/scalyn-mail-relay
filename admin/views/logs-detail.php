@@ -7,6 +7,7 @@
  *   bool       $uuid_error   True when the supplied UUID failed format validation.
  *   array|null $log          Mail log row as associative array, or null when not found.
  *   array      $timeline     Timeline events as associative arrays, oldest first.
+ *   array|null $delivery     Delivery evidence summary from DeliveryCoverage.
  *
  * Privacy: Do not render raw response_message or event_data.
  *          Do not render subject, recipient, or body
@@ -155,6 +156,34 @@ $status_labels = array(
 			</table>
 		</div>
 
+		<?php if ( is_array( $delivery ?? null ) ) : ?>
+			<?php
+			$delivery_badges = array(
+				'delivered'   => 'healthy',
+				'partial'     => 'warning',
+				'mixed'       => 'warning',
+				'bounced'     => 'critical',
+				'awaiting'    => 'unknown',
+				'not_enabled' => 'unverified',
+				'unavailable' => 'unknown',
+			);
+			?>
+			<section class="scalyn-card scalyn-delivery-evidence" aria-labelledby="scalyn-delivery-evidence-title">
+				<h2 id="scalyn-delivery-evidence-title"><?php esc_html_e( 'Delivery evidence', 'scalyn-mail-relay' ); ?></h2>
+				<p><?php StatusBadge::render( $delivery_badges[ $delivery['state'] ] ?? 'unknown', (string) $delivery['label'] ); ?></p>
+				<p><?php echo esc_html( (string) $delivery['explanation'] ); ?></p>
+				<?php if ( is_string( $delivery['latest_at'] ?? null ) ) : ?>
+					<p class="description">
+						<?php
+						/* translators: %s: UTC receipt time of the most recent provider report. */
+						echo esc_html( sprintf( __( 'Latest report received: %s UTC', 'scalyn-mail-relay' ), substr( $delivery['latest_at'], 0, 19 ) ) );
+						?>
+					</p>
+				<?php endif; ?>
+				<p class="description"><?php esc_html_e( 'This is separate from the sending status above, which never changes. Individual recipients are not identified.', 'scalyn-mail-relay' ); ?></p>
+			</section>
+		<?php endif; ?>
+
 	<?php endif; ?>
 
 	<div class="scalyn-card">
@@ -175,7 +204,17 @@ $status_labels = array(
 					$ev_message = (string) ( $event['event_message'] ?? '' );
 					$ev_created = (string) ( $event['created_at'] ?? '' );
 					$ev_ui_lbl  = $status_labels[ $ev_status ] ?? ucfirst( $ev_status );
-					// event_data is deliberately not rendered.
+					$ev_report  = 'delivery_evidence' === ( $event['event_type'] ?? '' );
+					$ev_when    = '';
+					if ( $ev_report ) {
+						// Only the allowlisted provider event timestamp is read; other event_data stays hidden.
+						$ev_data   = json_decode( (string) ( $event['event_data'] ?? '' ), true );
+						$ev_when   = is_array( $ev_data ) && is_string( $ev_data['occurred_at'] ?? null ) && preg_match( '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/', $ev_data['occurred_at'] ) ? str_replace( 'T', ' ', substr( $ev_data['occurred_at'], 0, 19 ) ) : '';
+						$ev_bounce = is_array( $ev_data ) && 'bounce' === ( $ev_data['kind'] ?? '' );
+						$ev_status = $ev_bounce ? 'warning' : 'healthy';
+						$ev_ui_lbl = __( 'Provider report', 'scalyn-mail-relay' );
+					}
+					// Other event_data is deliberately not rendered.
 					?>
 					<li class="scalyn-timeline__event scalyn-timeline__event--<?php echo esc_attr( $ev_status ); ?>">
 						<div class="scalyn-timeline__header">
@@ -189,6 +228,18 @@ $status_labels = array(
 						</div>
 						<?php if ( '' !== $ev_message ) : ?>
 							<p class="scalyn-timeline__message"><?php echo esc_html( $ev_message ); ?></p>
+						<?php endif; ?>
+						<?php if ( $ev_report ) : ?>
+							<p class="description">
+								<?php
+								echo esc_html(
+									'' !== $ev_when
+										/* translators: %s: provider event time in UTC. */
+										? sprintf( __( 'Provider event time: %s UTC. Time above is when the report was received (site time); reports can arrive late or out of order.', 'scalyn-mail-relay' ), $ev_when )
+										: __( 'Time above is when the report was received (site time).', 'scalyn-mail-relay' )
+								);
+								?>
+							</p>
 						<?php endif; ?>
 					</li>
 				<?php endforeach; ?>

@@ -142,6 +142,9 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 						echo '<div class="notice notice-error inline"><p>' . esc_html__( 'Postmark settings are incomplete or the stored token cannot be read. Check the sender and replace the token below.', 'scalyn-mail-relay' ) . '</p></div>';
 					}
 					$postmark_form->render( true );
+					if ( isset( $postmark_webhook_form ) ) {
+						$postmark_webhook_form->render();
+					}
 					break;
 				}
 				if ( 'sendgrid' === $active_provider_id ) :
