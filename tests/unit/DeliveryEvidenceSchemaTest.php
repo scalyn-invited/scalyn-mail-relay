@@ -19,7 +19,7 @@ final class DeliveryEvidenceSchemaTest extends TestCase {
 	}
 	public function test_additive_transactional_schema_is_verified_and_idempotent(): void {
 		Migrator::migrate();
-		$this->assertSame('0.6.0',get_option('scalyn_mail_relay_db_version'));
+		$this->assertSame('0.7.0',get_option('scalyn_mail_relay_db_version'));
 		$this->assertCount(5,$GLOBALS['_test_dbdelta_queries']);
 		$sql=implode("\n",$GLOBALS['_test_dbdelta_queries']);
 		$this->assertSame(5,substr_count($sql,'ENGINE=InnoDB'));
@@ -43,7 +43,7 @@ final class DeliveryEvidenceSchemaTest extends TestCase {
 		}
 		$GLOBALS['wpdb']=new DeliverySchemaWpdbStub();
 		Migrator::migrate();
-		$this->assertSame('0.6.0',get_option('scalyn_mail_relay_db_version'));
+		$this->assertSame('0.7.0',get_option('scalyn_mail_relay_db_version'));
 	}
 	public function test_key_retirement_upgrade_from_applied_05_is_additive_and_fail_closed(): void {
 		$GLOBALS['_test_wp_options']['scalyn_mail_relay_db_version']='0.5.0';
@@ -53,7 +53,7 @@ final class DeliveryEvidenceSchemaTest extends TestCase {
 		$this->assertSame('0.5.0',get_option('scalyn_mail_relay_db_version'));
 		$GLOBALS['wpdb']->missingRetirement=false;
 		Migrator::migrate();
-		$this->assertSame('0.6.0',get_option('scalyn_mail_relay_db_version'));
+		$this->assertSame('0.7.0',get_option('scalyn_mail_relay_db_version'));
 		$this->assertStringContainsString('retired_at datetime NULL',$GLOBALS['_test_dbdelta_queries'][0]);
 		$this->assertCount(2,$GLOBALS['_test_dbdelta_queries']);
 	}

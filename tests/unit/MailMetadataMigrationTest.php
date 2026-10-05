@@ -21,7 +21,7 @@ final class MailMetadataMigrationTest extends TestCase {
 		$GLOBALS['wpdb']->get_col_returns=array(array('id','logged_recipients','logged_subject'),array('id','configuration_id','provider_id','sending_domain'));
 		$GLOBALS['wpdb']->get_results_return=array(array(),array(),array());
 		Migrator::migrate();
-		$this->assertSame('0.6.0',get_option('scalyn_mail_relay_db_version'));
+		$this->assertSame('0.7.0',get_option('scalyn_mail_relay_db_version'));
 		$this->assertStringContainsString('logged_recipients text NULL',$GLOBALS['_test_dbdelta_queries'][0]);
 		$this->assertStringContainsString('logged_subject varchar(255) NULL',$GLOBALS['_test_dbdelta_queries'][0]);
 		$this->assertStringNotContainsString('DROP',$GLOBALS['_test_dbdelta_queries'][0]);
