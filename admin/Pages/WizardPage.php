@@ -59,12 +59,15 @@ final class WizardPage {
 		foreach ( $registry->all() as $id => $provider ) {
 			$registered_providers[ $id ] = $provider->get_label();
 		}
-		$active_provider_id = $settings->get_active_provider_id();
-		$sendgrid_form      = null;
-		$postmark_form      = null;
+		$active_provider_id    = $settings->get_active_provider_id();
+		$sendgrid_form         = null;
+		$postmark_form         = null;
+		$postmark_webhook_form = null;
 		if ( 3 === $current_step && 'postmark' === $active_provider_id ) {
 			$postmark_form = new \Scalyn\MailRelay\Admin\Components\PostmarkSettingsForm( $settings, $container->get( \Scalyn\MailRelay\Core\CredentialCipher::class ) );
 			$postmark_form->handle();
+			$postmark_webhook_form = new \Scalyn\MailRelay\Admin\Components\PostmarkWebhookForm( $container->get( \Scalyn\MailRelay\Core\PostmarkWebhookSettings::class ) );
+			$postmark_webhook_form->handle();
 		}
 		if ( 3 === $current_step && 'sendgrid' === $active_provider_id ) {
 			$sendgrid_form = new \Scalyn\MailRelay\Admin\Components\SendGridSettingsForm( $settings, $container->get( \Scalyn\MailRelay\Core\CredentialCipher::class ) );
