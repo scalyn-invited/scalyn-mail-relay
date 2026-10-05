@@ -50,6 +50,12 @@ final class Migrator {
 		if ( version_compare( $installed, '0.7.0', '<' ) ) {
 			TransactionalTablesSchema::migrate();
 		}
+		if ( version_compare( $installed, '0.8.0', '<' ) ) {
+			MailConfigurationSchema::migrate();
+		}
+		if ( version_compare( $installed, '0.9.0', '<' ) ) {
+			ConnectionEvidenceSchema::migrate();
+		}
 		update_option( 'scalyn_mail_relay_db_version', SCALYN_MAIL_RELAY_DB_VERSION, false );
 		if ( SCALYN_MAIL_RELAY_DB_VERSION !== get_option( 'scalyn_mail_relay_db_version' ) ) {
 			throw new \RuntimeException( 'Database version could not be saved.' );

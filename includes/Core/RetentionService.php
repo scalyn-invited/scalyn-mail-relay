@@ -74,9 +74,10 @@ final class RetentionService {
 		);
 		try {
 			$this->state->save( $status );
-			$cutoff_time    = current_datetime()->modify( '-' . $this->settings->get_log_retention_days() . ' days' );
-			$cutoff         = $cutoff_time->format( 'Y-m-d H:i:s' );
-			$delivery_count = 0;
+			$cutoff_time      = current_datetime()->modify( '-' . $this->settings->get_log_retention_days() . ' days' );
+			$cutoff           = $cutoff_time->format( 'Y-m-d H:i:s' );
+			$delivery_count   = 0;
+			$connection_count = ( new \Scalyn\MailRelay\Database\ConnectionEvidenceRepository() )->delete_expired( $cutoff_time->setTimezone( new \DateTimeZone( 'UTC' ) )->format( 'Y-m-d H:i:s.u' ) );
 			if ( version_compare( (string) get_option( 'scalyn_mail_relay_db_version', '0.0.0' ), '0.5.0', '>=' ) ) {
 				$utc_cutoff     = $cutoff_time->setTimezone( new \DateTimeZone( 'UTC' ) )->format( 'Y-m-d H:i:s' );
 				$delivery_count = $this->delivery->delete_expired_batch( $utc_cutoff, self::BATCH_SIZE );
@@ -94,7 +95,7 @@ final class RetentionService {
 			$status['health_scores']   = $diagnostics->deleted_health_scores;
 			$this->state->save( $status );
 			$status['audit_rows']      = $this->audit->delete_expired_batch( $cutoff );
-			$status['state']           = max( $delivery_count, $key_count, $mail->selected_messages, $diagnostics->selected_runs, $diagnostics->selected_health_scores, $status['audit_rows'] ) >= self::BATCH_SIZE ? 'more_pending' : 'complete';
+			$status['state']           = max( $connection_count, $delivery_count, $key_count, $mail->selected_messages, $diagnostics->selected_runs, $diagnostics->selected_health_scores, $status['audit_rows'] ) >= self::BATCH_SIZE ? 'more_pending' : 'complete';
 			$status['last_success_at'] = time();
 		} catch ( \Throwable $error ) {
 			// Exception details may contain credentials or SQL. Store only a fixed state.

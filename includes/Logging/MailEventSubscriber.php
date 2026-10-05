@@ -56,12 +56,12 @@ final class MailEventSubscriber {
 	 * Registers WordPress action hooks for the consumed mail lifecycle events.
 	 *
 	 * Must be called during plugin boot, after the service container is initialized.
-	 * accepted_args is 2 for both hooks because each fires with (SendResult, MailMessage).
+	 * The optional third argument is the dispatch-time configuration revision.
 	 */
 	public function register(): void {
-		add_action( HookNames::MAIL_SENT, array( $this, 'on_mail_sent' ), 10, 2 );
-		add_action( HookNames::MAIL_FAILED, array( $this, 'on_mail_failed' ), 10, 2 );
-		add_action( HookNames::MAIL_OUTCOME_UNCONFIRMED, array( $this, 'on_mail_unconfirmed' ), 10, 2 );
+		add_action( HookNames::MAIL_SENT, array( $this, 'on_mail_sent' ), 10, 3 );
+		add_action( HookNames::MAIL_FAILED, array( $this, 'on_mail_failed' ), 10, 3 );
+		add_action( HookNames::MAIL_OUTCOME_UNCONFIRMED, array( $this, 'on_mail_unconfirmed' ), 10, 3 );
 	}
 
 	/**
@@ -69,10 +69,11 @@ final class MailEventSubscriber {
 	 *
 	 * @param SendResult  $result Safe normalized unconfirmed outcome.
 	 * @param MailMessage $message Correlated message.
+	 * @param string|null $configuration_id Captured revision, or unknown for legacy publishers.
 	 */
-	public function on_mail_unconfirmed( SendResult $result, MailMessage $message ): void {
+	public function on_mail_unconfirmed( SendResult $result, MailMessage $message, ?string $configuration_id = null ): void {
 		try {
-			$this->log_repo->upsert( $message, $result, MailStatus::PREPARED );
+			$this->log_repo->upsert( $message, $result, MailStatus::PREPARED, $configuration_id );
 			$this->timeline_repo->insert_event(
 				$message->uuid,
 				'mail_outcome_unconfirmed',
@@ -96,10 +97,11 @@ final class MailEventSubscriber {
 	 *
 	 * @param SendResult  $result  The normalized send result (success=true).
 	 * @param MailMessage $message The dispatched message.
+	 * @param string|null $configuration_id Captured revision, or unknown for legacy publishers.
 	 */
-	public function on_mail_sent( SendResult $result, MailMessage $message ): void {
+	public function on_mail_sent( SendResult $result, MailMessage $message, ?string $configuration_id = null ): void {
 		try {
-			$this->log_repo->upsert( $message, $result, MailStatus::ACCEPTED );
+			$this->log_repo->upsert( $message, $result, MailStatus::ACCEPTED, $configuration_id );
 
 			$this->timeline_repo->insert_event(
 				$message->uuid,
@@ -123,10 +125,11 @@ final class MailEventSubscriber {
 	 *
 	 * @param SendResult  $result  The normalized send result (success=false).
 	 * @param MailMessage $message The dispatched message.
+	 * @param string|null $configuration_id Captured revision, or unknown for legacy publishers.
 	 */
-	public function on_mail_failed( SendResult $result, MailMessage $message ): void {
+	public function on_mail_failed( SendResult $result, MailMessage $message, ?string $configuration_id = null ): void {
 		try {
-			$this->log_repo->upsert( $message, $result, MailStatus::FAILED );
+			$this->log_repo->upsert( $message, $result, MailStatus::FAILED, $configuration_id );
 
 			$this->timeline_repo->insert_event(
 				$message->uuid,

@@ -150,14 +150,14 @@ final class MailEventSubscriberTest extends TestCase {
 		$this->make_subscriber()->register();
 
 		$registered = $GLOBALS['_test_wp_added_actions'][ HookNames::MAIL_SENT ][0];
-		$this->assertSame( 2, $registered['accepted_args'] );
+		$this->assertSame( 3, $registered['accepted_args'] );
 	}
 
 	public function test_register_mail_failed_action_accepts_two_arguments(): void {
 		$this->make_subscriber()->register();
 
 		$registered = $GLOBALS['_test_wp_added_actions'][ HookNames::MAIL_FAILED ][0];
-		$this->assertSame( 2, $registered['accepted_args'] );
+		$this->assertSame( 3, $registered['accepted_args'] );
 	}
 
 	// -------------------------------------------------------------------------

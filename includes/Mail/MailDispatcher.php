@@ -57,16 +57,19 @@ final class MailDispatcher {
 	 */
 	public function dispatch( MailMessage $message ): SendResult {
 		$provider_id = $this->settings->get_active_provider_id();
+		// Capture attribution before transport; missing legacy revisions stay unknown.
+		$revision         = $this->settings->get_diagnostic_revision();
+		$configuration_id = preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/D', $revision ) ? $revision : null;
 
 		if ( '' === $provider_id ) {
 			$result = new SendResult( false, '', null, null, 'No mail provider is configured.', false, 'config' );
-			$this->publish( HookNames::MAIL_FAILED, $result, $message );
+			$this->publish( HookNames::MAIL_FAILED, $result, $message, $configuration_id );
 			return $result;
 		}
 
 		if ( ! $this->registry->has( $provider_id ) ) {
 			$result = new SendResult( false, $provider_id, null, null, 'Configured mail provider is not registered.', false, 'config' );
-			$this->publish( HookNames::MAIL_FAILED, $result, $message );
+			$this->publish( HookNames::MAIL_FAILED, $result, $message, $configuration_id );
 			return $result;
 		}
 
@@ -75,7 +78,7 @@ final class MailDispatcher {
 			$config = $this->settings->get_provider_config( $provider_id );
 		} catch ( \Throwable $error ) {
 			$result = new SendResult( false, $provider_id, null, null, 'Stored provider credentials are unavailable. Replace the key in Providers.', false, 'config' );
-			$this->publish( HookNames::MAIL_FAILED, $result, $message );
+			$this->publish( HookNames::MAIL_FAILED, $result, $message, $configuration_id );
 			return $result;
 		}
 		// Optional tracking must be associated before submission and can never block it.
@@ -98,11 +101,11 @@ final class MailDispatcher {
 		}
 
 		if ( $result->success ) {
-			$this->publish( HookNames::MAIL_SENT, $result, $message );
+			$this->publish( HookNames::MAIL_SENT, $result, $message, $configuration_id );
 		} elseif ( $result->acceptance_unconfirmed ) {
-			$this->publish( HookNames::MAIL_OUTCOME_UNCONFIRMED, $result, $message );
+			$this->publish( HookNames::MAIL_OUTCOME_UNCONFIRMED, $result, $message, $configuration_id );
 		} else {
-			$this->publish( HookNames::MAIL_FAILED, $result, $message );
+			$this->publish( HookNames::MAIL_FAILED, $result, $message, $configuration_id );
 		}
 
 		return $result;
@@ -114,10 +117,11 @@ final class MailDispatcher {
 	 * @param string      $hook Established lifecycle hook.
 	 * @param SendResult  $result Normalized provider result.
 	 * @param MailMessage $message Correlated message.
+	 * @param string|null $configuration_id Dispatch-time revision, or unknown.
 	 */
-	private function publish( string $hook, SendResult $result, MailMessage $message ): void {
+	private function publish( string $hook, SendResult $result, MailMessage $message, ?string $configuration_id ): void {
 		try {
-			do_action( $hook, $result, $message );
+			do_action( $hook, $result, $message, $configuration_id );
 		} catch ( \Throwable $error ) {
 			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Fixed text only; never include the observer exception or mail content.
 			error_log( 'Scalyn Mail Relay: mail outcome observer failed.' );
