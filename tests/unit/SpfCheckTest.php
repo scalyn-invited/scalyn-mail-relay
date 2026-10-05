@@ -219,6 +219,9 @@ final class SpfCheckTest extends TestCase {
 
 	public static function weakOrBrokenProvider(): array {
 		return array(
+			'all domain'      => array( 'v=spf1 -all:garbage', 'fail', 'not valid syntax' ),
+			'all cidr'        => array( 'v=spf1 ~all/24', 'fail', 'not valid syntax' ),
+			'all empty'       => array( 'v=spf1 -all:', 'fail', 'not valid syntax' ),
 			'plus all'        => array( 'v=spf1 +all', 'fail', '+all' ),
 			'implicit plus'   => array( 'v=spf1 ip4:192.0.2.1 all', 'fail', '+all' ),
 			'neutral all'     => array( 'v=spf1 include:_spf.example.com ?all', 'warn', '?all' ),

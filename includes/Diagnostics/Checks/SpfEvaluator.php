@@ -109,6 +109,11 @@ final class SpfEvaluator {
 			$value     = isset( $parts[4] ) && ':' === $parts[3] ? $parts[4] : '';
 			switch ( $mechanism ) {
 				case 'all':
+					// RFC 7208 section 5.1: all takes neither a domain nor a CIDR suffix.
+					if ( isset( $parts[3] ) ) {
+						$this->state['errors'][] = 'The SPF all mechanism is not valid syntax: parameters are not permitted.';
+						break;
+					}
 					$has_all = true;
 					if ( $root ) {
 						$this->state['all'] = $qualifier;
