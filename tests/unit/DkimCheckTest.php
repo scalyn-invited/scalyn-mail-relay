@@ -15,6 +15,11 @@ use Scalyn\MailRelay\Diagnostics\DiagnosticContext;
  */
 final class DkimCheckTest extends TestCase {
 
+	/** Real public keys generated for these tests only (no private keys retained). */
+	private const RSA_512 = 'MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAL3ppcn+BpDmfZeT60ZI4fpfLa5pCe3d2adcLiYS5MEhJR/+p6T4qsxPLOJO8i1RhEwvW9MwLAp5to7YKAcRoccCAwEAAQ==';
+	private const RSA_1024 = 'MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC9ePwmSlpEHmP8Byslw1jgX/kICBla+1zTAvbki9NDgpPeFirzzUYzURNgwjtQjYlP3/pUdqdMU5w33I4YbcPJniIT4GZM+7H9aYEX29efxSvwhvMdrNUiEgYFx+AvqqKLK8jE9KFplo6vPvZMWOMjcszJdi3H7cg0FnsL8h6OaQIDAQAB';
+	private const RSA_2048 = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwAFJg9Cbu86ewrAa/2O8PYIFucFPL9zAbytaHN6uPSeZh2/P6ELDN3uuKMVgunoVh+grXbbSyZTroHTLDZs/0/YYdoWtFxHGEklOKsvopq7ysX5uVCsGPP7TLtd+zM90VXgoQ6A5Yb2KLb+Lg4aP1oyBK4RX/ELaiHwBMmfCPtfrF2VKI/yjJvj0JiQUcDZazZXnw/jmva81UUNFK8jpXl99I8tYCsd43nDZnMsh8I74STDDW55JWENUyKIvMXx+C4TlqdMQeVDggDJcS8caZMaulyfTAEHUNqqng35JReAiG2wO0CqzjeKzT3Rs0d12NwcuUvFgdvkEEL5+cQl7MQIDAQAB';
+
 	private function make_check( array|false $txt_records ): DkimCheck {
 		return new DkimCheck( static fn( string $domain ): array|false => $txt_records );
 	}
@@ -167,11 +172,38 @@ final class DkimCheckTest extends TestCase {
 	// -------------------------------------------------------------------------
 
 	public function test_returns_pass_for_a_well_formed_record(): void {
-		$records = array( $this->txt( 'v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC' ) );
+		$records = array( $this->txt( 'v=DKIM1; k=rsa; p=' . self::RSA_2048 ) );
 
 		$result = $this->make_check( $records )->run( $this->make_context( 'example.com', array( 'dkim_selector' => 'selector1' ) ) );
 
 		$this->assertSame( 'pass', $result->status );
+		$this->assertSame( 2048, $result->raw['key_bits'] );
+		$this->assertStringContainsString( '2048-bit RSA', $result->message );
+	}
+
+	// -------------------------------------------------------------------------
+	// Key analysis
+	// -------------------------------------------------------------------------
+
+	/** @dataProvider keyAnalysisProvider */
+	public function test_key_analysis( string $record, string $status, string $text ): void {
+		$result = $this->make_check( array( $this->txt( $record ) ) )->run( $this->make_context( 'example.com', array( 'dkim_selector' => 'selector1' ) ) );
+		$this->assertSame( $status, $result->status );
+		$this->assertStringContainsString( $text, $result->message );
+	}
+
+	public static function keyAnalysisProvider(): array {
+		return array(
+			'512-bit rsa'      => array( 'v=DKIM1; k=rsa; p=' . self::RSA_512, 'fail', 'only 512 bits' ),
+			'1024-bit rsa'     => array( 'v=DKIM1; p=' . self::RSA_1024, 'warn', '1024 bits' ),
+			'truncated key'    => array( 'v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC', 'fail', 'could not be parsed' ),
+			'not base64'       => array( 'v=DKIM1; k=rsa; p=@@@', 'fail', 'not valid base64' ),
+			'testing flag'     => array( 'v=DKIM1; t=y; p=' . self::RSA_2048, 'warn', 'testing mode' ),
+			'sha1 only'        => array( 'v=DKIM1; h=sha1; p=' . self::RSA_2048, 'warn', 'sha256' ),
+			'unknown type'     => array( 'v=DKIM1; k=dsa; p=' . self::RSA_2048, 'fail', 'not supported' ),
+			'ed25519'          => array( 'v=DKIM1; k=ed25519; p=' . base64_encode( str_repeat( 'k', 32 ) ), 'warn', 'Ed25519' ),
+			'bad ed25519'      => array( 'v=DKIM1; k=ed25519; p=' . base64_encode( 'short' ), 'fail', 'wrong length' ),
+		);
 	}
 
 	// -------------------------------------------------------------------------

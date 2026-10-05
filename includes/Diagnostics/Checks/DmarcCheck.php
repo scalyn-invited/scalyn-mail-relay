@@ -67,7 +67,7 @@ final class DmarcCheck implements DiagnosticCheckInterface {
 	 * @param DiagnosticContext $context The execution context for this check run.
 	 */
 	public function run( DiagnosticContext $context ): DiagnosticResult {
-		$domain = trim( $context->domain );
+		$domain = strtolower( trim( $context->domain ) );
 
 		if ( ! self::is_valid_domain( $domain ) ) {
 			return new DiagnosticResult(
@@ -77,26 +77,34 @@ final class DmarcCheck implements DiagnosticCheckInterface {
 			);
 		}
 
-		$dmarc_domain = '_dmarc.' . $domain;
-		$records      = ( $this->lookup_txt_records )( $dmarc_domain );
-
-		if ( false === $records ) {
-			return new DiagnosticResult(
-				status: 'unknown',
-				severity: 'low',
-				message: sprintf( 'DMARC lookup for "%s" failed; the DNS query could not be completed.', $domain )
-			);
-		}
-
-		$dmarc_values = array();
-		foreach ( $records as $record ) {
-			$txt = (string) ( $record['txt'] ?? '' );
-			if ( 0 === stripos( $txt, 'v=dmarc1' ) ) {
-				$dmarc_values[] = $txt;
+		// DMARCbis tree walk: the sending domain first, then parent domains above the TLD.
+		$labels    = explode( '.', $domain );
+		$candidate = null;
+		$found     = array();
+		$levels    = min( count( $labels ) - 1, 8 );
+		for ( $i = 0; $i < $levels; $i++ ) {
+			$candidate = implode( '.', array_slice( $labels, $i ) );
+			$records   = ( $this->lookup_txt_records )( '_dmarc.' . $candidate );
+			if ( false === $records ) {
+				return new DiagnosticResult(
+					status: 'unknown',
+					severity: 'low',
+					message: sprintf( 'DMARC lookup for "%s" failed; the DNS query could not be completed.', $candidate )
+				);
+			}
+			$found = array();
+			foreach ( $records as $record ) {
+				$txt = (string) ( $record['txt'] ?? '' );
+				if ( 0 === stripos( $txt, 'v=dmarc1' ) ) {
+					$found[] = $txt;
+				}
+			}
+			if ( array() !== $found ) {
+				break;
 			}
 		}
 
-		if ( array() === $dmarc_values ) {
+		if ( array() === $found ) {
 			return new DiagnosticResult(
 				status: 'fail',
 				severity: 'high',
@@ -106,53 +114,159 @@ final class DmarcCheck implements DiagnosticCheckInterface {
 			);
 		}
 
-		if ( count( $dmarc_values ) > 1 ) {
+		if ( count( $found ) > 1 ) {
 			return new DiagnosticResult(
 				status: 'fail',
 				severity: 'high',
-				message: sprintf( 'Multiple DMARC records found for "%s"; only one is permitted.', $domain ),
-				evidence: implode( "\n", $dmarc_values ),
+				message: sprintf( 'Multiple DMARC records found for "%s"; only one is permitted.', $candidate ),
+				evidence: implode( "\n", $found ),
 				impact: 'RFC 7489 requires exactly one DMARC record; receiving servers may ignore DMARC evaluation entirely when multiple records are present.',
 				recommended_action: 'Remove the extra "_dmarc" TXT records, leaving exactly one.',
-				raw: array( 'records' => $dmarc_values )
+				raw: array( 'records' => $found )
 			);
 		}
 
-		$dmarc  = $dmarc_values[0];
-		$policy = self::extract_policy( $dmarc );
+		$dmarc     = $found[0];
+		$inherited = $candidate !== $domain;
+		$tags      = self::parse_tags( $dmarc );
+		$policy    = self::extract_policy( $dmarc );
+		$evidence  = $inherited ? $dmarc . "\nInherited from: _dmarc." . $candidate : $dmarc;
+		$analysis  = self::analyze( $tags, $inherited, $context->settings );
+		$raw       = array(
+			'record'      => $dmarc,
+			'policy_from' => $candidate,
+			'inherited'   => $inherited,
+			'alignment'   => $analysis['alignment'],
+		);
 
 		if ( null === $policy ) {
 			return new DiagnosticResult(
 				status: 'warn',
 				severity: 'medium',
-				message: sprintf( 'DMARC record for "%s" is missing a valid "p=" policy tag.', $domain ),
-				evidence: $dmarc,
+				message: sprintf( 'DMARC record for "%s" is missing a valid "p=" policy tag.', $candidate ),
+				evidence: $evidence,
 				impact: 'A DMARC record without a recognized policy tag may be ignored by receiving servers.',
 				recommended_action: 'Add a "p=" tag with a value of "none", "quarantine" or "reject".',
-				raw: array( 'record' => $dmarc )
+				raw: $raw
 			);
 		}
 
-		if ( 'none' === $policy ) {
+		// A subdomain inherits the organizational record's sp= (or p= when sp= is absent).
+		$effective          = $inherited && in_array( $tags['sp'] ?? '', array( 'none', 'quarantine', 'reject' ), true ) ? $tags['sp'] : $policy;
+		$raw['policy']      = $effective;
+		$raw['percentage']  = $analysis['pct'];
+		$inherited_sentence = $inherited ? sprintf( ' The policy is inherited from "%s".', $candidate ) : '';
+
+		if ( 'none' === $effective ) {
 			return new DiagnosticResult(
 				status: 'warn',
 				severity: 'medium',
-				message: sprintf( 'DMARC record for "%s" is in monitor-only mode ("p=none").', $domain ),
-				evidence: $dmarc,
+				message: sprintf( 'DMARC record for "%s" is in monitor-only mode ("p=none").', $domain ) . $inherited_sentence,
+				evidence: $evidence,
 				impact: 'Monitor-only mode provides reporting visibility but does not instruct receivers to quarantine or reject spoofed mail.',
-				recommended_action: 'Once SPF/DKIM alignment is confirmed via DMARC reports, consider moving to "p=quarantine" or "p=reject".',
-				raw: array( 'record' => $dmarc )
+				recommended_action: 'Once SPF/DKIM alignment is confirmed via DMARC reports, consider moving to "p=quarantine" or "p=reject".' . $analysis['advice'],
+				raw: $raw
+			);
+		}
+
+		if ( $analysis['problems'] ) {
+			return new DiagnosticResult(
+				status: 'warn',
+				severity: 'medium',
+				message: sprintf( 'DMARC record for "%s" enforces "%s" with limitations: %s', $domain, $effective, $analysis['problems'][0] ) . $inherited_sentence,
+				evidence: $evidence . "\n" . implode( "\n", $analysis['problems'] ),
+				impact: 'Limited or invalid DMARC settings reduce protection or cause receivers to ignore parts of the policy.',
+				recommended_action: 'Correct the listed tags. Raise pct= to 100 once DMARC reports confirm legitimate mail aligns.' . $analysis['advice'],
+				raw: $raw
 			);
 		}
 
 		return new DiagnosticResult(
 			status: 'pass',
 			severity: 'low',
-			message: sprintf( 'A DMARC record with an enforcing policy ("p=%s") was found for "%s". Message authentication and alignment have not been verified.', $policy, $domain ),
+			message: sprintf( 'A DMARC record with an enforcing policy ("p=%s") was found for "%s". Message authentication and alignment have not been verified.', $effective, $domain ) . $inherited_sentence,
 			impact: 'An enforcing policy does not prove legitimate messages pass SPF or DKIM alignment. It may cause unauthenticated messages to be rejected.',
-			recommended_action: 'Confirm SPF or DKIM authentication and alignment for actual messages using receiver results or DMARC reports. Publishing this policy alone does not authenticate email.',
-			evidence: $dmarc,
-			raw: array( 'record' => $dmarc )
+			recommended_action: 'Confirm SPF or DKIM authentication and alignment for actual messages using receiver results or DMARC reports. Publishing this policy alone does not authenticate email.' . $analysis['advice'],
+			evidence: $evidence,
+			raw: $raw
+		);
+	}
+
+	/**
+	 * Parses DMARC tags into a lowercase map; later duplicates are ignored.
+	 *
+	 * @param string $dmarc Record text.
+	 * @return array<string, string>
+	 */
+	private static function parse_tags( string $dmarc ): array {
+		$tags = array();
+		foreach ( explode( ';', $dmarc ) as $part ) {
+			if ( preg_match( '/^\s*([a-z]+)\s*=\s*(.*?)\s*$/iD', $part, $match ) ) {
+				$name = strtolower( $match[1] );
+				if ( ! isset( $tags[ $name ] ) ) {
+					$tags[ $name ] = in_array( $name, array( 'rua', 'ruf' ), true ) ? $match[2] : strtolower( $match[2] );
+				}
+			}
+		}
+		return $tags;
+	}
+
+	/**
+	 * Validates enforcement tags and describes configuration-based alignment.
+	 *
+	 * Alignment here is a configuration assessment only. It never states that
+	 * messages align; that requires receiver results or DMARC aggregate reports.
+	 *
+	 * @param array<string, string> $tags Parsed tags.
+	 * @param bool                  $inherited Whether the record belongs to a parent domain.
+	 * @param array<string, mixed>  $settings Credential-free context settings.
+	 * @return array problems, advice, pct and alignment.
+	 */
+	private static function analyze( array $tags, bool $inherited, array $settings ): array {
+		$problems = array();
+		$pct      = 100;
+		if ( isset( $tags['pct'] ) ) {
+			if ( ! preg_match( '/^\d{1,3}$/D', $tags['pct'] ) || (int) $tags['pct'] > 100 ) {
+				$problems[] = 'the pct= value is invalid; receivers treat it as 100.';
+			} else {
+				$pct = (int) $tags['pct'];
+				if ( $pct < 100 ) {
+					$problems[] = sprintf( 'pct=%d applies the policy to only %d%% of failing mail.', $pct, $pct );
+				}
+			}
+		}
+		foreach ( array( 'adkim', 'aspf' ) as $mode ) {
+			if ( isset( $tags[ $mode ] ) && ! in_array( $tags[ $mode ], array( 'r', 's' ), true ) ) {
+				$problems[] = sprintf( 'the %s= value must be "r" or "s".', $mode );
+			}
+		}
+		if ( isset( $tags['sp'] ) && ! in_array( $tags['sp'], array( 'none', 'quarantine', 'reject' ), true ) ) {
+			$problems[] = 'the sp= value is not a recognized policy.';
+		}
+		$dkim_mode = 's' === ( $tags['adkim'] ?? 'r' ) ? 'strict' : 'relaxed';
+		$spf_mode  = 's' === ( $tags['aspf'] ?? 'r' ) ? 'strict' : 'relaxed';
+		$selector  = is_string( $settings['dkim_selector'] ?? null ) && '' !== $settings['dkim_selector'];
+		// A selector configured under the From domain means a provider signing with it uses d=<From domain>, which aligns in either mode.
+		$dkim   = $selector ? 'possible_with_configured_selector' : 'not_assessed';
+		$advice = $selector
+			? ' DKIM alignment is possible if your provider signs with the configured selector on this domain; confirm with message headers.'
+			: ' Configure your provider\'s DKIM selector in Diagnostics so DKIM alignment can be assessed.';
+		if ( empty( $tags['rua'] ) ) {
+			$advice .= ' Add an rua= reporting address to receive aggregate reports that confirm real alignment.';
+		}
+		return array(
+			'problems'  => $problems,
+			'advice'    => $advice,
+			'pct'       => $pct,
+			'alignment' => array(
+				'dkim_mode' => $dkim_mode,
+				'spf_mode'  => $spf_mode,
+				'dkim'      => $dkim,
+				// The envelope-sender domain is chosen by the provider and is not observed here.
+				'spf'       => 'not_assessed',
+				'reporting' => ! empty( $tags['rua'] ),
+				'subdomain' => $inherited,
+			),
 		);
 	}
 
