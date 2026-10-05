@@ -46,7 +46,7 @@ final class ProvidersPageTest extends TestCase {
 		$this->assertStringContainsString('Postmark API', $html);
 		$this->assertStringContainsString('Live Server token', $html);
 	}
-	public function test_active_route_uses_recorded_verification_without_credentials(): void {
+	public function test_active_route_shows_current_scope_health_without_credentials(): void {
 		$GLOBALS['_test_current_user_can'][Capabilities::MANAGE_SETTINGS] = true;
 		$GLOBALS['_test_wp_options'][SettingsRepository::OPTION_KEY] = array(
 			'provider' => array('active'=>'smtp','verified'=>true,'verified_at'=>'2026-09-30T08:00:00+00:00'),
@@ -54,20 +54,22 @@ final class ProvidersPageTest extends TestCase {
 		);
 		$html = $this->render_page();
 		$this->assertStringContainsString('Active sending route', $html);
-		$this->assertStringContainsString('Success recorded', $html);
+		$this->assertStringContainsString('Connection status', $html);
+		$this->assertStringContainsString('Not checked for the current configuration', $html);
+		$this->assertStringContainsString('Provider health', $html);
+		$this->assertStringContainsString('Unknown', $html);
 		$this->assertStringContainsString('Verify connection', $html);
 		$this->assertStringContainsString('Settings saved', $html);
-		$this->assertStringContainsString('not live availability', $html);
+		$this->assertStringContainsString('current configuration', $html);
 		$this->assertStringNotContainsString('NEVER_RENDER_THIS', $html);
 		$this->assertStringContainsString('wizard&step=3">Configure in wizard', $html);
 		$this->assertStringContainsString('wizard&step=2">Select in wizard', $html);
 	}
-	public function test_unverified_route_does_not_show_success_date(): void {
+	public function test_inactive_cards_do_not_reuse_active_provider_health(): void {
 		$GLOBALS['_test_wp_options'][SettingsRepository::OPTION_KEY] = array('provider'=>array('active'=>'smtp','verified'=>false,'verified_at'=>'2099-01-01T00:00:00+00:00'));
 		$html = $this->render_page();
-		$this->assertStringNotContainsString('Last success (site time)', $html);
 		$this->assertStringNotContainsString('2099-01-01', $html);
-		$this->assertStringContainsString('Not verified for the current selection', $html);
+		$this->assertStringContainsString('Not assessed — select this provider to assess its current configuration.', $html);
 	}
 	public function test_providers_page_no_longer_processes_credential_posts(): void {
 		$_SERVER['REQUEST_METHOD'] = 'POST';

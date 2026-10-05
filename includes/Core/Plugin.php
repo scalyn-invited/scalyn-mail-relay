@@ -41,6 +41,7 @@ use Scalyn\MailRelay\Database\WebhookRateLimitRepository;
 use Scalyn\MailRelay\Delivery\DeliveryCoverage;
 use Scalyn\MailRelay\Delivery\DeliveryTracker;
 use Scalyn\MailRelay\Providers\Postmark\PostmarkProvider;
+use Scalyn\MailRelay\Health\ProviderHealthAssessment;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -150,6 +151,7 @@ final class Plugin {
 		$this->container->set( WordPressMailBridge::class, static fn( Container $c ): WordPressMailBridge => new WordPressMailBridge( $c->get( SettingsRepository::class ), $c->get( MailDispatcher::class ) ) );
 
 		$this->container->set( MailLogRepository::class, static fn(): MailLogRepository => new MailLogRepository() );
+		$this->container->set( ProviderHealthAssessment::class, static fn( Container $c ): ProviderHealthAssessment => new ProviderHealthAssessment( $c->get( SettingsRepository::class ), $c->get( ConnectionVerification::class ), $c->get( MailLogRepository::class ) ) );
 		$this->container->set( MailRetentionRepository::class, static fn(): MailRetentionRepository => new MailRetentionRepository() );
 		$this->container->set( DeliveryRetentionRepository::class, static fn(): DeliveryRetentionRepository => new DeliveryRetentionRepository() );
 		$this->container->set( DeliveryKeyRepository::class, static fn( Container $c ): DeliveryKeyRepository => new DeliveryKeyRepository( $c->get( CredentialCipher::class ) ) );

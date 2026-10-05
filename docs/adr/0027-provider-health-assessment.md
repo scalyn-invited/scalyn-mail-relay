@@ -2,8 +2,9 @@
 
 Status: **Accepted** by Bernie on 2026-10-05 (Milestone 8 ticket 8).
 D1–D4 and the additional unknown/stale policy are accepted. Implementation remains
-pending. The ADR-0026 acceptance dependency is satisfied by its acceptance on the
-same date; this does not mean either feature has been implemented.
+in progress. The ADR-0026 acceptance dependency is satisfied by its acceptance
+on the same date; this does not mean a numerical Deliverability Score has been
+implemented.
 
 ## Context
 
@@ -162,5 +163,24 @@ schema in place; do not backfill verification from the legacy success timestamp.
 
 Local unit/controller regression and disposable real-database checks cover
 scope, privacy, freshness, idempotency, late-result ordering and retention.
-Controlled live transport QA and owner review remain pending. Health calculations,
-provider-card UI and assessment scoring are not implemented by these two slices.
+Controlled live transport QA and owner review remain pending.
+
+### Third implementation slice — assessment and provider cards (2026-10-05)
+
+`ProviderHealthAssessment` reads only the selected provider's current revision:
+the revision-keyed connection record plus indexed Accepted/Failed mail-log counts
+for 24 hours and seven days. It reports Critical only for a failure rate above
+20% with at least 10 attributed submissions in 24 hours; Warning at 5% or more,
+or for stale connection evidence; Healthy only for a fresh passed check and at
+least 10 current-revision submissions in seven days. All other cases remain
+Unknown. Generic failed connection checks remain Unknown because their failure
+category is intentionally not retained.
+
+Provider cards consume this read model and distinguish Connection status from
+Provider health, show an explainable finding and next action, and never reuse
+inactive-provider or historical evidence. The initial slice excludes
+unattributed logs, unconfirmed outcomes, provider-rejection/rate-limit history,
+three-consecutive authentication/configuration failures, and aggregated
+delivery/bounce rates until their evidence is retained and queryable. Postmark
+collection status remains separate from a health result. No state confirms
+delivery or inbox placement.

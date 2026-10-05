@@ -55,11 +55,64 @@ $wizard_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 							</p>
 							<dl>
 								<dt><?php esc_html_e( 'Transport', 'scalyn-mail-relay' ); ?></dt><dd><?php echo esc_html( $p['transport'] ); ?></dd>
-								<dt><?php esc_html_e( 'Verification', 'scalyn-mail-relay' ); ?></dt><dd><?php echo esc_html( $p['verified'] ? __( 'Success recorded', 'scalyn-mail-relay' ) : __( 'Not verified for the current selection', 'scalyn-mail-relay' ) ); ?></dd>
+								<dt><?php esc_html_e( 'Connection status', 'scalyn-mail-relay' ); ?></dt>
+								<dd>
 								<?php
-								if ( $p['verified'] ) :
+								if ( ! $p['is_active'] || ! is_array( $p['health'] ) ) {
+									esc_html_e( 'Not assessed — select this provider to assess its current configuration.', 'scalyn-mail-relay' );
+								} else {
+									$connection = $p['health']['connection'] ?? array();
+									$checked_at = is_string( $connection['checked_at'] ?? null ) ? $connection['checked_at'] : '';
+									$checked    = '' !== $checked_at ? wp_date( 'Y-m-d H:i:s', strtotime( $checked_at ) ) : '';
+									echo esc_html(
+										match ( $connection['status'] ?? 'unknown' ) {
+										'passed' => sprintf(
+											/* translators: %s: Site-local connection-check timestamp. */
+											__( 'Connected (checked %s)', 'scalyn-mail-relay' ),
+											$checked
+										),
+										'failed' => sprintf(
+											/* translators: %s: Site-local connection-check timestamp. */
+											__( 'Connection failed (checked %s)', 'scalyn-mail-relay' ),
+											$checked
+										),
+										'stale' => sprintf(
+											/* translators: %s: Site-local connection-check timestamp. */
+											__( 'Connection evidence stale (checked %s)', 'scalyn-mail-relay' ),
+											$checked
+										),
+										default => __( 'Not checked for the current configuration', 'scalyn-mail-relay' ),
+										}
+									);
+								}
+								?>
+								</dd>
+								<dt><?php esc_html_e( 'Provider health', 'scalyn-mail-relay' ); ?></dt>
+								<dd>
+								<?php
+								if ( ! $p['is_active'] || ! is_array( $p['health'] ) ) {
+									esc_html_e( 'Not assessed for this inactive provider', 'scalyn-mail-relay' );
+								} else {
+									$health = $p['health'];
+									$state  = in_array( $health['health'] ?? '', array( 'healthy', 'warning', 'critical', 'unknown' ), true ) ? $health['health'] : 'unknown';
+									$label  = match ( $state ) {
+										'healthy' => __( 'Healthy', 'scalyn-mail-relay' ),
+										'warning' => __( 'Warning', 'scalyn-mail-relay' ),
+										'critical' => __( 'Critical', 'scalyn-mail-relay' ),
+										default => __( 'Unknown', 'scalyn-mail-relay' ),
+									};
 									?>
-									<dt><?php esc_html_e( 'Last success (site time)', 'scalyn-mail-relay' ); ?></dt><dd><?php echo esc_html( $p['verified_at'] ); ?></dd><?php endif; ?>
+									<span class="scalyn-badge scalyn-badge--<?php echo esc_attr( $state ); ?>"><?php echo esc_html( $label ); ?></span>
+									<?php
+									if ( ! empty( $health['findings'][0] ) ) {
+										echo ' ' . esc_html( $health['findings'][0] );
+									}
+									if ( ! empty( $health['recommended_action'] ) ) {
+										echo ' ' . esc_html( $health['recommended_action'] );
+									}
+								}
+								?>
+								</dd>
 								<dt><?php esc_html_e( 'Delivery evidence', 'scalyn-mail-relay' ); ?></dt>
 								<dd>
 									<?php
@@ -89,7 +142,7 @@ $wizard_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 		</div>
 	<?php endif; ?>
 	<details class="scalyn-provider-evidence scalyn-disclosure"><summary><?php esc_html_e( 'What these statuses mean', 'scalyn-mail-relay' ); ?></summary>
-		<p><?php esc_html_e( 'Saved settings are not proof of authorization or delivery. Verification records a successful check or accepted send, not live availability or the latest attempt. SendGrid sandbox verification does not prove real-send permission. Postmark verification checks token access and Live server type, not sender authorization or sending allowance. Provider acceptance never guarantees inbox placement.', 'scalyn-mail-relay' ); ?></p>
+		<p><?php esc_html_e( 'Connection status and provider health use only evidence for the selected provider’s current configuration. Unknown and stale evidence are never treated as healthy. Saved settings are not proof of authorization or delivery. Provider acceptance never guarantees delivery or inbox placement. SendGrid sandbox verification does not prove real-send permission. Postmark verification checks token access and Live server type, not sender authorization or sending allowance.', 'scalyn-mail-relay' ); ?></p>
 	</details>
 		<aside class="scalyn-card" aria-labelledby="scalyn-provider-help"><h2 id="scalyn-provider-help"><?php esc_html_e( 'Before you switch providers', 'scalyn-mail-relay' ); ?></h2>
 			<ol><li><?php esc_html_e( 'Prepare the provider credentials and an authorized sender.', 'scalyn-mail-relay' ); ?></li><li><?php esc_html_e( 'Use the wizard to select and configure the sending route. Selection takes effect immediately.', 'scalyn-mail-relay' ); ?></li><li><?php esc_html_e( 'Verify the connection, send a test to an inbox you control, and check receipt.', 'scalyn-mail-relay' ); ?></li></ol>
