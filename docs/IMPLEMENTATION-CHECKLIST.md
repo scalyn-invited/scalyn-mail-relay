@@ -157,7 +157,7 @@ SendGrid webhook signatures apply to Postmark.
   - [x] Dispatch integration (pre-submission association, acknowledgement binding, failure isolation), consent and key-selection coordination, coverage read model and log-detail evidence card, Providers status. See [activation path](MILESTONE-8-DELIVERY-EVIDENCE.md#activation-path-2026-10-03).
   - [ ] Live callback QA, including limiter and source-lifecycle behaviour under real provider retries.
 - [x] Extend authentication diagnostics with deeper SPF evaluation, DKIM selector configuration, and DMARC alignment analysis. Published-policy evaluation (RFC 7208 lookup limits, DKIM key analysis, DMARC inheritance, tag validation and configuration-based alignment); see [ADR-0023](adr/0023-deeper-authentication-diagnostics.md). Message-level alignment remains for the header-analysis ticket.
-- [ ] Add reverse-DNS analysis only where the sending infrastructure is known.
+- [x] Add reverse-DNS analysis only where the sending infrastructure is known. Forward-confirmed reverse DNS for the configured SMTP host's public addresses; API providers and private relays are reported as not assessed; not scored. See [ADR-0024](adr/0024-reverse-dns-known-infrastructure.md).
 - [ ] Introduce controlled message/header analysis and mailbox testing with explicit privacy boundaries.
 - [ ] Define deliverability assessment coverage, freshness, and scoring policy before displaying a numerical score.
 - [ ] Ticket 8: implement Provider Health Assessment (owner: Bernie; after the preceding evidence and assessment-policy tickets).

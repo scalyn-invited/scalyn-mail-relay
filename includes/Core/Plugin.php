@@ -197,6 +197,7 @@ final class Plugin {
 		$this->container->set( DkimCheck::class, static fn(): DkimCheck => new DkimCheck() );
 		$this->container->set( DmarcCheck::class, static fn(): DmarcCheck => new DmarcCheck() );
 		$this->container->set( SmtpTlsCheck::class, static fn(): SmtpTlsCheck => new SmtpTlsCheck() );
+		$this->container->set( \Scalyn\MailRelay\Diagnostics\Checks\ReverseDnsCheck::class, static fn(): \Scalyn\MailRelay\Diagnostics\Checks\ReverseDnsCheck => new \Scalyn\MailRelay\Diagnostics\Checks\ReverseDnsCheck() );
 	}
 
 	/**
@@ -210,6 +211,7 @@ final class Plugin {
 		$registry->register( $this->container->get( DkimCheck::class ) );
 		$registry->register( $this->container->get( DmarcCheck::class ) );
 		$registry->register( $this->container->get( SmtpTlsCheck::class ) );
+		$registry->register( $this->container->get( \Scalyn\MailRelay\Diagnostics\Checks\ReverseDnsCheck::class ) );
 	}
 
 	/**

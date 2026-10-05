@@ -24,7 +24,7 @@ final class RecommendationEngine {
 	public function recommend( array $rows, string $cadence, int $now, string $provider = 'smtp' ): array {
 		$rules = $this->rules();
 		if ( 'smtp' !== $provider ) {
-			unset( $rules['smtp_tls'] );
+			unset( $rules['smtp_tls'], $rules['reverse_dns'] );
 		}
 		$by_check = array();
 		$refresh  = count( $rows ) > 250;
@@ -68,6 +68,10 @@ final class RecommendationEngine {
 				continue;
 			}
 			$observed = in_array( $status, array( 'fail', 'warn' ), true );
+			if ( ! $observed && 'reverse_dns' === $name ) {
+				// Informational and often not applicable; only an observed problem is actionable.
+				continue;
+			}
 			$severity = $row['severity'] ?? '';
 			$severity = is_string( $severity ) && isset( $severity_order[ $severity ] ) ? $severity : 'unknown';
 			$items[]  = array(
@@ -144,6 +148,12 @@ final class RecommendationEngine {
 				__( 'The published policy needs review; actual message authentication and alignment are not evaluated here.', 'scalyn-mail-relay' ),
 				__( 'Review the DMARC finding and reporting data with your provider. Verify legitimate sender alignment before tightening enforcement; an enforcing policy can reject legitimate unauthenticated mail.', 'scalyn-mail-relay' ),
 				__( 'Confirm DNS lookup availability and rerun the DMARC check. Missing evidence is not proof of failed message alignment.', 'scalyn-mail-relay' ),
+			),
+			'reverse_dns'  => array(
+				__( 'Review reverse DNS for the SMTP server', 'scalyn-mail-relay' ),
+				__( 'Missing forward-confirmed reverse DNS matters only if the SMTP server delivers directly to recipients; relays through a provider are unaffected.', 'scalyn-mail-relay' ),
+				__( 'Confirm whether the SMTP server delivers directly to recipients. If it does, ask its hosting provider to publish a PTR record for each address that resolves back to that address.', 'scalyn-mail-relay' ),
+				__( 'Retry diagnostics later. An incomplete reverse DNS lookup is not evidence of a problem.', 'scalyn-mail-relay' ),
 			),
 			'mx_record'    => array(
 				__( 'Review inbound MX records', 'scalyn-mail-relay' ),
