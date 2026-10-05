@@ -79,6 +79,33 @@ final class ReverseDnsCheckTest extends TestCase {
 		$this->assertSame( array(), $calls );
 	}
 
+	public function test_forward_lookup_failure_is_unknown_not_a_configuration_warning(): void {
+		$result = $this->check(
+			array( 'mail.example.com' => false ),
+			array( '8.8.8.8' => array( 'mail.example.com' ) )
+		)->run( $this->smtp( '8.8.8.8' ) );
+		$this->assertSame( 'unknown', $result->status );
+		$this->assertSame( 'unknown', $result->raw['addresses'][0]['state'] );
+		$this->assertStringContainsString( 'forward lookup failed', $result->evidence );
+		$this->assertStringNotContainsString( 'does not resolve back', $result->evidence );
+	}
+
+	public function test_one_failed_ptr_target_does_not_hide_a_confirmed_alternative(): void {
+		$result = $this->check(
+			array( 'first.example.com' => false, 'second.example.com' => array( '8.8.8.8' ) ),
+			array( '8.8.8.8' => array( 'first.example.com', 'second.example.com' ) )
+		)->run( $this->smtp( '8.8.8.8' ) );
+		$this->assertSame( 'pass', $result->status );
+	}
+
+	public function test_incomplete_alternative_does_not_prove_a_mismatch(): void {
+		$result = $this->check(
+			array( 'first.example.com' => array( '1.1.1.1' ), 'second.example.com' => false ),
+			array( '8.8.8.8' => array( 'first.example.com', 'second.example.com' ) )
+		)->run( $this->smtp( '8.8.8.8' ) );
+		$this->assertSame( 'unknown', $result->status );
+	}
+
 	public function test_address_count_is_bounded(): void {
 		$ips   = array_map( static fn( $i ) => '198.51.100.' . $i, range( 1, 10 ) );
 		$calls = array();

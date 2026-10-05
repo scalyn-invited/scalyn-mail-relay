@@ -154,10 +154,15 @@ final class ReverseDnsCheck implements DiagnosticCheckInterface {
 				);
 				continue;
 			}
-			$match = null;
+			$match          = null;
+			$forward_failed = false;
 			foreach ( array_slice( $names, 0, 3 ) as $name ) {
 				$name    = strtolower( rtrim( $name, '.' ) );
 				$forward = ( $this->resolve )( $name );
+				if ( false === $forward ) {
+					$forward_failed = true;
+					continue;
+				}
 				// Compare binary forms so equivalent IPv6 spellings match.
 				$packed = inet_pton( $ip );
 				if ( is_array( $forward ) && in_array( $packed, array_map( static fn( $candidate ) => is_string( $candidate ) && false !== filter_var( $candidate, FILTER_VALIDATE_IP ) ? inet_pton( $candidate ) : false, $forward ), true ) ) {
@@ -172,6 +177,13 @@ final class ReverseDnsCheck implements DiagnosticCheckInterface {
 					'ip'    => $ip,
 					'state' => 'confirmed',
 					'ptr'   => $match,
+				);
+			} elseif ( $forward_failed ) {
+				++$incomplete;
+				$lines[]   = $ip . ' → forward lookup failed; confirmation unavailable';
+				$details[] = array(
+					'ip'    => $ip,
+					'state' => 'unknown',
 				);
 			} else {
 				++$problems;
