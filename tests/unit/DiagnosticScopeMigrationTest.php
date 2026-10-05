@@ -16,7 +16,7 @@ final class DiagnosticScopeMigrationTest extends TestCase {
 		$GLOBALS['wpdb']->get_col_return=['configuration_id','provider_id','sending_domain'];
 		$GLOBALS['wpdb']->get_results_return=[[],[],[]];
 		Migrator::migrate();
-		$this->assertSame('0.6.0',get_option('scalyn_mail_relay_db_version'));
+		$this->assertSame('0.7.0',get_option('scalyn_mail_relay_db_version'));
 		$sql=$GLOBALS['_test_dbdelta_queries'][0];
 		$this->assertStringContainsString('configuration_id char(36) NULL',$sql);
 		$this->assertStringContainsString('KEY configuration_created (configuration_id,created_at,id)',$sql);
