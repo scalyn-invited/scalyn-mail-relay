@@ -74,6 +74,7 @@ final class ProvidersPage {
 				'health'     => $id === $active_provider_id ? $assessment : null,
 				'evidence'   => match ( $id ) {
 					'postmark' => $evidence_status,
+					'smtp2go', 'brevo' => $container->get( \Scalyn\MailRelay\Core\ApiWebhookSettings::class . ':' . $id )->collection_status(),
 					default => 'unsupported',
 				},
 				'transport'  => match ( $id ) {

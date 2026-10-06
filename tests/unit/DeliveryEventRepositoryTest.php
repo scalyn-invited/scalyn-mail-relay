@@ -27,6 +27,21 @@ final class DeliveryEventRepositoryTest extends TestCase {
 		$this->db->member=str_repeat('a',64);
 	}
 	protected function tearDown(): void { unset($GLOBALS['wpdb']); }
+	public function test_new_providers_commit_and_deduplicate_with_provider_scoped_lock(): void {
+		foreach(['smtp2go'=>'AbCd-1234','brevo'=>'<UpperCase@relay.test>'] as $p=>$id) {
+			$this->setUp();
+			$event=$this->event();$event['provider']=$p;$event['provider_message_id']=$id;$event['authentication_method']=$p.'_bearer_tls';
+			$this->assertSame('stored',$this->append($event));
+			$lock=array_values(array_filter($this->db->prepare_calls,fn($call)=>str_contains($call['query'],'SELECT provider_message_id')))[0] ?? null;
+			$this->assertContains($p,$lock['args']);
+			$stored=$this->db->inserts[0]['data'];
+			$this->db->rows=[['provider_message_id'=>$id],$stored];
+			$this->assertSame('duplicate',$this->append($event));
+			$this->assertCount(2,$this->db->inserts);
+			$bad=$event;$bad['authentication_method']='postmark_basic_tls';
+			try{$this->append($bad);$this->fail('Wrong authentication');}catch(RuntimeException $e){$this->assertCount(2,$this->db->inserts);}
+		}
+	}
 	private function event(): array {
 		return ['schema_version'=>1,'source_id'=>self::ID,'provider'=>'postmark','message_uuid'=>self::ID,'provider_message_id'=>self::ID,'event_key'=>str_repeat('b',64),'kind'=>'delivery','recipient_token'=>str_repeat('a',64),'occurred_at'=>'2026-10-02T00:00:00.000000Z','received_at'=>'2026-10-02T00:01:00.000000Z','authentication_method'=>'postmark_basic_tls','reason_code'=>null];
 	}

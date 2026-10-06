@@ -43,6 +43,15 @@ if ( is_string( $scalyn_webhook_id ) && preg_match( '/^[a-f0-9]{8}-[a-f0-9]{4}-[
 	delete_option( 'scalyn_webhook_budget_' . $scalyn_webhook_id );
 }
 delete_option( 'scalyn_mail_relay_postmark_webhook' );
+foreach ( array( 'smtp2go', 'brevo' ) as $scalyn_provider ) {
+	$scalyn_option = 'scalyn_mail_relay_' . $scalyn_provider . '_webhook';
+	$scalyn_draft  = get_option( $scalyn_option, array() );
+	$scalyn_id     = is_array( $scalyn_draft ) ? ( $scalyn_draft['id'] ?? '' ) : '';
+	if ( is_string( $scalyn_id ) && preg_match( '/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/D', $scalyn_id ) ) {
+		delete_option( 'scalyn_webhook_budget_' . $scalyn_id );
+	}
+	delete_option( $scalyn_option );
+}
 
 $owned_tables = array(
 	'scalyn_connection_evidence',

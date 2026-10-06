@@ -133,8 +133,34 @@ final class Plugin {
 		$this->container->set( DeliveryEventRepository::class, static fn(): DeliveryEventRepository => new DeliveryEventRepository() );
 		$this->container->set( DeliveryCoverageRepository::class, static fn(): DeliveryCoverageRepository => new DeliveryCoverageRepository() );
 		$this->container->set( WebhookRateLimitRepository::class, static fn(): WebhookRateLimitRepository => new WebhookRateLimitRepository() );
-		$this->container->set( DeliveryTracker::class, static fn( Container $c ): DeliveryTracker => new DeliveryTracker( $c->get( PostmarkWebhookSettings::class ), $c->get( DeliveryKeyRepository::class ), $c->get( DeliveryAttemptRepository::class ), new PostmarkProvider() ) );
-		$this->container->set( DeliveryCoverage::class, static fn( Container $c ): DeliveryCoverage => new DeliveryCoverage( $c->get( DeliveryCoverageRepository::class ), $c->get( PostmarkWebhookSettings::class ) ) );
+		foreach ( array( 'smtp2go', 'brevo' ) as $provider ) {
+			$this->container->set( ApiWebhookSettings::class . ':' . $provider, static fn( Container $c ): ApiWebhookSettings => new ApiWebhookSettings( $c->get( CredentialCipher::class ), $provider, $c->get( DeliveryKeyRepository::class ), $c->get( SettingsRepository::class ) ) );
+			$this->container->set( \Scalyn\MailRelay\Rest\ApiWebhookEndpoint::class . ':' . $provider, static fn( Container $c ): \Scalyn\MailRelay\Rest\ApiWebhookEndpoint => new \Scalyn\MailRelay\Rest\ApiWebhookEndpoint( $c->get( ApiWebhookSettings::class . ':' . $provider ), $c->get( SettingsRepository::class ), $c->get( WebhookRateLimitRepository::class ), $c->get( DeliveryAttemptRepository::class ), $c->get( DeliveryKeyRepository::class ), $c->get( DeliveryEventRepository::class ) ) );
+		}
+		$this->container->set(
+			DeliveryTracker::class,
+			static fn( Container $c ): DeliveryTracker => new DeliveryTracker(
+				$c->get( PostmarkWebhookSettings::class ),
+				$c->get( DeliveryKeyRepository::class ),
+				$c->get( DeliveryAttemptRepository::class ),
+				new PostmarkProvider(),
+				array(
+					'smtp2go' => $c->get( ApiWebhookSettings::class . ':smtp2go' ),
+					'brevo'   => $c->get( ApiWebhookSettings::class . ':brevo' ),
+				)
+			)
+		);
+		$this->container->set(
+			DeliveryCoverage::class,
+			static fn( Container $c ): DeliveryCoverage => new DeliveryCoverage(
+				$c->get( DeliveryCoverageRepository::class ),
+				$c->get( PostmarkWebhookSettings::class ),
+				array(
+					'smtp2go' => $c->get( ApiWebhookSettings::class . ':smtp2go' ),
+					'brevo'   => $c->get( ApiWebhookSettings::class . ':brevo' ),
+				)
+			)
+		);
 		$this->container->set( PostmarkWebhookEndpoint::class, static fn( Container $c ): PostmarkWebhookEndpoint => new PostmarkWebhookEndpoint( $c->get( PostmarkWebhookSettings::class ), $c->get( SettingsRepository::class ), $c->get( WebhookRateLimitRepository::class ), $c->get( DeliveryAttemptRepository::class ), $c->get( DeliveryKeyRepository::class ), $c->get( DeliveryEventRepository::class ) ) );
 		$this->container->set( SettingsRepository::class, static fn( Container $c ): SettingsRepository => new SettingsRepository( $c->get( CredentialCipher::class ) ) );
 		$this->container->set( ProviderRegistry::class, static fn(): ProviderRegistry => new ProviderRegistry() );
@@ -238,6 +264,9 @@ final class Plugin {
 		add_action( 'rest_api_init', array( $this->container->get( DiagnosticsRunEndpoint::class ), 'register' ) );
 		$container = $this->container;
 		add_action( 'rest_api_init', static fn() => $container->get( PostmarkWebhookEndpoint::class )->register() );
+		foreach ( array( 'smtp2go', 'brevo' ) as $provider ) {
+			add_action( 'rest_api_init', static fn() => $container->get( \Scalyn\MailRelay\Rest\ApiWebhookEndpoint::class . ':' . $provider )->register() );
+		}
 		add_filter( 'application_password_is_api_request', array( PostmarkWebhookEndpoint::class, 'exclude_application_passwords' ) );
 
 		if ( is_admin() ) {

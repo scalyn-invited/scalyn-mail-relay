@@ -178,7 +178,9 @@ SendGrid webhook signatures apply to Postmark.
 Both HTTPS transports and wizard integration are implemented locally in separate
 stacked changes. See [ADR 0029](adr/0029-bounded-provider-expansion.md) and
 [QA handoff](qa/2026-10-06-provider-expansion.md). Controlled live sending,
-provider-specific webhooks, remote CI and owner acceptance remain pending; the
+live webhook QA, remote CI and owner acceptance remain pending. Authenticated
+SMTP2GO/Brevo receivers are implemented locally under [ADR 0030](adr/0030-authenticated-provider-webhooks.md);
+the
 full provider-completion checkboxes below intentionally remain unchecked.
 
 Schedule: after Milestone 8 and before Milestone 9. Complete the first provider's

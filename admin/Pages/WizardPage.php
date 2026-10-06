@@ -70,6 +70,11 @@ final class WizardPage {
 			$brevo_form = new \Scalyn\MailRelay\Admin\Components\BrevoSettingsForm( $settings, $container->get( \Scalyn\MailRelay\Core\CredentialCipher::class ) );
 			$brevo_form->handle();
 		}
+		$api_webhook_form = null;
+		if ( 3 === $current_step && in_array( $active_provider_id, array( 'smtp2go', 'brevo' ), true ) ) {
+			$api_webhook_form = new \Scalyn\MailRelay\Admin\Components\ApiWebhookForm( $container->get( \Scalyn\MailRelay\Core\ApiWebhookSettings::class . ':' . $active_provider_id ) );
+			$api_webhook_form->handle();
+		}
 		$sendgrid_form         = null;
 		$postmark_form         = null;
 		$postmark_webhook_form = null;

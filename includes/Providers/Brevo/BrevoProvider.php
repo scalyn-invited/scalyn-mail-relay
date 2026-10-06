@@ -64,6 +64,7 @@ class BrevoProvider extends JsonApiProvider {
 		if ( null !== $message['reply_to'] ) {
 			$payload['replyTo'] = $message['reply_to'];
 		}
+		$message['headers']['X-Mailin-custom'] = $message['uuid'];
 		if ( $message['headers'] ) {
 			$payload['headers'] = $message['headers'];
 		}

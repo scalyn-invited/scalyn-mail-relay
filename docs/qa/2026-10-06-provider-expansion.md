@@ -1,5 +1,10 @@
 # SMTP2GO and Brevo provider expansion
 
+Current owner update (2026-10-06): Bernie confirms SMTP2GO and Brevo sending QA
+is complete. Live webhook delivery/bounce/retry testing remains in the backlog.
+SendGrid remains deferred. Earlier pending sending-QA notes below are historical;
+this update records owner confirmation, not an independent rerun.
+
 Owner: Bernie. Branch: feature/provider-expansion-smtp2go. Base: develop 8c1aac5.
 SMTP2GO commit: 8f9c738. Brevo is a separate stacked change on
 feature/provider-expansion-brevo, which contains both providers for local QA.

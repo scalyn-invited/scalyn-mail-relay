@@ -22,7 +22,7 @@ final class DeliveryAttemptDb extends WpdbStub {
 		if(str_contains($query,'SELECT recipient_token')) { return in_array($args[2],$this->members[$args[1]] ?? [],true) ? $args[2] : null; }
 		if(str_contains($query,'SELECT provider_message_id')) {
 			$r=$this->attempts[$args[1]] ?? null;
-			return $r && $r['source_id']===$args[2] && $r['provider']==='postmark' ? $r['provider_message_id'] : null;
+			return $r && $r['source_id']===$args[2] && $r['provider']===$args[3] ? $r['provider_message_id'] : null;
 		}
 		return null;
 	}
@@ -42,14 +42,14 @@ final class DeliveryAttemptDb extends WpdbStub {
 		if($query==='COMMIT' && $this->failCommit) { return false; }
 		if(str_starts_with($query,'UPDATE')) {
 			$a=end($this->prepare_calls)['args']; $r=$this->attempts[$a[2]] ?? null;
-			if(!$r || $r['source_id']!==$a[3] || $r['provider']!=='postmark' || ($r['provider_message_id']!==null && $r['provider_message_id']!==$a[1])) { return 0; }
+			if(!$r || $r['source_id']!==$a[3] || $r['provider']!==$a[4] || ($r['provider_message_id']!==null && $r['provider_message_id']!==$a[1])) { return 0; }
 			$this->attempts[$a[2]]['provider_message_id']=$a[1];
 		}
 		return 1;
 	}
 	public function get_results(string $query,string $output=OBJECT): array {
 		$a=end($this->prepare_calls)['args'];
-		return array_slice(array_values(array_filter($this->attempts,static fn($r)=>$r['source_id']===$a[1] && $r['provider']==='postmark' && $r[$a[2]]===$a[3] && $r['created_at'] >= $a[4])),0,2);
+		return array_slice(array_values(array_filter($this->attempts,static fn($r)=>$r['source_id']===$a[1] && $r['provider']===$a[2] && $r[$a[3]]===$a[4] && $r['created_at'] >= $a[5])),0,2);
 	}
 }
 
@@ -67,6 +67,19 @@ final class DeliveryAttemptRepositoryTest extends TestCase {
 		$this->version=$this->keys->provision();
 	}
 	protected function tearDown(): void { unset($GLOBALS['wpdb']); }
+	public function test_expanded_providers_are_scoped_and_preserve_identifier_case(): void {
+		foreach (['smtp2go'=>'AbCd-12345','brevo'=>'<UpperCase@relay.test>'] as $p=>$id) {
+			$this->setUp();
+			$t=$this->keys->token($this->version,self::ID,self::ID,'User@example.com');
+			$this->repo->prepare(['message_uuid'=>self::ID,'source_id'=>self::ID,'configuration_id'=>self::OTHER,'key_version'=>$this->version],[$t],$p);
+			$this->assertNotNull($this->repo->resolve(self::ID,$id,self::ID,'User@example.com','2000-01-01 00:00:00',$this->keys,$p));
+			$this->assertNull($this->repo->resolve(self::ID,self::OTHER,self::ID,'User@example.com','2000-01-01 00:00:00',$this->keys,'postmark'));
+			$this->repo->acknowledge(self::ID,self::ID,$id,$p);
+			$this->assertSame($id,$this->db->attempts[self::ID]['provider_message_id']);
+			$this->assertNull($this->repo->resolve(self::ID,strtolower($id),self::ID,'User@example.com','2000-01-01 00:00:00',$this->keys,$p));
+			$this->assertNull($this->repo->resolve(self::ID,$id,self::ID,'stranger@example.com','2000-01-01 00:00:00',$this->keys,$p));
+		}
+	}
 	private function prepare(): string {
 		$t=$this->keys->token($this->version,self::ID,self::ID,'User@example.com');
 		$this->repo->prepare(['message_uuid'=>self::ID,'source_id'=>self::ID,'configuration_id'=>self::OTHER,'key_version'=>$this->version],[$t,$t]);

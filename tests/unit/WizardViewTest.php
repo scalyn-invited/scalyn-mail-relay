@@ -26,6 +26,7 @@ final class WizardViewTest extends TestCase {
 			$cipher=new \Scalyn\MailRelay\Core\CredentialCipher(base64_encode(str_repeat('a',32)));
 			$settings->save(['provider'=>['active'=>$provider]]);
 			if ($ready) { $settings->{'save_'.$provider}(['from_email'=>'sender@example.test','from_name'=>'Sender','key_action'=>'replace','api_key'=>'synthetic_credential_0123456789'],$cipher); }
+			$api_webhook_form=new \Scalyn\MailRelay\Admin\Components\ApiWebhookForm(new \Scalyn\MailRelay\Core\ApiWebhookSettings($cipher,$provider,null,$settings));
 			$smtp2go_form=new \Scalyn\MailRelay\Admin\Components\Smtp2goSettingsForm($settings,$cipher);
 			$brevo_form=new \Scalyn\MailRelay\Admin\Components\BrevoSettingsForm($settings,$cipher);
 		}

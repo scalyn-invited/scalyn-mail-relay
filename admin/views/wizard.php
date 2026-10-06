@@ -141,10 +141,12 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 			case 3:
 				if ( 'brevo' === $active_provider_id ) {
 					$brevo_form->render( true );
+					$api_webhook_form->render();
 					break;
 				}
 				if ( 'smtp2go' === $active_provider_id ) {
 					$smtp2go_form->render( true );
+					$api_webhook_form->render();
 					break;
 				}
 				if ( 'postmark' === $active_provider_id ) {
