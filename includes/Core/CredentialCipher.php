@@ -104,7 +104,7 @@ final class CredentialCipher {
 		if ( 'postmark-webhook' === $provider ) {
 			return 'scalyn:postmark:webhook-credentials:v1';
 		}
-		if ( ! in_array( $provider, array( 'sendgrid', 'postmark' ), true ) ) {
+		if ( ! in_array( $provider, array( 'sendgrid', 'postmark', 'smtp2go' ), true ) ) {
 			throw new \InvalidArgumentException( 'Unsupported credential context.' );
 		}
 		return 'scalyn:' . $provider . ':api-key:v1';

@@ -56,6 +56,8 @@ add_action(
 			->register( new \Scalyn\MailRelay\Providers\SendGrid\SendGridProvider() );
 		$container->get( \Scalyn\MailRelay\Core\ProviderRegistry::class )
 			->register( new \Scalyn\MailRelay\Providers\Postmark\PostmarkProvider() );
+		$container->get( \Scalyn\MailRelay\Core\ProviderRegistry::class )
+			->register( new \Scalyn\MailRelay\Providers\Smtp2go\Smtp2goProvider() );
 	}
 );
 

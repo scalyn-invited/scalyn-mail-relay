@@ -53,6 +53,7 @@ final class DiagnosticContextBuilder {
 		if ( '' !== $provider && 'smtp' !== $provider ) {
 			$public = match ( $provider ) {
 				'postmark' => $settings->get_postmark_settings(),
+				'smtp2go' => $settings->get_smtp2go_settings(),
 				'sendgrid' => $settings->get_sendgrid_settings(),
 				default => array( 'from_email' => '' ),
 			};

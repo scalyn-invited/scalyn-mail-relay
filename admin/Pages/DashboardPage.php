@@ -49,6 +49,7 @@ final class DashboardPage {
 			'smtp' => __( 'SMTP', 'scalyn-mail-relay' ),
 			'sendgrid' => __( 'API (HTTPS)', 'scalyn-mail-relay' ),
 			'postmark' => __( 'API (HTTPS)', 'scalyn-mail-relay' ),
+			'smtp2go' => __( 'API (HTTPS)', 'scalyn-mail-relay' ),
 			default => __( 'Not reported', 'scalyn-mail-relay' ),
 		};
 		$verified_at          = $provider_verified ? $settings->get_provider_verified_at() : null;

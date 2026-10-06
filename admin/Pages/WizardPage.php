@@ -59,7 +59,12 @@ final class WizardPage {
 		foreach ( $registry->all() as $id => $provider ) {
 			$registered_providers[ $id ] = $provider->get_label();
 		}
-		$active_provider_id    = $settings->get_active_provider_id();
+		$active_provider_id = $settings->get_active_provider_id();
+		$smtp2go_form       = null;
+		if ( 3 === $current_step && 'smtp2go' === $active_provider_id ) {
+			$smtp2go_form = new \Scalyn\MailRelay\Admin\Components\Smtp2goSettingsForm( $settings, $container->get( \Scalyn\MailRelay\Core\CredentialCipher::class ) );
+			$smtp2go_form->handle();
+		}
 		$sendgrid_form         = null;
 		$postmark_form         = null;
 		$postmark_webhook_form = null;
@@ -157,8 +162,9 @@ final class WizardPage {
 		}
 
 		// Step 3: The selected provider must have its own configuration.
-		if ( in_array( $active_provider_id, array( 'sendgrid', 'postmark' ), true ) ) {
-			$sendgrid = 'postmark' === $active_provider_id ? $settings->get_postmark_settings() : $settings->get_sendgrid_settings();
+		if ( in_array( $active_provider_id, array( 'sendgrid', 'postmark', 'smtp2go' ), true ) ) {
+			$sendgrid = match ( $active_provider_id ) {
+				'postmark' => $settings->get_postmark_settings(), 'smtp2go' => $settings->get_smtp2go_settings(), default => $settings->get_sendgrid_settings() };
 			if ( ! $sendgrid['has_key'] || '' === $sendgrid['from_email'] ) {
 				return 3;
 			}

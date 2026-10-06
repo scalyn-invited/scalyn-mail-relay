@@ -39,6 +39,7 @@ final class ProvidersPage {
 		$smtp_settings      = $settings->get_smtp_config();
 		$sendgrid_settings  = $settings->get_sendgrid_settings();
 		$postmark_settings  = $settings->get_postmark_settings();
+		$smtp2go_settings   = $settings->get_smtp2go_settings();
 		$can_configure      = current_user_can( Capabilities::MANAGE_SETTINGS );
 		$assessment         = null;
 		if ( $can_configure ) {
@@ -60,6 +61,7 @@ final class ProvidersPage {
 				'smtp' => '' !== ( $smtp_settings['host'] ?? '' ) && '' !== ( $smtp_settings['from_email'] ?? '' ),
 				'sendgrid' => $sendgrid_settings['has_key'] && '' !== $sendgrid_settings['from_email'],
 				'postmark' => $postmark_settings['has_key'] && '' !== $postmark_settings['from_email'],
+				'smtp2go' => $smtp2go_settings['has_key'] && '' !== $smtp2go_settings['from_email'],
 				default => false,
 			};
 			$providers[] = array(
@@ -76,6 +78,7 @@ final class ProvidersPage {
 					'smtp' => 'SMTP',
 					'sendgrid' => 'API (HTTPS)',
 					'postmark' => 'API (HTTPS)',
+					'smtp2go' => 'API (HTTPS)',
 					default => __( 'Not reported', 'scalyn-mail-relay' ),
 				},
 			);

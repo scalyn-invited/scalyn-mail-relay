@@ -19,7 +19,7 @@ final readonly class AuditEvent {
 	 */
 	public AuditActor $actor;
 
-	public const FIELDS = array( 'provider.active', 'smtp.host', 'smtp.port', 'smtp.encryption', 'smtp.username', 'smtp.password', 'smtp.from_name', 'smtp.from_email', 'sendgrid.api_key', 'sendgrid.from_name', 'sendgrid.from_email', 'postmark.api_key', 'postmark.from_name', 'postmark.from_email', 'advanced.log_retention_days', 'advanced.log_message_metadata', 'advanced.delete_data_on_uninstall', 'advanced.diagnostic_schedule', 'advanced.alert_webhook_enabled', 'advanced.dkim_selector' );
+	public const FIELDS = array( 'provider.active', 'smtp.host', 'smtp.port', 'smtp.encryption', 'smtp.username', 'smtp.password', 'smtp.from_name', 'smtp.from_email', 'sendgrid.api_key', 'sendgrid.from_name', 'sendgrid.from_email', 'postmark.api_key', 'smtp2go.api_key', 'smtp2go.from_email', 'smtp2go.from_name', 'postmark.from_name', 'postmark.from_email', 'advanced.log_retention_days', 'advanced.log_message_metadata', 'advanced.delete_data_on_uninstall', 'advanced.diagnostic_schedule', 'advanced.alert_webhook_enabled', 'advanced.dkim_selector' );
 
 	private const OUTCOMES = array(
 		'report_export'            => array( 'started', 'prepared', 'failed' ),
