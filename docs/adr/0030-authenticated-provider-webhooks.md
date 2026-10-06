@@ -109,4 +109,3 @@ No schema rollback or deletion is needed.
 Offline contract tests are not live-provider verification. Both providers require
 controlled public HTTPS delivery, bounce, replay, disable and retention QA before
 release; no account settings or live mail were changed by this implementation.
-
