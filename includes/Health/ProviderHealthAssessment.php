@@ -19,14 +19,16 @@ final class ProviderHealthAssessment {
 	/**
 	 * Creates the current-configuration health read model.
 	 *
-	 * @param SettingsRepository     $settings Current provider and revision.
-	 * @param ConnectionVerification $connection Revision-keyed connection evidence.
-	 * @param MailLogRepository      $logs Revision-keyed terminal submission counts.
+	 * @param SettingsRepository            $settings Current provider and revision.
+	 * @param ConnectionVerification        $connection Revision-keyed connection evidence.
+	 * @param MailLogRepository             $logs Revision-keyed terminal submission counts.
+	 * @param ProviderDeliveryEvidence|null $delivery Optional delivery coverage service.
 	 */
 	public function __construct(
 		private readonly SettingsRepository $settings,
 		private readonly ConnectionVerification $connection,
-		private readonly MailLogRepository $logs
+		private readonly MailLogRepository $logs,
+		private readonly ?ProviderDeliveryEvidence $delivery = null
 	) {}
 
 	/**
@@ -52,7 +54,7 @@ final class ProviderHealthAssessment {
 		$connection = $this->connection->current();
 		$day        = $this->logs->configuration_status_counts( $revision, $provider, 24 );
 		$week       = $this->logs->configuration_status_counts( $revision, $provider, 168 );
-		return self::evaluate( $provider, $revision, $connection, $day, $week );
+		return self::evaluate( $provider, $revision, $connection, $day, $week, $this->delivery?->current() );
 	}
 
 	/**
@@ -63,9 +65,11 @@ final class ProviderHealthAssessment {
 	 * @param array      $connection `status`, `checked_at`.
 	 * @param array|null $day 24-hour accepted/failed/total counts.
 	 * @param array|null $week Seven-day accepted/failed/total counts.
+	 * @param array|null $delivery Current-source delivery counts and availability.
 	 * @return array<string,mixed> Safe assessment.
 	 */
-	public static function evaluate( string $provider, string $revision, array $connection, ?array $day, ?array $week ): array {
+	public static function evaluate( string $provider, string $revision, array $connection, ?array $day, ?array $week, ?array $delivery = null ): array {
+		$delivery           = self::delivery_summary( $delivery );
 		$connection_status  = in_array( $connection['status'] ?? '', array( 'passed', 'failed', 'stale' ), true ) ? $connection['status'] : 'unknown';
 		$day                = self::normalise_counts( $day );
 		$week               = self::normalise_counts( $week );
@@ -83,10 +87,20 @@ final class ProviderHealthAssessment {
 			$recommended_action = __( 'Review recent failed submissions and correct the underlying provider or configuration issue.', 'scalyn-mail-relay' );
 			/* translators: 1: Failed attributed submissions. 2: Total attributed submissions. */
 			$findings[] = sprintf( __( '%1$d of %2$d attributed submissions failed in the last 24 hours.', 'scalyn-mail-relay' ), $day['failed'], $day['total'] );
+		} elseif ( null !== $delivery['rate'] && $delivery['rate'] > 0.05 ) {
+			$state              = 'warning';
+			$recommended_action = __( 'Review hard bounces and recipient quality in your provider account. Do not automatically resend bounced messages.', 'scalyn-mail-relay' );
+			/* translators: 1: Hard-bounced recipient attempts, 2: Observed recipient attempts. */
+			$findings[] = sprintf( __( '%1$d of %2$d tracked recipient attempts with evidence hard-bounced in the delivery window (over 5%%).', 'scalyn-mail-relay' ), $delivery['hard_bounced'], $delivery['observed'] );
 		} elseif ( 'stale' === $connection_status ) {
 			$state              = 'warning';
 			$recommended_action = __( 'Run a new connection check for the current configuration.', 'scalyn-mail-relay' );
 			$findings[]         = __( 'Connection evidence is older than seven days.', 'scalyn-mail-relay' );
+		} elseif ( 'passed' === $connection_status && $week['total'] >= 10 && ! $day['available'] ) {
+			$findings[] = __( 'The 24-hour submission evidence is unavailable; health cannot be confirmed from older totals.', 'scalyn-mail-relay' );
+		} elseif ( 'passed' === $connection_status && $week['total'] >= 10 && in_array( $delivery['status'], array( 'insufficient', 'partial', 'unavailable', 'paused' ), true ) ) {
+			$findings[]         = $delivery['explanation'];
+			$recommended_action = __( 'Review webhook collection and wait for sufficient current-configuration evidence. Missing callbacks are not delivery failures.', 'scalyn-mail-relay' );
 		} elseif ( 'passed' === $connection_status && $week['total'] >= 10 ) {
 			$state              = 'healthy';
 			$recommended_action = __( 'Continue monitoring; this state does not confirm delivery or inbox placement.', 'scalyn-mail-relay' );
@@ -105,14 +119,68 @@ final class ProviderHealthAssessment {
 			'window_24h'         => $day,
 			'window_7d'          => $week,
 			'failure_rate'       => $rate,
+			'delivery'           => $delivery,
 			'findings'           => $findings,
 			'recommended_action' => $recommended_action,
 			'limitations'        => array(
 				__( 'Only Accepted and Failed submissions attributed to the current configuration are counted.', 'scalyn-mail-relay' ),
 				__( 'Unattributed history, unconfirmed outcomes and missing evidence are excluded.', 'scalyn-mail-relay' ),
-				in_array( $provider, array( 'postmark', 'smtp2go', 'brevo' ), true ) ? __( 'Bounce-rate assessment needs aggregated tracked-recipient coverage and is not assessed here.', 'scalyn-mail-relay' ) : __( 'Out-of-band delivery/bounce evidence is unavailable for this provider.', 'scalyn-mail-relay' ),
+				__( 'Bounce-rate assessment uses only current-source authenticated recipient evidence; missing callbacks are not passes or failures.', 'scalyn-mail-relay' ),
+				__( 'Category-based connection and submission failure rules remain unassessed until those categories are retained.', 'scalyn-mail-relay' ),
 			),
 		);
+	}
+
+	/**
+	 * Keeps unknown/partial evidence distinct from a zero bounce rate.
+	 *
+	 * @param array|null $input Count-only current-source projection.
+	 * @return array Safe presentation and rule inputs.
+	 */
+	private static function delivery_summary( ?array $input ): array {
+		$status = $input['status'] ?? 'unsupported';
+		if ( ! in_array( $status, array( 'available', 'off', 'paused', 'unsupported', 'unavailable' ), true ) ) {
+			$status = 'unavailable'; }
+		$result = array(
+			'status'       => $status,
+			'tracked'      => null,
+			'observed'     => null,
+			'hard_bounced' => null,
+			'coverage'     => null,
+			'rate'         => null,
+			'window_start' => null,
+			'window_end'   => null,
+			'days'         => null,
+		);
+		if ( 'available' === $status ) {
+			foreach ( array( 'tracked', 'observed', 'hard_bounced' ) as $key ) {
+				if ( ! is_int( $input[ $key ] ?? null ) || $input[ $key ] < 0 || $input[ $key ] > 50000 ) {
+					$status = 'unavailable'; }
+			}
+			if ( 'available' === $status && ( $input['observed'] > $input['tracked'] || $input['hard_bounced'] > $input['observed'] ) ) {
+				$status = 'unavailable'; }
+			if ( 'available' === $status ) {
+				foreach ( array( 'tracked', 'observed', 'hard_bounced' ) as $key ) {
+					$result[ $key ] = $input[ $key ]; }
+				$result['coverage'] = $input['tracked'] > 0 ? $input['observed'] / $input['tracked'] : null;
+				$result['rate']     = $input['observed'] >= 20 ? $input['hard_bounced'] / $input['observed'] : null;
+				$status             = $input['observed'] < 20 ? 'insufficient' : ( $input['observed'] < $input['tracked'] ? 'partial' : 'assessed' );
+				foreach ( array( 'window_start', 'window_end' ) as $key ) {
+					$result[ $key ] = is_string( $input[ $key ] ?? null ) ? $input[ $key ] : null; }
+				$result['days'] = is_int( $input['days'] ?? null ) ? $input['days'] : null;
+			}
+		}
+		$result['status']      = $status;
+		$result['explanation'] = match ( $status ) {
+			'off' => __( 'Collection is not enabled; health uses connection and submission evidence only.', 'scalyn-mail-relay' ),
+			'paused' => __( 'Delivery collection is paused for this configuration. No prior-source evidence is reused.', 'scalyn-mail-relay' ),
+			'insufficient' => __( 'Fewer than 20 tracked recipient attempts have current delivery or bounce evidence. Bounce rate is not assessed.', 'scalyn-mail-relay' ),
+			'partial' => __( 'Some tracked recipient outcomes remain unknown. The bounce rate describes observed recipients only and cannot establish healthy delivery.', 'scalyn-mail-relay' ),
+			'assessed' => __( 'Authenticated recipient evidence is available. Recipient-server delivery does not prove inbox placement.', 'scalyn-mail-relay' ),
+			'unsupported' => __( 'Out-of-band delivery/bounce evidence is unavailable for this provider.', 'scalyn-mail-relay' ),
+			default => __( 'Delivery evidence is unavailable or exceeds the bounded assessment limit. It is not treated as healthy.', 'scalyn-mail-relay' ),
+		};
+		return $result;
 	}
 
 	/**

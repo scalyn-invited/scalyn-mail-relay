@@ -127,6 +127,34 @@ $wizard_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 									);
 									?>
 								</dd>
+
+								<?php
+								if ( $p['is_active'] && isset( $p['health']['delivery'] ) ) :
+									$delivery = $p['health']['delivery'];
+									?>
+									<dt><?php esc_html_e( 'Delivery coverage / hard bounces', 'scalyn-mail-relay' ); ?></dt>
+									<dd>
+										<?php if ( null !== $delivery['tracked'] ) : ?>
+											<?php
+											/* translators: 1: Observed recipient attempts, 2: Tracked recipient attempts, 3: Hard bounces. */
+											echo esc_html( sprintf( __( '%1$d of %2$d tracked recipient attempts have evidence; %3$d hard-bounced.', 'scalyn-mail-relay' ), $delivery['observed'], $delivery['tracked'], $delivery['hard_bounced'] ) );
+											if ( null !== $delivery['rate'] ) {
+												/* translators: %s: Hard-bounce percentage among observed recipients. */
+												echo ' ' . esc_html( sprintf( __( 'Observed hard-bounce rate: %s%%.', 'scalyn-mail-relay' ), number_format_i18n( $delivery['rate'] * 100, 1 ) ) );
+											}
+											?>
+										<?php endif; ?>
+										<?php echo esc_html( $delivery['explanation'] ); ?>
+										<?php if ( $delivery['window_start'] && $delivery['window_end'] ) : ?>
+											<p>
+											<?php
+											/* translators: 1: Start UTC timestamp, 2: End UTC timestamp. */
+											echo esc_html( sprintf( __( 'Window (UTC): %1$s to %2$s.', 'scalyn-mail-relay' ), $delivery['window_start'], $delivery['window_end'] ) );
+											?>
+											</p>
+										<?php endif; ?>
+									</dd>
+								<?php endif; ?>
 							</dl>
 							<div class="scalyn-actions scalyn-provider-actions">
 								<?php if ( $can_configure ) : ?>
