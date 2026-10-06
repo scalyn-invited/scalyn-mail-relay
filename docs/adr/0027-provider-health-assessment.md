@@ -184,3 +184,47 @@ three-consecutive authentication/configuration failures, and aggregated
 delivery/bounce rates until their evidence is retained and queryable. Postmark
 collection status remains separate from a health result. No state confirms
 delivery or inbox placement.
+
+### Fourth implementation slice - delivery aggregation (2026-10-06)
+
+The current-source read model now supports Postmark, SMTP2GO and Brevo. It requires
+the settings capability, enabled/current collection and a source bound to the
+active configuration revision. Postmark still requires source verification.
+Disabled collection is explicitly not assessed; paused/unreadable sources never
+reuse historical evidence.
+
+A count-only repository reads recipient-attempt membership plus authenticated
+delivery/bounce events for the same message, source and provider. Both event
+occurrence and receipt must be inside the UTC window (seven days, shortened by
+configured retention); future events are excluded. Duplicate callbacks and
+delivery/bounce combinations count the recipient attempt only once, with a hard
+bounce retained if observed. No tokens, addresses or event payloads leave SQL.
+There is no new schema, write path, network request or retention policy.
+
+The missing-evidence policy is applied conservatively: the hard-bounce fraction
+uses observed tracked recipient attempts, not missing callbacks as non-bounces.
+At least 20 observed tracked recipient attempts are required before calculating
+the rate; strictly over 5% raises Warning. The card labels this as an observed
+rate and shows observed/total coverage and the UTC window. Partial or insufficient
+enabled evidence cannot establish Healthy, but independent current failure
+evidence can still establish Warning/Critical. Disabled/unsupported collection
+leaves the explicitly limited connection/submission assessment available.
+These denominator and partial-coverage semantics require owner review with this
+slice; the accepted numeric thresholds are unchanged.
+
+The query caps its cohort at 1,000 attempts plus an overflow sentinel. Overflow,
+storage errors or malformed counts are unavailable, never a truncated Healthy
+sample. Reads use existing message/receipt and source/time indexes. The existing
+24-hour submission-read error is also now prevented from producing Healthy from
+older seven-day totals.
+
+Local unit and temporary-table SQL checks cover scope, deduplication, missing,
+future and expired callbacks, sample/threshold boundaries, permissions and escaped
+card rendering. Bernie reported visual QA passed on 2026-10-06; live webhook
+delivery/bounce/retry QA remains pending. Authentication/configuration consecutive-failure and provider
+rejection/rate-limit rules still require safely persisted categories; this slice
+does not claim to complete those rules or ADR-0026's Deliverability Score.
+
+Rollback: revert this code/UI slice; it writes no data and requires no migration
+or cleanup. Existing delivery retention and delete-on-uninstall behavior are
+unchanged.
