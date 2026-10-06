@@ -113,6 +113,7 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 											echo esc_html(
 												match ( $provider_key ) {
 													'smtp' => __( 'Use an existing mail server with a host, port and login supplied by your provider.', 'scalyn-mail-relay' ),
+													'smtp2go' => __( 'Send through the SMTP2GO HTTPS API using an API key and an authorized sender.', 'scalyn-mail-relay' ),
 													'sendgrid' => __( 'Send through the SendGrid API using a Mail Send key and a verified sender.', 'scalyn-mail-relay' ),
 													'postmark' => __( 'Send transactional email through Postmark using a Live Server API token and a verified sender.', 'scalyn-mail-relay' ),
 													default => __( 'Use this registered mail provider for your site.', 'scalyn-mail-relay' ),
@@ -137,6 +138,10 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 
 			// -----------------------------------------------------------------
 			case 3:
+				if ( 'smtp2go' === $active_provider_id ) {
+					$smtp2go_form->render( true );
+					break;
+				}
 				if ( 'postmark' === $active_provider_id ) {
 					if ( is_array( $step3_errors ) && in_array( 'postmark', $step3_errors, true ) ) {
 						echo '<div class="notice notice-error inline"><p>' . esc_html__( 'Postmark settings are incomplete or the stored token cannot be read. Check the sender and replace the token below.', 'scalyn-mail-relay' ) . '</p></div>';
@@ -310,7 +315,9 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 			case 4:
 				?>
 				<h2><?php esc_html_e( 'Verify Connection', 'scalyn-mail-relay' ); ?></h2>
-				<?php if ( 'postmark' === $active_provider_id ) : ?>
+				<?php if ( 'smtp2go' === $active_provider_id ) : ?>
+					<p><?php esc_html_e( 'Check API read access without sending mail. Allow /stats/email_cycle on your SMTP2GO key. This does not verify sending permission, sender authorization or delivery.', 'scalyn-mail-relay' ); ?></p>
+				<?php elseif ( 'postmark' === $active_provider_id ) : ?>
 					<p><?php esc_html_e( 'Check the Postmark Server API token and Live server type without sending email. This does not verify sender authorization, sending allowance or delivery. Sandbox servers are not supported.', 'scalyn-mail-relay' ); ?></p>
 				<?php elseif ( 'sendgrid' === $active_provider_id ) : ?>
 					<p><?php esc_html_e( 'Validate the SendGrid key and request format in sandbox mode. No email is sent, and this does not prove real-send permission or recipient delivery.', 'scalyn-mail-relay' ); ?></p>

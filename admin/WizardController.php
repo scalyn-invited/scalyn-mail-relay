@@ -143,7 +143,7 @@ final class WizardController {
 		check_admin_referer( 'scalyn_wizard_step3' );
 		$settings    = $this->get_settings();
 		$provider_id = $settings->get_active_provider_id();
-		if ( in_array( $provider_id, array( 'sendgrid', 'postmark' ), true ) ) {
+		if ( in_array( $provider_id, array( 'sendgrid', 'postmark', 'smtp2go' ), true ) ) {
 			try {
 				$valid = $this->get_registry()->get( $provider_id )->validate_config( $settings->get_provider_config( $provider_id ) )->valid;
 			} catch ( \Throwable $error ) {
@@ -305,12 +305,13 @@ final class WizardController {
 		$provider_id = $settings->get_active_provider_id();
 		$sender      = match ( $provider_id ) {
 			'postmark' => $settings->get_postmark_settings(),
+			'smtp2go' => $settings->get_smtp2go_settings(),
 			'sendgrid' => $settings->get_sendgrid_settings(),
 			default => $settings->get_smtp_config(),
 		};
 		$from_email = (string) ( $sender['from_email'] ?? '' );
 		$from_name  = (string) ( $sender['from_name'] ?? '' );
-		$from       = in_array( $provider_id, array( 'sendgrid', 'postmark' ), true ) ? $from_email : ( '' !== $from_name
+		$from       = in_array( $provider_id, array( 'sendgrid', 'postmark', 'smtp2go' ), true ) ? $from_email : ( '' !== $from_name
 			? $from_name . ' <' . $from_email . '>'
 			: $from_email );
 
