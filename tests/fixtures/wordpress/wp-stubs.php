@@ -8,7 +8,7 @@ if ( ! function_exists( 'esc_textarea' ) ) {
 
 if ( ! function_exists( 'wp_verify_nonce' ) ) {
 	function wp_verify_nonce( $nonce, $action = -1 ) {
-		if ( 'scalyn_postmark_webhook' === $action ) {
+		if ( in_array( $action, array( 'scalyn_postmark_webhook', 'scalyn_smtp2go_webhook', 'scalyn_brevo_webhook' ), true ) ) {
 			return 'valid' === $nonce && ( $GLOBALS['_test_wp_nonce_valid'] ?? false ) ? 1 : false;
 		}
 		return 'scalyn_export_report' === $action && 'valid-export-nonce' === $nonce ? 1 : false;
@@ -412,7 +412,7 @@ if ( ! function_exists( 'rest_url' ) ) {
 	 * @param string $scheme Unused in stub.
 	 */
 	function rest_url( string $path = '', string $scheme = 'rest' ): string {
-		return 'http://example.com/wp-json/' . ltrim( $path, '/' );
+		return ( $GLOBALS['_test_rest_base'] ?? 'http://example.com/wp-json/' ) . ltrim( $path, '/' );
 	}
 }
 

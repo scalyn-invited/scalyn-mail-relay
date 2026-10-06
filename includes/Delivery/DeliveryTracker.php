@@ -30,12 +30,14 @@ final class DeliveryTracker {
 	 * @param DeliveryKeyRepository     $keys Matching keys.
 	 * @param DeliveryAttemptRepository $attempts Attempt associations.
 	 * @param PostmarkProvider          $parser Postmark recipient parser shared with send().
+	 * @param array                     $api_sources Provider-bound optional sources.
 	 */
 	public function __construct(
 		private readonly PostmarkWebhookSettings $sources,
 		private readonly DeliveryKeyRepository $keys,
 		private readonly DeliveryAttemptRepository $attempts,
-		private readonly PostmarkProvider $parser
+		private readonly PostmarkProvider $parser,
+		private readonly array $api_sources = array()
 	) {}
 
 	/**
@@ -46,16 +48,16 @@ final class DeliveryTracker {
 	 * @return array|null Association for acknowledgement, or null when untracked.
 	 */
 	public function prepare( MailMessage $message, string $provider_id ): ?array {
-		if ( 'postmark' !== $provider_id ) {
+		if ( 'postmark' !== $provider_id && ! isset( $this->api_sources[ $provider_id ] ) ) {
 			return null;
 		}
-		$source = $this->sources->dispatch_source();
+		$source = ( 'postmark' === $provider_id ? $this->sources : $this->api_sources[ $provider_id ] )->dispatch_source();
 		if ( null === $source ) {
 			return null;
 		}
 		$attempt = strtolower( $message->uuid );
 		try {
-			$addresses = $this->parser->recipient_addresses( $message );
+			$addresses = ( 'postmark' === $provider_id ? $this->parser : new \Scalyn\MailRelay\Providers\BoundedApiMessage() )->recipient_addresses( $message );
 		} catch ( \Throwable $error ) {
 			// The adapter will reject the same input before submission; nothing to track.
 			return null;
@@ -70,7 +72,8 @@ final class DeliveryTracker {
 					'configuration_id' => $source['configuration_id'],
 					'key_version'      => $source['key_version'],
 				),
-				$tokens
+				$tokens,
+				$provider_id
 			);
 		} catch ( \Throwable $error ) {
 			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Fixed text only; no addresses, tokens or SQL.
@@ -90,11 +93,11 @@ final class DeliveryTracker {
 	 * @param SendResult $result Provider result.
 	 */
 	public function acknowledge( ?array $association, SendResult $result ): void {
-		if ( null === $association || ! $result->success || 'postmark' !== $result->provider || ! is_string( $result->provider_message_id ) ) {
+		if ( null === $association || ! $result->success || ! in_array( $result->provider, array( 'postmark', 'smtp2go', 'brevo' ), true ) || ! is_string( $result->provider_message_id ) ) {
 			return;
 		}
 		try {
-			$this->attempts->acknowledge( $association['source_id'], $association['message_uuid'], strtolower( $result->provider_message_id ) );
+			$this->attempts->acknowledge( $association['source_id'], $association['message_uuid'], 'postmark' === $result->provider ? strtolower( $result->provider_message_id ) : $result->provider_message_id, $result->provider );
 		} catch ( \Throwable $error ) {
 			// A callback can still bind the identifier through the pre-submission association.
 			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Fixed text only.

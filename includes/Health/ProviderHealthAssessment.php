@@ -110,7 +110,7 @@ final class ProviderHealthAssessment {
 			'limitations'        => array(
 				__( 'Only Accepted and Failed submissions attributed to the current configuration are counted.', 'scalyn-mail-relay' ),
 				__( 'Unattributed history, unconfirmed outcomes and missing evidence are excluded.', 'scalyn-mail-relay' ),
-				'postmark' === $provider ? __( 'Bounce-rate assessment needs aggregated tracked-recipient coverage and is not assessed here.', 'scalyn-mail-relay' ) : __( 'Out-of-band delivery/bounce evidence is unavailable for this provider.', 'scalyn-mail-relay' ),
+				in_array( $provider, array( 'postmark', 'smtp2go', 'brevo' ), true ) ? __( 'Bounce-rate assessment needs aggregated tracked-recipient coverage and is not assessed here.', 'scalyn-mail-relay' ) : __( 'Out-of-band delivery/bounce evidence is unavailable for this provider.', 'scalyn-mail-relay' ),
 			),
 		);
 	}

@@ -48,7 +48,7 @@ final class DeliveryEventRepository {
 			$started = true;
 			// Serialize on the retained attempt, including concurrent duplicate callbacks.
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Retention deletion must take the same attempt lock.
-			$attempt = $wpdb->get_row( $wpdb->prepare( "SELECT provider_message_id FROM %i WHERE message_uuid=%s AND source_id=%s AND provider='postmark' AND created_at >= %s FOR UPDATE", $wpdb->prefix . 'scalyn_delivery_attempts', $event['message_uuid'], $event['source_id'], $cutoff ), ARRAY_A );
+			$attempt = $wpdb->get_row( $wpdb->prepare( 'SELECT provider_message_id FROM %i WHERE message_uuid=%s AND source_id=%s AND provider=%s AND created_at >= %s FOR UPDATE', $wpdb->prefix . 'scalyn_delivery_attempts', $event['message_uuid'], $event['source_id'], $event['provider'], $cutoff ), ARRAY_A );
 			if ( ! empty( $wpdb->last_error ) ) {
 				throw new \RuntimeException();
 			}
@@ -97,7 +97,7 @@ final class DeliveryEventRepository {
 				'delivery_evidence',
 				'',
 				$delivery ? 'Delivered (recipient server)' : 'Bounce reported',
-				$delivery ? 'Postmark reported delivery to one recipient server. This does not prove inbox placement or delivery to all recipients.' : 'Postmark reported a bounce for one recipient. The original sending outcome is unchanged.',
+				$delivery ? 'The provider reported delivery to one recipient server. This does not prove inbox placement or delivery to all recipients.' : 'The provider reported a bounce for one recipient. The original sending outcome is unchanged.',
 				array(
 					'schema_version' => 1,
 					'kind'           => $event['kind'],
@@ -128,10 +128,14 @@ final class DeliveryEventRepository {
 	 * @throws \RuntimeException On malformed fields.
 	 */
 	private function validate( #[\SensitiveParameter] array $event ): array {
-		if ( count( $event ) !== count( self::FIELDS ) || array_diff( self::FIELDS, array_keys( $event ) ) || 1 !== $event['schema_version'] || 'postmark' !== $event['provider'] || 'postmark_basic_tls' !== $event['authentication_method'] || ! in_array( $event['kind'], array( 'delivery', 'bounce' ), true ) ) {
+		if ( count( $event ) !== count( self::FIELDS ) || array_diff( self::FIELDS, array_keys( $event ) ) || 1 !== $event['schema_version'] || ! \Scalyn\MailRelay\Delivery\ProviderMessageId::valid( $event['provider'], $event['provider_message_id'] ) || ( array(
+			'postmark' => 'postmark_basic_tls',
+			'smtp2go'  => 'smtp2go_bearer_tls',
+			'brevo'    => 'brevo_bearer_tls',
+		)[ $event['provider'] ] ?? null ) !== $event['authentication_method'] || ! in_array( $event['kind'], array( 'delivery', 'bounce' ), true ) ) {
 			throw new \RuntimeException();
 		}
-		foreach ( array( 'source_id', 'message_uuid', 'provider_message_id' ) as $field ) {
+		foreach ( array( 'source_id', 'message_uuid' ) as $field ) {
 			if ( ! is_string( $event[ $field ] ) || ! preg_match( '/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/D', $event[ $field ] ) ) {
 				throw new \RuntimeException();
 			}

@@ -1,5 +1,10 @@
 # Project Status
 
+Current owner update (2026-10-06): Bernie confirms SMTP2GO and Brevo sending QA
+is complete. Live webhook delivery/bounce/retry testing remains in the backlog.
+SendGrid remains deferred. Earlier pending sending-QA notes below are historical;
+this update records owner confirmation, not an independent rerun.
+
 ## Provider expansion update — 2026-10-06
 
 SMTP2GO and Brevo HTTPS adapters are implemented locally with encrypted wizard
@@ -7,7 +12,10 @@ configuration, non-sending verification, wp_mail handling and scoped diagnostics
 See [current QA and limitations](qa/2026-10-06-provider-expansion.md).
 Local provider cards and wizard choices were inspected without changing the
 active Postmark route. Real provider account/send QA, PR/CI and owner review are
-still pending. Delivery/bounce receivers for these new providers are not included.
+still pending. Authenticated delivery/bounce receivers are now implemented locally
+on feature/provider-webhook-evidence; see [webhook QA](qa/2026-10-06-provider-webhooks.md)
+and [ADR 0030](adr/0030-authenticated-provider-webhooks.md). Collection remains off
+by default; real webhook delivery/bounce/retry QA is pending.
 Historical milestone notes below are retained and are not the current baseline.
 
 ## Current verified status — 2026-09-21

@@ -18,15 +18,18 @@ final class DeliveryAttemptRepository {
 	/**
 	 * Persists membership atomically before an opted-in send is submitted.
 	 *
-	 * @param array $association Exactly message_uuid, source_id, configuration_id, key_version.
-	 * @param array $tokens Already derived To/Cc/Bcc tokens, maximum 50 unique recipients.
+	 * @param array  $association Exactly message_uuid, source_id, configuration_id, key_version.
+	 * @param array  $tokens Already derived To/Cc/Bcc tokens, maximum 50 unique recipients.
+	 * @param string $provider Supported provider identity.
 	 * @throws \RuntimeException When validation or persistence fails.
 	 */
-	public function prepare( array $association, #[\SensitiveParameter] array $tokens ): void {
+	public function prepare( array $association, #[\SensitiveParameter] array $tokens, string $provider = 'postmark' ): void {
 		global $wpdb;
 		$suppressed = $wpdb->suppress_errors( true );
 		$started    = false;
 		try {
+			if ( ! in_array( $provider, array( 'postmark', 'smtp2go', 'brevo' ), true ) ) {
+				throw new \RuntimeException(); }
 			$fields = array( 'message_uuid', 'source_id', 'configuration_id', 'key_version' );
 			if ( count( $association ) !== 4 || array_diff( $fields, array_keys( $association ) ) || ! $tokens || count( $tokens ) > 50 ) {
 				throw new \RuntimeException();
@@ -56,7 +59,7 @@ final class DeliveryAttemptRepository {
 			$row = array_merge(
 				$association,
 				array(
-					'provider'            => 'postmark',
+					'provider'            => $provider,
 					'expected_recipients' => count( $tokens ),
 					'created_at'          => gmdate( 'Y-m-d H:i:s' ),
 				)
@@ -98,24 +101,27 @@ final class DeliveryAttemptRepository {
 	 * @param string $source Original source UUID.
 	 * @param string $attempt Attempt UUID.
 	 * @param string $message_id Validated provider acknowledgement identifier.
+	 * @param string $provider Supported provider identity.
 	 * @throws \RuntimeException When binding fails or contradicts a previous identifier.
 	 */
-	public function acknowledge( string $source, string $attempt, string $message_id ): void {
+	public function acknowledge( string $source, string $attempt, string $message_id, string $provider = 'postmark' ): void {
 		global $wpdb;
 		$suppressed = $wpdb->suppress_errors( true );
 		try {
-			foreach ( array( $source, $attempt, $message_id ) as $id ) {
+			if ( ! \Scalyn\MailRelay\Delivery\ProviderMessageId::valid( $provider, $message_id ) ) {
+				throw new \RuntimeException(); }
+			foreach ( array( $source, $attempt ) as $id ) {
 				if ( ! preg_match( self::UUID, $id ) ) {
 					throw new \RuntimeException();
 				}
 			}
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Compare-and-set never overwrites callback or acknowledgement identity.
-			$result = $wpdb->query( $wpdb->prepare( "UPDATE %i SET provider_message_id=%s WHERE message_uuid=%s AND source_id=%s AND provider='postmark' AND (provider_message_id IS NULL OR provider_message_id=%s)", $wpdb->prefix . 'scalyn_delivery_attempts', $message_id, $attempt, $source, $message_id ) );
+			$result = $wpdb->query( $wpdb->prepare( 'UPDATE %i SET provider_message_id=%s WHERE message_uuid=%s AND source_id=%s AND provider=%s AND (provider_message_id IS NULL OR provider_message_id=%s)', $wpdb->prefix . 'scalyn_delivery_attempts', $message_id, $attempt, $source, $provider, $message_id ) );
 			if ( false === $result ) {
 				throw new \RuntimeException();
 			}
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Verify no-op success; zero updates can also mean absent or contradictory identity.
-			$stored = $wpdb->get_var( $wpdb->prepare( "SELECT provider_message_id FROM %i WHERE message_uuid=%s AND source_id=%s AND provider='postmark'", $wpdb->prefix . 'scalyn_delivery_attempts', $attempt, $source ) );
+			$stored = $wpdb->get_var( $wpdb->prepare( 'SELECT provider_message_id FROM %i WHERE message_uuid=%s AND source_id=%s AND provider=%s', $wpdb->prefix . 'scalyn_delivery_attempts', $attempt, $source, $provider ) );
 			if ( $stored !== $message_id ) {
 				throw new \RuntimeException();
 			}
@@ -135,14 +141,17 @@ final class DeliveryAttemptRepository {
 	 * @param string                $address Transient parsed recipient.
 	 * @param string                $cutoff UTC attempt-creation retention boundary.
 	 * @param DeliveryKeyRepository $keys Version-aware matching service.
+	 * @param string                $provider Supported provider identity.
 	 * @return array|null Internal match, or null when unknown, ambiguous, expired or mismatched.
 	 * @throws \RuntimeException When database or key material is unavailable.
 	 */
-	public function resolve( string $source, string $message_id, ?string $hint, #[\SensitiveParameter] string $address, string $cutoff, DeliveryKeyRepository $keys ): ?array {
+	public function resolve( string $source, string $message_id, ?string $hint, #[\SensitiveParameter] string $address, string $cutoff, DeliveryKeyRepository $keys, string $provider = 'postmark' ): ?array {
 		global $wpdb;
 		$suppressed = $wpdb->suppress_errors( true );
 		try {
-			foreach ( array_filter( array( $source, $message_id, $hint ), static fn( $id ) => null !== $id ) as $id ) {
+			if ( ! \Scalyn\MailRelay\Delivery\ProviderMessageId::valid( $provider, $message_id ) ) {
+				throw new \RuntimeException(); }
+			foreach ( array_filter( array( $source, $hint ), static fn( $id ) => null !== $id ) as $id ) {
 				if ( ! preg_match( self::UUID, $id ) ) {
 					throw new \RuntimeException();
 				}
@@ -153,7 +162,7 @@ final class DeliveryAttemptRepository {
 			}
 			$field = null !== $hint ? 'message_uuid' : 'provider_message_id';
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Two rows suffice to reject ambiguous provider identifiers; no fuzzy matching.
-			$rows = $wpdb->get_results( $wpdb->prepare( "SELECT message_uuid,provider_message_id,key_version FROM %i WHERE source_id=%s AND provider='postmark' AND %i=%s AND created_at >= %s LIMIT 2", $wpdb->prefix . 'scalyn_delivery_attempts', $source, $field, $hint ?? $message_id, $cutoff ), ARRAY_A );
+			$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT message_uuid,provider_message_id,key_version FROM %i WHERE source_id=%s AND provider=%s AND %i=%s AND created_at >= %s LIMIT 2', $wpdb->prefix . 'scalyn_delivery_attempts', $source, $provider, $field, $hint ?? $message_id, $cutoff ), ARRAY_A );
 			if ( ! empty( $wpdb->last_error ) || ! is_array( $rows ) ) {
 				throw new \RuntimeException();
 			}

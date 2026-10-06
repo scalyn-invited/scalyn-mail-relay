@@ -64,6 +64,7 @@ class Smtp2goProvider extends JsonApiProvider {
 		if ( null !== $message['reply_to'] ) {
 			$message['headers']['Reply-To'] = $this->mailbox( $message['reply_to'] );
 		}
+		$message['headers']['X-Scalyn-Message-UUID'] = $message['uuid'];
 		foreach ( $message['headers'] as $name => $value ) {
 			$payload['custom_headers'][] = array(
 				'header' => $name,

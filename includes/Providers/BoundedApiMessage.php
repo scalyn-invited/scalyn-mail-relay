@@ -84,6 +84,7 @@ final class BoundedApiMessage {
 			throw new \InvalidArgumentException( 'The message content or subject is unsupported.' );
 		}
 		$payload = array(
+			'uuid'         => strtolower( $message->uuid ),
 			'sender'       => $from,
 			'to'           => $recipients['to'],
 			'cc'           => $recipients['cc'],
@@ -101,6 +102,34 @@ final class BoundedApiMessage {
 			throw new \InvalidArgumentException( 'The message exceeds the API adapter size limit.' );
 		}
 		return $payload;
+	}
+
+	/**
+	 * Uses the exact same address subset for pre-send recipient membership.
+	 *
+	 * @param MailMessage $message Prepared message.
+	 * @return array Transient recipient addresses.
+	 * @throws \InvalidArgumentException When recipient input is unsupported.
+	 */
+	public function recipient_addresses( MailMessage $message ): array {
+		if ( array() === $message->to || count( $message->to ) > self::MAX_RECIPIENTS ) {
+			throw new \InvalidArgumentException( 'The recipient count is unsupported.' );
+		}
+		$addresses = array();
+		foreach ( $message->to as $raw ) {
+			$addresses[] = $this->address( $raw )['email'];
+		}
+		foreach ( $message->headers as $header ) {
+			if ( is_string( $header ) && preg_match( '/^(cc|bcc):[ \t]*(.+)$/iD', $header, $parts ) ) {
+				foreach ( explode( ',', trim( $parts[2] ) ) as $item ) {
+					$addresses[] = $this->address( trim( $item ) )['email'];
+				}
+			}
+		}
+		if ( count( $addresses ) > self::MAX_RECIPIENTS ) {
+			throw new \InvalidArgumentException( 'The recipient count is unsupported.' );
+		}
+		return array_values( array_unique( $addresses ) );
 	}
 
 	/**

@@ -101,8 +101,8 @@ final class CredentialCipher {
 		if ( 'delivery-matching' === $provider ) {
 			return 'scalyn:delivery:recipient-matching:v1';
 		}
-		if ( 'postmark-webhook' === $provider ) {
-			return 'scalyn:postmark:webhook-credentials:v1';
+		if ( in_array( $provider, array( 'postmark-webhook', 'smtp2go-webhook', 'brevo-webhook' ), true ) ) {
+			return 'scalyn:' . str_replace( '-webhook', '', $provider ) . ':webhook-credentials:v1';
 		}
 		if ( ! in_array( $provider, array( 'sendgrid', 'postmark', 'smtp2go', 'brevo' ), true ) ) {
 			throw new \InvalidArgumentException( 'Unsupported credential context.' );

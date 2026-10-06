@@ -24,10 +24,12 @@ final class DeliveryCoverage {
 	 *
 	 * @param DeliveryCoverageRepository $repository Token-free aggregates.
 	 * @param PostmarkWebhookSettings    $sources Source state.
+	 * @param array                      $api_sources Provider-bound optional sources.
 	 */
 	public function __construct(
 		private readonly DeliveryCoverageRepository $repository,
-		private readonly PostmarkWebhookSettings $sources
+		private readonly PostmarkWebhookSettings $sources,
+		private readonly array $api_sources = array()
 	) {}
 
 	/**
@@ -44,7 +46,7 @@ final class DeliveryCoverage {
 			return $this->result( 'unavailable', __( 'Unavailable', 'scalyn-mail-relay' ), __( 'Delivery evidence could not be read. The sending outcome above is unchanged.', 'scalyn-mail-relay' ) );
 		}
 		if ( null === $coverage ) {
-			if ( ! $this->sources->collection_enabled() ) {
+			if ( ! $this->sources->collection_enabled() && ! array_filter( $this->api_sources, static fn( $source ): bool => $source->collection_enabled() ) ) {
 				return $this->result( 'not_enabled', __( 'Not enabled', 'scalyn-mail-relay' ), __( 'Delivery and bounce evidence collection is not enabled. Accepted reflects provider acknowledgement only.', 'scalyn-mail-relay' ) );
 			}
 			return $this->result( 'unavailable', __( 'Unavailable', 'scalyn-mail-relay' ), __( 'This message was not tracked. It may have been sent before collection started, through another provider, while collection was paused, or tracking could not be prepared. Evidence is never inferred for untracked messages.', 'scalyn-mail-relay' ) );

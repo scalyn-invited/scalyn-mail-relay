@@ -34,7 +34,9 @@ embeds remain unsupported. No raw response, credential or message body is
 persisted by these adapters. Provider account tracking settings remain external;
 the plugin neither enables nor imports open/click tracking.
 
-Delivery/bounce webhooks and automatic failover are outside this addition.
+Delivery/bounce webhooks and automatic failover were outside this transport addition.
+ADR 0030 adds authenticated webhook receivers in a separate follow-up; automatic
+failover remains excluded. The following describes the transport-only baseline:
 Provider cards explicitly show evidence unavailable. Accepted is not Delivered.
 Future providers require a focused adapter, settings/UI wiring, provider-specific
 contract tests and live QA; they must not inherit assumed delivery capabilities.
