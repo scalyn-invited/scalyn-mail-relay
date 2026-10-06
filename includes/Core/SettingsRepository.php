@@ -200,7 +200,7 @@ final class SettingsRepository {
 		if ( 'smtp' === $provider_id ) {
 			return $this->get_smtp_config();
 		}
-		if ( in_array( $provider_id, array( 'sendgrid', 'postmark', 'smtp2go' ), true ) ) {
+		if ( in_array( $provider_id, array( 'sendgrid', 'postmark', 'smtp2go', 'brevo' ), true ) ) {
 			$config = $this->data[ $provider_id ] ?? array();
 			$stored = $config['key_cipher'] ?? '';
 			if ( ! is_string( $stored ) || '' === $stored ) {
@@ -451,6 +451,88 @@ final class SettingsRepository {
 		foreach ( array( 'from_email', 'from_name', 'key_cipher' ) as $field ) {
 			if ( ( $old[ $field ] ?? null ) !== $config[ $field ] ) {
 				$fields[] = 'smtp2go.' . ( 'key_cipher' === $field ? 'api_key' : $field );
+			}
+		}
+		try {
+			do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'settings_changed', 'changed', '', $fields ) );
+		} catch ( \Throwable $error ) {
+			// Audit observer failure must not repeat or undo an already saved credential.
+			return true;
+		}
+		return true;
+	}
+
+	/**
+	 * Credential-free Brevo configuration for Admin.
+	 *
+	 * @return array Public configuration and credential presence only.
+	 */
+	public function get_brevo_settings(): array {
+		$config = $this->data['brevo'] ?? array();
+		return array(
+			'from_email' => is_string( $config['from_email'] ?? null ) ? sanitize_email( $config['from_email'] ) : '',
+			'from_name'  => is_string( $config['from_name'] ?? null ) ? sanitize_text_field( $config['from_name'] ) : '',
+			'has_key'    => ! empty( $config['key_cipher'] ),
+		);
+	}
+
+	/**
+	 * Saves Brevo configuration, with explicit credential intent.
+	 *
+	 * @param array            $input Strictly validated configuration and action.
+	 * @param CredentialCipher $cipher Credential protection service.
+	 * @return bool Whether the desired settings were persisted (including no-op).
+	 * @throws \InvalidArgumentException When input is invalid.
+	 */
+	public function save_brevo( #[\SensitiveParameter] array $input, CredentialCipher $cipher ): bool {
+		$action = $input['key_action'] ?? null;
+		$secret = $input['api_key'] ?? '';
+		$email  = $input['from_email'] ?? null;
+		$name   = $input['from_name'] ?? null;
+		if ( ! in_array( $action, array( 'keep', 'replace', 'remove' ), true ) || ! is_string( $secret )
+			|| ! is_string( $email ) || strlen( $email ) > 254 || ! filter_var( $email, FILTER_VALIDATE_EMAIL )
+			|| ! is_string( $name ) || strlen( $name ) > 200 || preg_match( '/[\r\n\x00]/', $name )
+			|| ( 'replace' !== $action && '' !== $secret )
+			|| ( 'replace' === $action && ( strlen( $secret ) < 16 || strlen( $secret ) > 512 || ! preg_match( '/^[A-Za-z0-9._-]+$/D', $secret ) ) )
+			|| ( 'remove' === $action && true !== ( $input['confirm_remove'] ?? false ) ) ) {
+			throw new \InvalidArgumentException( 'Invalid Brevo settings. No changes were saved.' );
+		}
+		$before = $this->data;
+		$old    = $before['brevo'] ?? array();
+		$stored = $old['key_cipher'] ?? '';
+		if ( 'replace' === $action ) {
+			$stored = $cipher->encrypt( $secret, 'brevo' );
+		} elseif ( 'remove' === $action ) {
+			$stored = '';
+		} elseif ( ! is_string( $stored ) || '' === $stored ) {
+			throw new \InvalidArgumentException( 'Provide a new API key using Replace.' );
+		} else {
+			$cipher->decrypt( $stored, 'brevo' );
+		}
+		$config = array(
+			'from_email' => $email,
+			'from_name'  => sanitize_text_field( $name ),
+			'key_cipher' => $stored,
+		);
+		if ( $config === $old ) {
+			return true;
+		}
+		$next          = $before;
+		$next['brevo'] = $config;
+		if ( 'brevo' === $this->get_active_provider_id() ) {
+			$next['provider']['verified']               = false;
+			$next['provider']['verified_at']            = null;
+			$next['provider']['test_email_accepted_at'] = null;
+		}
+		$next = self::with_diagnostic_revision( $before, $next );
+		if ( ! update_option( self::OPTION_KEY, $next ) ) {
+			return false;
+		}
+		$this->data = $next;
+		$fields     = array();
+		foreach ( array( 'from_email', 'from_name', 'key_cipher' ) as $field ) {
+			if ( ( $old[ $field ] ?? null ) !== $config[ $field ] ) {
+				$fields[] = 'brevo.' . ( 'key_cipher' === $field ? 'api_key' : $field );
 			}
 		}
 		try {

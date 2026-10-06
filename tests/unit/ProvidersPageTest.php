@@ -24,7 +24,7 @@ final class ProvidersPageTest extends TestCase {
 	}
 	private function render_page(): string {
 		Plugin::instance()->boot();
-		foreach (array('smtp'=>'SMTP', 'sendgrid'=>'SendGrid API', 'postmark'=>'Postmark API', 'smtp2go'=>'SMTP2GO API') as $id=>$label) {
+		foreach (array('smtp'=>'SMTP', 'sendgrid'=>'SendGrid API', 'postmark'=>'Postmark API', 'smtp2go'=>'SMTP2GO API', 'brevo'=>'Brevo API') as $id=>$label) {
 			$provider = $this->createMock(\Scalyn\MailRelay\Contracts\ProviderInterface::class);
 			$provider->method('get_id')->willReturn($id);
 			$provider->method('get_label')->willReturn($label);
@@ -45,6 +45,7 @@ final class ProvidersPageTest extends TestCase {
 		$this->assertStringNotContainsString('<form', $html);
 		$this->assertStringContainsString('Postmark API', $html);
 		$this->assertStringContainsString('SMTP2GO API', $html);
+		$this->assertStringContainsString('Brevo API', $html);
 		$this->assertStringContainsString('Live Server token', $html);
 	}
 	public function test_active_route_shows_current_scope_health_without_credentials(): void {

@@ -1,5 +1,15 @@
 # Project Status
 
+## Provider expansion update — 2026-10-06
+
+SMTP2GO and Brevo HTTPS adapters are implemented locally with encrypted wizard
+configuration, non-sending verification, wp_mail handling and scoped diagnostics.
+See [current QA and limitations](qa/2026-10-06-provider-expansion.md).
+Local provider cards and wizard choices were inspected without changing the
+active Postmark route. Real provider account/send QA, PR/CI and owner review are
+still pending. Delivery/bounce receivers for these new providers are not included.
+Historical milestone notes below are retained and are not the current baseline.
+
 ## Current verified status — 2026-09-21
 
 Update — 2026-09-22: all Milestone 4 implementation tickets are complete locally.

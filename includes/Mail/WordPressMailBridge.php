@@ -42,7 +42,7 @@ final class WordPressMailBridge {
 	 * @return mixed Null for core mail, otherwise the provider acknowledgement boolean.
 	 */
 	public function maybe_send( mixed $pre, mixed $atts ): mixed {
-		if ( null !== $pre || ! in_array( $this->settings->get_active_provider_id(), array( 'sendgrid', 'postmark', 'smtp2go' ), true ) ) {
+		if ( null !== $pre || ! in_array( $this->settings->get_active_provider_id(), array( 'sendgrid', 'postmark', 'smtp2go', 'brevo' ), true ) ) {
 			return $pre;
 		}
 		$uuid = wp_generate_uuid4();
@@ -111,7 +111,11 @@ final class WordPressMailBridge {
 			throw new \InvalidArgumentException( 'Unsupported mail headers.' );
 		}
 		$config = match ( $this->settings->get_active_provider_id() ) {
-			'postmark' => $this->settings->get_postmark_settings(), 'smtp2go' => $this->settings->get_smtp2go_settings(), default => $this->settings->get_sendgrid_settings() };
+			'postmark' => $this->settings->get_postmark_settings(),
+			'smtp2go' => $this->settings->get_smtp2go_settings(),
+			'brevo' => $this->settings->get_brevo_settings(),
+			default => $this->settings->get_sendgrid_settings(),
+		};
 		$from_email   = $config['from_email'];
 		$content_type = apply_filters( 'wp_mail_content_type', 'text/plain' );
 		$forwarded    = array();

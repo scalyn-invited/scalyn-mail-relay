@@ -1,8 +1,8 @@
 # ADR 0029: Bounded HTTPS provider expansion
 
-Status: implementation decision for owner review (SMTP2GO requested 2026-10-06).
+Status: implementation decision for owner review (SMTP2GO and Brevo requested 2026-10-06).
 
-Bernie owns implementation and integration. Add SMTP2GO behind the existing
+Bernie owns implementation and integration. Add SMTP2GO and Brevo behind the existing
 ProviderInterface; no interface, service-container, schema, REST or lifecycle
 contract changes. Register explicitly, not through arbitrary configurable URLs.
 
@@ -20,6 +20,12 @@ unconfirmed, never retried automatically. HTTP 4xx other than 408 are rejection.
 Verification uses POST /stats/email_cycle with an empty JSON object: it verifies
 read access only, not send permission, sender authorization, quota or delivery.
 Keys need /email/send and /stats/email_cycle permissions.
+
+Brevo uses POST /smtp/email and requires HTTP 201 with a bounded messageId.
+Verification uses GET /account, validating account-response structure but never
+retaining account details or returned automation credentials. It verifies API
+account access only, not transactional activation, sender authorization, allowance
+or delivery. Use a Brevo API key, not an SMTP key; account IP restrictions apply.
 
 Limits: 50 recipients including Cc/Bcc, 1 MiB body, 10 attachments totaling 4 MiB,
 8 MiB JSON, 16 KiB response, 15-second request, no redirects, TLS verification.
@@ -41,3 +47,5 @@ References verified 2026-10-06:
 - https://developers.smtp2go.com/reference/send-standard-email
 - https://developers.smtp2go.com/docs/send-an-email
 - https://developers.smtp2go.com/reference/email-cycle
+- https://developers.brevo.com/reference/send-transac-email
+- https://developers.brevo.com/reference/get-account

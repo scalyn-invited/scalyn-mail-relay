@@ -20,6 +20,15 @@ final class WizardViewTest extends TestCase {
 		$conn_result = $result;
 		$email_result = $result;
 		$prior_options = $GLOBALS['_test_wp_options'] ?? array();
+		if (in_array($provider,['smtp2go','brevo'],true)) {
+			$GLOBALS['_test_wp_options']=[];
+			$settings=new \Scalyn\MailRelay\Core\SettingsRepository();
+			$cipher=new \Scalyn\MailRelay\Core\CredentialCipher(base64_encode(str_repeat('a',32)));
+			$settings->save(['provider'=>['active'=>$provider]]);
+			if ($ready) { $settings->{'save_'.$provider}(['from_email'=>'sender@example.test','from_name'=>'Sender','key_action'=>'replace','api_key'=>'synthetic_credential_0123456789'],$cipher); }
+			$smtp2go_form=new \Scalyn\MailRelay\Admin\Components\Smtp2goSettingsForm($settings,$cipher);
+			$brevo_form=new \Scalyn\MailRelay\Admin\Components\BrevoSettingsForm($settings,$cipher);
+		}
 		if ( 'postmark' === $provider ) {
 			$GLOBALS['_test_wp_options'] = array();
 			$settings = new \Scalyn\MailRelay\Core\SettingsRepository();
@@ -52,6 +61,22 @@ final class WizardViewTest extends TestCase {
 			$this->assertStringContainsString( 'aria-labelledby="scalyn-wizard-help-title"', $output );
 			$this->assertStringContainsString( 'Acceptance is not delivery', $output );
 			$this->assertStringNotContainsString( 'verifying delivery', $output );
+		}
+	}
+
+	public function test_expanded_providers_configure_inside_wizard_and_gate_continue(): void {
+		$GLOBALS['_test_current_user_can']=[Capabilities::MANAGE_SETTINGS=>true,Capabilities::MANAGE_MAIL=>true];
+		$_POST=[]; $_SERVER['REQUEST_METHOD']='GET';
+		foreach (['smtp2go'=>'SMTP2GO','brevo'=>'Brevo'] as $id=>$label) {
+			$html=$this->render_view(3,$id,false);
+			$this->assertStringContainsString('Configure '.$label,$html);
+			$this->assertStringContainsString('name="scalyn_'.$id.'_settings"',$html);
+			$this->assertStringNotContainsString('Continue to verification',$html);
+			$this->assertStringNotContainsString('Configure SMTP<',$html);
+			$html=$this->render_view(3,$id,true);
+			$this->assertStringContainsString('Continue to verification',$html);
+			$this->assertStringNotContainsString('synthetic_credential',$html);
+			$this->assertStringContainsString('without sending mail',$this->render_view(4,$id,true));
 		}
 	}
 

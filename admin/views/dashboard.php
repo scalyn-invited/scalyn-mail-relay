@@ -111,6 +111,8 @@ $setup_steps = array(
 				<p class="description"><?php esc_html_e( 'Verification records a successful connection check or accepted send, not current availability or inbox delivery. It is not the latest attempt result; later failures may exist.', 'scalyn-mail-relay' ); ?></p>
 				<?php if ( 'sendgrid' === $active_provider_id ) : ?>
 					<p class="description"><?php esc_html_e( 'SendGrid connection checks use sandbox mode and do not prove real-send permission.', 'scalyn-mail-relay' ); ?></p>
+				<?php elseif ( 'brevo' === $active_provider_id ) : ?>
+					<p class="description"><?php esc_html_e( 'Brevo connection checks verify API account access only, not transactional activation, sender authorization or delivery.', 'scalyn-mail-relay' ); ?></p>
 				<?php elseif ( 'smtp2go' === $active_provider_id ) : ?>
 					<p class="description"><?php esc_html_e( 'SMTP2GO connection checks verify API read access only, not sending permission, sender authorization or delivery.', 'scalyn-mail-relay' ); ?></p>
 				<?php elseif ( 'postmark' === $active_provider_id ) : ?>
