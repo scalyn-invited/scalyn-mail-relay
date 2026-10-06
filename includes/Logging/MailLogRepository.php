@@ -414,4 +414,68 @@ final class MailLogRepository {
 
 		return $counts;
 	}
+
+	/**
+	 * Returns terminal submission counts for one exact provider configuration.
+	 *
+	 * Unattributed historical records, other configurations, Prepared and unknown
+	 * outcomes are excluded. Accepted means provider acknowledgement only.
+	 *
+	 * @param string $configuration_id Captured configuration revision UUID.
+	 * @param string $provider Provider ID.
+	 * @param int    $hours Window length, 1 through 168.
+	 * @return array{accepted:int,failed:int,total:int}|null Null when evidence cannot be read.
+	 */
+	public function configuration_status_counts( string $configuration_id, string $provider, int $hours ): ?array {
+		global $wpdb;
+		if ( ! self::valid_configuration_scope( $configuration_id, $provider ) ) {
+			return null;
+		}
+		$hours = min( 168, max( 1, $hours ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Exact indexed operational evidence read.
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				'SELECT status, COUNT(*) AS row_count FROM %i WHERE configuration_id=%s AND provider=%s AND created_at >= DATE_SUB(%s, INTERVAL %d HOUR) AND status IN (%s,%s) GROUP BY status',
+				$wpdb->prefix . 'scalyn_mail_logs',
+				$configuration_id,
+				$provider,
+				current_time( 'mysql' ),
+				$hours,
+				MailStatus::ACCEPTED,
+				MailStatus::FAILED
+			),
+			ARRAY_A
+		);
+		if ( ! is_array( $rows ) || ( isset( $wpdb->last_error ) && '' !== $wpdb->last_error ) ) {
+			return null;
+		}
+		$counts = array(
+			'accepted' => 0,
+			'failed'   => 0,
+			'total'    => 0,
+		);
+		foreach ( $rows as $row ) {
+			$status = (string) ( $row['status'] ?? '' );
+			$count  = max( 0, (int) ( $row['row_count'] ?? 0 ) );
+			if ( MailStatus::ACCEPTED === $status ) {
+				$counts['accepted'] += $count;
+			} elseif ( MailStatus::FAILED === $status ) {
+				$counts['failed'] += $count;
+			}
+		}
+		$counts['total'] = $counts['accepted'] + $counts['failed'];
+		return $counts;
+	}
+
+	/**
+	 * Validates opaque identifiers; no scope is inferred from older log rows.
+	 *
+	 * @param string $configuration_id Current configuration revision UUID.
+	 * @param string $provider Provider identifier.
+	 * @return bool Whether the scope is safe to query.
+	 */
+	private static function valid_configuration_scope( string $configuration_id, string $provider ): bool {
+		return 1 === preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/D', $configuration_id )
+			&& 1 === preg_match( '/^[a-z0-9_-]{1,100}$/D', $provider );
+	}
 }

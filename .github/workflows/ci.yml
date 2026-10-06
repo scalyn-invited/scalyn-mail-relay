@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
     # PR #67 is stacked on the delivery-evidence branch before integration.
-    branches: [develop, main, feature/m8-t2-postmark-webhook-auth]
+    branches: [develop, main, feature/m8-t2-postmark-webhook-auth, feature/m8-provider-health-foundation]
   push:
     branches: [develop]
 

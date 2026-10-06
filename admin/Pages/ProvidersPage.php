@@ -12,6 +12,7 @@ use Scalyn\MailRelay\Core\Plugin;
 use Scalyn\MailRelay\Core\PostmarkWebhookSettings;
 use Scalyn\MailRelay\Core\ProviderRegistry;
 use Scalyn\MailRelay\Core\SettingsRepository;
+use Scalyn\MailRelay\Health\ProviderHealthAssessment;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -39,10 +40,15 @@ final class ProvidersPage {
 		$sendgrid_settings  = $settings->get_sendgrid_settings();
 		$postmark_settings  = $settings->get_postmark_settings();
 		$can_configure      = current_user_can( Capabilities::MANAGE_SETTINGS );
-		$verified           = $settings->is_provider_verified();
-		$verified_time      = $verified ? strtotime( $settings->get_provider_verified_at() ?? '' ) : false;
-		$verified_date      = false !== $verified_time ? wp_date( 'Y-m-d H:i:s', $verified_time ) : __( 'Not recorded', 'scalyn-mail-relay' );
-		$evidence_status    = 'off';
+		$assessment         = null;
+		if ( $can_configure ) {
+			try {
+				$assessment = $container->get( ProviderHealthAssessment::class )->current();
+			} catch ( \Throwable $error ) {
+				$assessment = null;
+			}
+		}
+		$evidence_status = 'off';
 		try {
 			$evidence_status = $container->get( PostmarkWebhookSettings::class )->collection_status();
 		} catch ( \Throwable $error ) {
@@ -57,17 +63,16 @@ final class ProvidersPage {
 				default => false,
 			};
 			$providers[] = array(
-				'id'          => $id,
-				'label'       => $provider->get_label(),
-				'is_active'   => $id === $active_provider_id,
-				'configured'  => $configured,
-				'verified'    => $id === $active_provider_id && $verified,
-				'verified_at' => $verified_date,
-				'evidence'    => match ( $id ) {
+				'id'         => $id,
+				'label'      => $provider->get_label(),
+				'is_active'  => $id === $active_provider_id,
+				'configured' => $configured,
+				'health'     => $id === $active_provider_id ? $assessment : null,
+				'evidence'   => match ( $id ) {
 					'postmark' => $evidence_status,
 					default => 'unsupported',
 				},
-				'transport'   => match ( $id ) {
+				'transport'  => match ( $id ) {
 					'smtp' => 'SMTP',
 					'sendgrid' => 'API (HTTPS)',
 					'postmark' => 'API (HTTPS)',

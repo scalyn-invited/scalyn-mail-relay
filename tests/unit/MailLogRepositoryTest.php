@@ -43,6 +43,33 @@ final class MailLogRepositoryTest extends TestCase {
 		return new MailLogRepository();
 	}
 
+	public function test_configuration_status_counts_only_uses_exact_attributed_terminal_evidence(): void {
+		$this->wpdb->get_results_return = array(
+			array( 'status' => MailStatus::ACCEPTED, 'row_count' => 12 ),
+			array( 'status' => MailStatus::FAILED, 'row_count' => 3 ),
+			array( 'status' => MailStatus::PREPARED, 'row_count' => 99 ),
+		);
+
+		$counts = $this->make_repo()->configuration_status_counts(
+			'a823862b-5478-41b5-be43-3b067b1d5021',
+			'smtp',
+			24
+		);
+
+		$this->assertSame( array( 'accepted' => 12, 'failed' => 3, 'total' => 15 ), $counts );
+		$prepared = end( $this->wpdb->prepare_calls );
+		$this->assertStringContainsString( 'configuration_id=%s', $prepared['query'] );
+		$this->assertStringContainsString( 'status IN (%s,%s)', $prepared['query'] );
+		$this->assertSame( 'a823862b-5478-41b5-be43-3b067b1d5021', $prepared['args'][1] );
+		$this->assertSame( 'smtp', $prepared['args'][2] );
+	}
+
+	public function test_configuration_status_counts_rejects_unattributed_or_invalid_scope(): void {
+		$this->assertNull( $this->make_repo()->configuration_status_counts( '', 'smtp', 24 ) );
+		$this->assertNull( $this->make_repo()->configuration_status_counts( 'a823862b-5478-41b5-be43-3b067b1d5021', 'SMTP invalid', 24 ) );
+		$this->assertSame( array(), $this->wpdb->prepare_calls );
+	}
+
 	private function make_message( array $overrides = array() ): MailMessage {
 		return new MailMessage(
 			uuid: $overrides['uuid'] ?? 'test-uuid-0001',
