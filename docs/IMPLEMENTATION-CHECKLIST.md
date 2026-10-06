@@ -174,6 +174,13 @@ SendGrid webhook signatures apply to Postmark.
 
 ## Provider expansion A — Remaining Phase 2 providers
 
+2026-10-06 update: Bernie requested SMTP2GO and Brevo as the next additions.
+Both HTTPS transports and wizard integration are implemented locally in separate
+stacked changes. See [ADR 0029](adr/0029-bounded-provider-expansion.md) and
+[QA handoff](qa/2026-10-06-provider-expansion.md). Controlled live sending,
+provider-specific webhooks, remote CI and owner acceptance remain pending; the
+full provider-completion checkboxes below intentionally remain unchecked.
+
 Schedule: after Milestone 8 and before Milestone 9. Complete the first provider's
 transport and delivery-evidence workflow before starting this stage. Bernie
 prioritises the remaining providers by managed-client needs; provider order is

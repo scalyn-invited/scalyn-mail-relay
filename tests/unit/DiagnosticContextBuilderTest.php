@@ -12,6 +12,20 @@ use Scalyn\MailRelay\Diagnostics\DiagnosticContextBuilder;
  * sending-domain derivation.
  */
 final class DiagnosticContextBuilderTest extends TestCase {
+	public function test_expanded_api_providers_use_only_their_current_sender_domain(): void {
+		foreach (['smtp2go','brevo'] as $provider) {
+			$GLOBALS['_test_wp_options'][SettingsRepository::OPTION_KEY]=[
+				'provider'=>['active'=>$provider],
+				$provider=>['from_email'=>'sender@current.example','key_cipher'=>'private-ciphertext'],
+				'postmark'=>['from_email'=>'sender@previous.example'],
+				'smtp'=>['host'=>'private.smtp.example','password'=>'private-password','from_email'=>'sender@old.example'],
+			];
+			$context=(new DiagnosticContextBuilder())->build(new SettingsRepository(),'fallback.example');
+			$this->assertSame('current.example',$context->domain);
+			$this->assertSame([],$context->settings);
+			$this->assertStringNotContainsString('private',serialize($context));
+		}
+	}
 
 	protected function setUp(): void {
 		$GLOBALS['_test_wp_options'] = array();
