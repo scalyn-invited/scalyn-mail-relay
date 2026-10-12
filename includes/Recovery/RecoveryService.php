@@ -33,9 +33,17 @@ final class RecoveryService {
 
 	/** Registers worker and reconciles the cleanup schedule without enabling recovery. */
 	public function register(): void {
-		// phpcs:ignore WordPress.WP.CronInterval.CronSchedulesInterval -- Approved recovery delays require minute cadence; one submission per tick, no polling loop.
-		add_filter( 'cron_schedules', array( $this, 'schedules' ) );
 		add_action( ScheduledHooks::RECOVERY, array( $this, 'tick' ) );
+		self::ensure_scheduled();
+	}
+
+	/** Reconciles only the owned cadence after activation, without enabling sending. */
+	public static function ensure_scheduled(): void {
+		// phpcs:ignore WordPress.WP.CronInterval.CronSchedulesInterval -- Approved recovery delays require minute cadence; one submission per tick, no polling loop.
+		add_filter( 'cron_schedules', array( self::class, 'schedules' ) );
+		if ( wp_next_scheduled( ScheduledHooks::RECOVERY ) && 'scalyn_minute' !== wp_get_schedule( ScheduledHooks::RECOVERY ) ) {
+			wp_clear_scheduled_hook( ScheduledHooks::RECOVERY );
+		}
 		if ( ! wp_next_scheduled( ScheduledHooks::RECOVERY ) ) {
 			// phpcs:ignore WordPress.WP.CronInterval -- Approved bounded recovery delays require a minute cadence; one submission per tick, no polling loop.
 			wp_schedule_event( time() + 60, 'scalyn_minute', ScheduledHooks::RECOVERY );
@@ -47,7 +55,7 @@ final class RecoveryService {
 	 *
 	 * @param array $schedules Existing recurrences.
 	 */
-	public function schedules( array $schedules ): array {
+	public static function schedules( array $schedules ): array {
 		$schedules['scalyn_minute'] = array(
 			'interval' => 60,
 			'display'  => __( 'Mail Relay recovery and expiry', 'scalyn-mail-relay' ),
@@ -78,6 +86,7 @@ final class RecoveryService {
 				$plan = array( $this->settings->configuration_target( $this->settings->get_active_configuration_id() ) );
 			}
 			$this->queue->enqueue( $message->uuid, $this->payload->seal( $message, $plan, $origin ), time() );
+			$this->audit( 'owned', $message->uuid );
 			return true;
 		} catch ( \Throwable $error ) {
 			return false;
@@ -123,13 +132,17 @@ final class RecoveryService {
 			$result = $this->dispatcher->dispatch( $message, $target, true );
 			if ( $result->success ) {
 				$this->queue->finish( $row, 'accepted', 'accepted', time() );
+				$this->audit( 'accepted', $row['logical_uuid'] );
 			} elseif ( $result->acceptance_unconfirmed ) {
 				$this->queue->finish( $row, 'review', 'unconfirmed', time() );
+				$this->audit( 'review', $row['logical_uuid'] );
 			} elseif ( SubmissionSafety::retryable( $result ) && $completed + 1 < 3 ) {
 				$next = time() + SubmissionSafety::delay( $result, $completed + 1 );
 				$this->queue->finish( $row, $next < strtotime( $row['expires_at'] . ' UTC' ) ? 'pending' : 'failed', $next < strtotime( $row['expires_at'] . ' UTC' ) ? 'retry_wait' : 'exhausted', time(), $next );
+				$this->audit( 'retry_evaluated', $row['logical_uuid'] );
 			} else {
 				$this->queue->finish( $row, 'failed', $completed + 1 >= 3 ? 'exhausted' : 'permanent', time() );
+				$this->audit( 'stopped', $row['logical_uuid'] );
 			}
 		} catch ( \Throwable $error ) {
 			if ( null !== $row ) {
@@ -145,6 +158,20 @@ final class RecoveryService {
 				// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- Closing deletes private per-process temporary content.
 				fclose( $handle );
 			}
+		}
+	}
+
+	/**
+	 * Audit observers never reverse ownership or a provider outcome.
+	 *
+	 * @param string $outcome Fixed operational outcome.
+	 * @param string $logical Logical correlation UUID.
+	 */
+	private function audit( string $outcome, string $logical ): void {
+		try {
+			do_action( \Scalyn\MailRelay\Core\HookNames::AUDIT_EVENT, new \Scalyn\MailRelay\Audit\AuditEvent( 'recovery_work', $outcome, $logical ) );
+		} catch ( \Throwable $error ) {
+			unset( $error );
 		}
 	}
 }

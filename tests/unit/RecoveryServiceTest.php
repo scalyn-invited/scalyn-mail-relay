@@ -78,9 +78,36 @@ final class RecoveryServiceTest extends TestCase {
 		$this->assertSame('pending',$this->queue->row['state']); $this->assertSame([],$this->provider->calls);
 		foreach(['private body','recipient@example.test','private-secret'] as $private){$this->assertStringNotContainsString($private,$this->queue->row['payload']);}
 	}
+	public function test_wordpress_bridge_returns_queue_ownership_before_provider_invocation():void {
+		$registry=new ProviderRegistry();$registry->register($this->provider);
+		$bridge=new \Scalyn\MailRelay\Mail\WordPressMailBridge($this->settings,new MailDispatcher($registry,$this->settings,null,$this->attempts),$this->service);
+		$this->assertTrue($bridge->maybe_send(null,['to'=>['recipient@example.test'],'subject'=>'synthetic','message'=>'synthetic body','headers'=>[],'attachments'=>[]]));
+		$this->assertSame([],$this->provider->calls);
+		$this->assertSame('pending',$this->queue->row['state']);
+	}
 	public function test_acceptance_stops_and_erases_payload():void {
 		$this->service->own($this->message()); $this->service->tick(); $this->service->tick();
 		$this->assertCount(1,$this->provider->calls);$this->assertSame('accepted',$this->queue->row['state']);$this->assertSame('',$this->queue->row['payload']);
+	}
+	public function test_ordered_same_provider_configurations_fail_over_only_after_proven_nonacceptance():void {
+		$first=$this->settings->get_active_configuration_id();
+		$this->settings->configure('create','smtp','Alternate');
+		$items=$this->settings->get_configurations();$second=$items[1]['id'];
+		$this->settings->configure('select',$second);
+		$this->settings->save(['smtp'=>['host'=>'alternate.example.test','from_email'=>'sender@example.test','username'=>'alternate','password'=>'alternate-secret']]);
+		$this->settings->configure('select',$first);
+		(new RoutingRepository())->save(true,['unknown/default'=>[$first,$second]],'',$this->settings);
+		$this->provider->results=[$this->transient(),new SendResult(true,'smtp')];
+		$this->assertTrue($this->service->own($this->message()));
+		$this->settings->configure('select',$second);
+		$this->service->tick();
+		$this->assertSame('smtp.example.test',$this->provider->calls[0]['host']);
+		$this->queue->row['next_at']=gmdate('Y-m-d H:i:s',time()-1);
+		$this->service->tick();$this->service->tick();
+		$this->assertSame('alternate.example.test',$this->provider->calls[1]['host']);
+		$this->assertCount(2,$this->provider->calls);
+		$this->assertSame('accepted',$this->queue->row['state']);
+		$this->assertNotSame($this->attempts->records[0]['revision'],$this->attempts->records[1]['revision']);
 	}
 	public function test_unknown_and_permanent_never_resubmit():void {
 		foreach([new SendResult(false,'smtp',failure_category:'auth'),new SendResult(false,'smtp',acceptance_unconfirmed:true),new SendResult(false,'smtp',retryable:true,failure_category:'timeout')] as $result){

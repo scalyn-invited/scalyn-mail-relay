@@ -74,6 +74,7 @@ final class MailEventSubscriber {
 	public function on_mail_unconfirmed( SendResult $result, MailMessage $message, ?string $configuration_id = null ): void {
 		try {
 			$this->log_repo->upsert( $message, $result, MailStatus::PREPARED, $configuration_id );
+			$this->record_retry( $message );
 			$this->timeline_repo->insert_event(
 				$message->uuid,
 				'mail_outcome_unconfirmed',
@@ -102,6 +103,7 @@ final class MailEventSubscriber {
 	public function on_mail_sent( SendResult $result, MailMessage $message, ?string $configuration_id = null ): void {
 		try {
 			$this->log_repo->upsert( $message, $result, MailStatus::ACCEPTED, $configuration_id );
+			$this->record_retry( $message );
 
 			$this->timeline_repo->insert_event(
 				$message->uuid,
@@ -130,6 +132,7 @@ final class MailEventSubscriber {
 	public function on_mail_failed( SendResult $result, MailMessage $message, ?string $configuration_id = null ): void {
 		try {
 			$this->log_repo->upsert( $message, $result, MailStatus::FAILED, $configuration_id );
+			$this->record_retry( $message );
 
 			$this->timeline_repo->insert_event(
 				$message->uuid,
@@ -160,6 +163,30 @@ final class MailEventSubscriber {
 		return array(
 			'provider'      => $result->provider,
 			'response_code' => $result->response_code,
+		);
+	}
+
+	/**
+	 * Links a later submission to its logical message without storing its content.
+	 *
+	 * @param MailMessage $message Dispatched attempt.
+	 */
+	private function record_retry( MailMessage $message ): void {
+		$number  = $message->context['attempt_number'] ?? 0;
+		$logical = $message->context['logical_uuid'] ?? '';
+		if ( ! is_int( $number ) || $number < 2 || $number > 3 || ! \Scalyn\MailRelay\Database\SubmissionAttemptRepository::uuid( $logical ) ) {
+			return;
+		}
+		$this->timeline_repo->insert_event(
+			$message->uuid,
+			'mail_retried',
+			MailStatus::RETRIED,
+			__( 'Bounded recovery submission', 'scalyn-mail-relay' ),
+			'',
+			array(
+				'logical_uuid'   => $logical,
+				'attempt_number' => $number,
+			)
 		);
 	}
 

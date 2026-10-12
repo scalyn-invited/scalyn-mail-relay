@@ -124,26 +124,34 @@ class RecoveryQueueRepository {
 	 * Deletes expired content even when recovery is off. Unknown claims become review.
 	 *
 	 * @param int $now UTC time.
+	 * @throws \RuntimeException When cleanup cannot be confirmed.
 	 */
 	public function sweep( int $now ): void {
 		global $wpdb;
 		$table = $wpdb->prefix . 'scalyn_recovery_queue';
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Bounded crash cleanup never makes a claim retryable.
-		$wpdb->query( $wpdb->prepare( "UPDATE %i SET state=%s,reason=%s,payload='',claim_token=NULL,updated_at=%s WHERE state IN (%s,%s) AND claimed_at<=%s LIMIT 100", $table, 'review', 'unconfirmed', gmdate( 'Y-m-d H:i:s', $now ), 'running', 'submitting', gmdate( 'Y-m-d H:i:s', $now - 300 ) ) );
+		$crashed = $wpdb->query( $wpdb->prepare( "UPDATE %i SET state=%s,reason=%s,payload='',claim_token=NULL,updated_at=%s WHERE state IN (%s,%s) AND claimed_at<=%s LIMIT 100", $table, 'review', 'unconfirmed', gmdate( 'Y-m-d H:i:s', $now ), 'running', 'submitting', gmdate( 'Y-m-d H:i:s', $now - 300 ) ) );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Hard expiry is also checked before decrypting and before submission.
-		$wpdb->query( $wpdb->prepare( "UPDATE %i SET state=CASE WHEN state IN ('running','submitting') THEN 'review' ELSE 'expired' END,reason=CASE WHEN state IN ('running','submitting','review') THEN 'unconfirmed' ELSE 'expired' END,payload='',claim_token=NULL,updated_at=%s WHERE expires_at<=%s AND payload<>'' LIMIT 100", $table, gmdate( 'Y-m-d H:i:s', $now ), gmdate( 'Y-m-d H:i:s', $now ) ) );
+		$expired = $wpdb->query( $wpdb->prepare( "UPDATE %i SET state=CASE WHEN state IN ('running','submitting') THEN 'review' ELSE 'expired' END,reason=CASE WHEN state IN ('running','submitting','review') THEN 'unconfirmed' ELSE 'expired' END,payload='',claim_token=NULL,updated_at=%s WHERE expires_at<=%s AND payload<>'' LIMIT 100", $table, gmdate( 'Y-m-d H:i:s', $now ), gmdate( 'Y-m-d H:i:s', $now ) ) );
+		if ( false === $crashed || false === $expired ) {
+			throw new \RuntimeException( 'Recovery cleanup is unavailable.' );
+		}
 	}
 
 	/**
-	 * Credential/content-free read model, at most 50 rows with cursor pagination.
+	 * Credential/content-free read model, at most 50 recent rows.
 	 *
 	 * @param string $before Optional UTC timestamp cursor.
+	 * @throws \RuntimeException When history is unavailable.
 	 */
 	public function summaries( string $before = '9999-12-31 23:59:59' ): array {
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Bounded public read; encrypted payload and sender plan explicitly excluded.
 		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT logical_uuid,state,attempt_count,next_at,expires_at,created_at,reason FROM %i WHERE created_at<%s ORDER BY created_at DESC,logical_uuid DESC LIMIT 50', $wpdb->prefix . 'scalyn_recovery_queue', $before ), ARRAY_A );
-		return is_array( $rows ) ? $rows : array();
+		if ( ! is_array( $rows ) ) {
+			throw new \RuntimeException( 'Recovery history is unavailable.' );
+		}
+		return $rows;
 	}
 
 	/**
@@ -164,10 +172,14 @@ class RecoveryQueueRepository {
 	 * Prunes only terminal metadata, never an active payload before processing.
 	 *
 	 * @param string $cutoff UTC timestamp using existing log retention.
+	 * @throws \RuntimeException When metadata cleanup fails.
 	 */
 	public function prune( string $cutoff ): void {
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Bounded metadata retention after payload erasure.
-		$wpdb->query( $wpdb->prepare( "DELETE FROM %i WHERE payload='' AND state NOT IN (%s,%s,%s) AND created_at<%s LIMIT 500", $wpdb->prefix . 'scalyn_recovery_queue', 'pending', 'running', 'submitting', $cutoff ) );
+		$deleted = $wpdb->query( $wpdb->prepare( "DELETE FROM %i WHERE payload='' AND state NOT IN (%s,%s,%s) AND created_at<%s LIMIT 500", $wpdb->prefix . 'scalyn_recovery_queue', 'pending', 'running', 'submitting', $cutoff ) );
+		if ( false === $deleted ) {
+			throw new \RuntimeException( 'Recovery metadata cleanup is unavailable.' );
+		}
 	}
 }

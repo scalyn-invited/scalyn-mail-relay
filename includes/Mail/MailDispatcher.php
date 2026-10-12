@@ -25,9 +25,9 @@ defined( 'ABSPATH' ) || exit;
  *   5. Publish a lifecycle hook so other modules can respond without coupling.
  *   6. Return the normalized SendResult to the caller.
  *
- * MailDispatcher intentionally has no knowledge of database repositories,
- * timeline writers, or logging services. Those modules subscribe to
- * HookNames::MAIL_SENT and HookNames::MAIL_FAILED and act independently.
+ * Submission evidence is an explicit repository dependency. Timeline and log
+ * writers remain independent hook subscribers. Ordinary-mail route selection
+ * belongs to WordPressMailBridge; direct wizard dispatch uses the site default.
  *
  * Ownership: Bernie / Core.
  */
@@ -61,13 +61,6 @@ final class MailDispatcher {
 	 * @return SendResult The normalized result from the provider.
 	 */
 	public function dispatch( MailMessage $message, ?array $target = null, bool $require_evidence = false ): SendResult {
-		try {
-			$target ??= ( new RoutingRepository() )->plan( $this->settings, MailOrigin::current() )[0] ?? null;
-		} catch ( \Throwable $error ) {
-			$result = new SendResult( false, '', response_message: 'Routing configuration is unavailable. Review the selected route.', failure_category: 'config' );
-			$this->publish( HookNames::MAIL_FAILED, $result, $message, null );
-			return $result;
-		}
 		$provider_id = $this->settings->get_active_provider_id();
 		// Capture attribution before transport; missing legacy revisions stay unknown.
 		$revision         = $this->settings->get_diagnostic_revision();

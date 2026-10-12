@@ -51,6 +51,18 @@ final class MailEventSubscriberTest extends TestCase {
 	// Helpers
 	// -------------------------------------------------------------------------
 
+	public function test_recovery_attempt_records_logical_correlation_without_content(): void {
+		$logical = '11111111-1111-4111-8111-111111111111';
+		$message = $this->make_message(['context'=>['logical_uuid'=>$logical,'attempt_number'=>2]]);
+		$this->make_subscriber()->on_mail_sent($this->make_success_result(),$message);
+		$this->assertSame(1,$this->wpdb->inserts[0]['data']['retry_count']);
+		$event=$this->wpdb->inserts[1]['data'];
+		$this->assertSame('mail_retried',$event['event_type']);
+		$this->assertSame(MailStatus::RETRIED,$event['event_status']);
+		$this->assertSame(['logical_uuid'=>$logical,'attempt_number'=>2],json_decode($event['event_data'],true));
+		$this->assertStringNotContainsString($message->body,$event['event_data']);
+	}
+
 	private function make_subscriber(): MailEventSubscriber {
 		return new MailEventSubscriber(
 			new MailLogRepository(),

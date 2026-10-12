@@ -13,8 +13,10 @@ final class AlertsPageTest extends TestCase {
 		$this->assertStringContainsString('id="scalyn-alert-preferences"',$html);
 		$this->assertStringContainsString('id="scalyn-incident-history"',$html);
 		$this->assertStringContainsString('Records on this page: 0',$html);
-		$this->assertStringContainsString('It does not repair configuration, resend email or automatically switch providers.',$html);
-		$this->assertSame(1,substr_count($html,'<form '));
+		$this->assertStringContainsString('It does not repair configuration or prove inbox delivery.',$html);
+		$this->assertSame(2,substr_count($html,'<form '));
+		$this->assertStringContainsString('id="scalyn-recovery"',$html);
+		$this->assertStringContainsString('Queued is not Accepted or Delivered.',$html);
 	}
 	protected function setUp():void {
 		$GLOBALS['wpdb']=new WpdbStub();

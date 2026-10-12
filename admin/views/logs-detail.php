@@ -29,6 +29,7 @@ $status_labels = array(
 );
 ?>
 <div class="wrap scalyn-mail-relay scalyn-timeline-detail">
+	<?php \Scalyn\MailRelay\Admin\Components\AttemptHistory::render( $message_uuid ); ?>
 	<h1 data-scalyn-full-page-only><?php esc_html_e( 'Email Timeline', 'scalyn-mail-relay' ); ?></h1>
 
 	<p data-scalyn-full-page-only>

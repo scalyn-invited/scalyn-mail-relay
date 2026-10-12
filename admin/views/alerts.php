@@ -13,8 +13,9 @@ defined( 'ABSPATH' ) || exit;
 	<div class="scalyn-grid scalyn-status-grid">
 		<section class="scalyn-card"><h2><?php esc_html_e( 'Notifications', 'scalyn-mail-relay' ); ?></h2><p class="scalyn-status-value"><?php echo esc_html( $enabled ? __( 'Enabled', 'scalyn-mail-relay' ) : __( 'Disabled', 'scalyn-mail-relay' ) ); ?></p><p><?php esc_html_e( 'Independent webhook channel. This is a preference, not proof of delivery.', 'scalyn-mail-relay' ); ?></p><a href="#scalyn-alert-preferences"><?php esc_html_e( 'Manage notifications', 'scalyn-mail-relay' ); ?></a></section>
 		<section class="scalyn-card"><h2><?php esc_html_e( 'Webhook readiness', 'scalyn-mail-relay' ); ?></h2><p class="scalyn-status-value"><?php echo esc_html( $configured ? __( 'Configuration present', 'scalyn-mail-relay' ) : __( 'Setup required', 'scalyn-mail-relay' ) ); ?></p><p><?php esc_html_e( 'Configuration presence does not verify connectivity. Credentials stay in protected server configuration.', 'scalyn-mail-relay' ); ?></p></section>
-		<section class="scalyn-card"><h2><?php esc_html_e( 'Recovery behavior', 'scalyn-mail-relay' ); ?></h2><p><?php esc_html_e( 'Recovery records an incident resolving after qualifying evidence. It does not repair configuration, resend email or automatically switch providers.', 'scalyn-mail-relay' ); ?></p><a href="#scalyn-incident-history"><?php esc_html_e( 'Review incident history', 'scalyn-mail-relay' ); ?></a></section>
+		<section class="scalyn-card"><h2><?php esc_html_e( 'Recovery behavior', 'scalyn-mail-relay' ); ?></h2><p><?php esc_html_e( 'Incident recovery records an observed resolution. Separate opt-in email recovery can queue messages and retry only proven transient nonacceptance. It does not repair configuration or prove inbox delivery.', 'scalyn-mail-relay' ); ?></p><a href="#scalyn-recovery"><?php esc_html_e( 'Manage email recovery', 'scalyn-mail-relay' ); ?></a></section>
 	</div>
+	<?php \Scalyn\MailRelay\Admin\Components\RecoveryPanel::render(); ?>
 	<?php if ( $notice ) : ?>
 		<div class="notice notice-info"><p><?php echo esc_html( $notice ); ?></p></div>
 	<?php endif; ?>

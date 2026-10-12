@@ -46,6 +46,7 @@ final class AdminMenu {
 		add_action( 'admin_post_scalyn_export_report', array( new ReportExportController(), 'handle' ) );
 		add_action( 'admin_post_scalyn_client_report', array( new ClientReportController(), 'handle' ) );
 		add_action( 'admin_post_scalyn_configuration', array( new ConfigurationController(), 'handle' ) );
+		add_action( 'admin_post_scalyn_recovery', array( new RecoveryController(), 'handle' ) );
 	}
 
 	/**

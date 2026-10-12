@@ -18,7 +18,7 @@ $wizard_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 	<section class="scalyn-card scalyn-provider-overview" aria-labelledby="scalyn-active-route">
 		<div><h2 id="scalyn-active-route"><?php esc_html_e( 'Active sending route', 'scalyn-mail-relay' ); ?></h2>
 		<p class="scalyn-provider-overview__name"><?php echo esc_html( $active_label ); ?></p>
-		<p><?php esc_html_e( 'Only the selected provider handles site email. Saved settings on another provider do not enable automatic failover.', 'scalyn-mail-relay' ); ?></p></div>
+		<p><?php esc_html_e( 'This is the site default. Explicit source routes can override it when routing is enabled. Saved settings on another provider do not enable automatic failover; recovery requires separate opt-in.', 'scalyn-mail-relay' ); ?></p></div>
 		<?php if ( $can_configure ) : ?>
 			<a class="button button-primary" href="<?php echo esc_url( add_query_arg( 'step', 2, $wizard_url ) ); ?>"><?php esc_html_e( 'Change sending provider', 'scalyn-mail-relay' ); ?></a>
 		<?php endif; ?>

@@ -13,7 +13,7 @@ use Scalyn\MailRelay\Core\HookNames;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Intercepts wp_mail only when SendGrid or Postmark is active. SMTP behavior is unchanged.
+ * Intercepts API mail, or SMTP only when routing/recovery is explicitly enabled.
  * Unsupported mail shapes fail closed instead of silently falling back to PHP mail.
  */
 final class WordPressMailBridge {
@@ -41,7 +41,7 @@ final class WordPressMailBridge {
 	 *
 	 * @param mixed $pre  Prior pre_wp_mail result.
 	 * @param mixed $atts Filtered WordPress mail arguments.
-	 * @return mixed Null for core mail, otherwise the provider acknowledgement boolean.
+	 * @return mixed Null for core mail; otherwise acknowledgement or opted-in durable ownership.
 	 */
 	public function maybe_send( mixed $pre, mixed $atts ): mixed {
 		if ( null !== $pre || ( ! $this->recovery?->enabled() && true !== ( new RoutingRepository() )->policy()['enabled'] && ! in_array( $this->settings->get_active_provider_id(), array( 'sendgrid', 'postmark', 'smtp2go', 'brevo' ), true ) ) ) {
@@ -76,7 +76,8 @@ final class WordPressMailBridge {
 			if ( $this->recovery?->enabled() ) {
 				return $this->recovery->own( $message );
 			}
-			return $this->dispatcher->dispatch( $message )->success;
+			$target = ( new RoutingRepository() )->plan( $this->settings, MailOrigin::current() )[0] ?? null;
+			return $this->dispatcher->dispatch( $message, $target )->success;
 		} catch ( \Throwable $error ) {
 			// Do not fabricate a preparation failure after dispatch may have started.
 			return false;

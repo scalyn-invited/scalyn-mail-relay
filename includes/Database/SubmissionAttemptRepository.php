@@ -92,6 +92,7 @@ class SubmissionAttemptRepository {
 	 *
 	 * @param string $logical Logical message UUID.
 	 * @return array At most three attempts.
+	 * @throws \RuntimeException When history is unavailable.
 	 */
 	public function history( string $logical ): array {
 		global $wpdb;
@@ -100,17 +101,40 @@ class SubmissionAttemptRepository {
 		}
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Bounded read through the correlation index.
 		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT attempt_uuid, logical_uuid, configuration_id, provider, origin, attempt_number, status, failure_category, safe_to_retry, created_at, finished_at FROM %i WHERE logical_uuid=%s ORDER BY attempt_number LIMIT 3', $wpdb->prefix . 'scalyn_submission_attempts', $logical ), ARRAY_A );
-		return is_array( $rows ) ? $rows : array();
+		if ( ! is_array( $rows ) ) {
+			throw new \RuntimeException( 'Submission history is unavailable.' );
+		}
+		return $rows;
+	}
+
+	/**
+	 * Resolves one retained attempt without inferring from the current default.
+	 *
+	 * @param string $attempt Submission UUID from a log detail page.
+	 * @return string Logical UUID, or empty for old/unattributed records.
+	 */
+	public function logical_for( string $attempt ): string {
+		global $wpdb;
+		if ( ! self::uuid( $attempt ) ) {
+			return '';
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Exact primary-key correlation read.
+		$value = $wpdb->get_var( $wpdb->prepare( 'SELECT logical_uuid FROM %i WHERE attempt_uuid=%s LIMIT 1', $wpdb->prefix . 'scalyn_submission_attempts', $attempt ) );
+		return self::uuid( $value ) ? $value : '';
 	}
 
 	/**
 	 * Prunes bounded metadata under the existing log-retention policy.
 	 *
 	 * @param string $cutoff UTC SQL timestamp.
+	 * @throws \RuntimeException When metadata cleanup fails.
 	 */
 	public function prune( string $cutoff ): void {
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Bounded repository retention.
-		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i WHERE created_at < %s LIMIT 500', $wpdb->prefix . 'scalyn_submission_attempts', $cutoff ) );
+		$deleted = $wpdb->query( $wpdb->prepare( 'DELETE FROM %i WHERE created_at < %s LIMIT 500', $wpdb->prefix . 'scalyn_submission_attempts', $cutoff ) );
+		if ( false === $deleted ) {
+			throw new \RuntimeException( 'Submission metadata cleanup is unavailable.' );
+		}
 	}
 }
