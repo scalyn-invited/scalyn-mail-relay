@@ -36,14 +36,16 @@ final class MailDispatcher {
 	/**
 	 * Creates a new mail dispatcher.
 	 *
-	 * @param ProviderRegistry     $registry The registry of available mail providers.
-	 * @param SettingsRepository   $settings The repository for reading plugin settings.
-	 * @param DeliveryTracker|null $tracker Optional opted-in delivery evidence associations.
+	 * @param ProviderRegistry                                            $registry The registry of available mail providers.
+	 * @param SettingsRepository                                          $settings The repository for reading plugin settings.
+	 * @param DeliveryTracker|null                                        $tracker Optional opted-in delivery evidence associations.
+	 * @param \Scalyn\MailRelay\Database\SubmissionAttemptRepository|null $attempts Submission evidence repository.
 	 */
 	public function __construct(
 		private readonly ProviderRegistry $registry,
 		private readonly SettingsRepository $settings,
-		private readonly ?DeliveryTracker $tracker = null
+		private readonly ?DeliveryTracker $tracker = null,
+		private readonly ?\Scalyn\MailRelay\Database\SubmissionAttemptRepository $attempts = null
 	) {}
 
 	/**
@@ -54,9 +56,11 @@ final class MailDispatcher {
 	 *
 	 * @param MailMessage $message The prepared message to send.
 	 * @param array|null  $target Optional pinned target for recovery; never user-controlled.
+	 * @param bool        $require_evidence Recovery must establish durable evidence before any transport call.
+	 * @throws \RuntimeException If mandatory recovery evidence cannot be established.
 	 * @return SendResult The normalized result from the provider.
 	 */
-	public function dispatch( MailMessage $message, ?array $target = null ): SendResult {
+	public function dispatch( MailMessage $message, ?array $target = null, bool $require_evidence = false ): SendResult {
 		try {
 			$target ??= ( new RoutingRepository() )->plan( $this->settings, MailOrigin::current() )[0] ?? null;
 		} catch ( \Throwable $error ) {
@@ -94,6 +98,18 @@ final class MailDispatcher {
 			$this->publish( HookNames::MAIL_FAILED, $result, $message, $configuration_id );
 			return $result;
 		}
+		$recorded = false;
+		try {
+			if ( null !== $this->attempts ) {
+				$this->attempts->begin( $message->context['logical_uuid'] ?? $message->uuid, $message->uuid, $message->context['attempt_number'] ?? 1, $provider_id, $configuration_id, $message->context['origin'] ?? MailOrigin::current() );
+				$recorded = true;
+			}
+		} catch ( \Throwable $error ) {
+			$recorded = false;
+		}
+		if ( $require_evidence && ! $recorded ) {
+			throw new \RuntimeException( 'Durable submission evidence is unavailable. No submission was attempted.' );
+		}
 		// Optional tracking must be associated before submission and can never block it.
 		$association = null;
 		try {
@@ -106,6 +122,14 @@ final class MailDispatcher {
 			$result = $provider->send( $message, $config );
 		} catch ( \Throwable $error ) {
 			$result = new SendResult( false, $provider_id, null, null, 'Provider acceptance is unconfirmed. Check provider activity before retrying.', false, 'unknown', array(), true );
+		}
+		try {
+			if ( $recorded ) {
+				$this->attempts->finish( $message->uuid, $result );
+			}
+		} catch ( \Throwable $error ) {
+			// Never reverse observed acceptance, nor retry because an observer failed.
+			unset( $error );
 		}
 		try {
 			$this->tracker?->acknowledge( $association, $result );
