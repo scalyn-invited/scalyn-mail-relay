@@ -496,3 +496,6 @@
 	.scalyn-mail-relay .scalyn-wizard-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 	.scalyn-mail-relay .scalyn-wizard-step { padding: 10px 6px; font-size: 11px; }
 }
+.scalyn-mail-relay .scalyn-routing-row { display: flex; flex-wrap: wrap; gap: 12px; margin-block: 20px; border: 1px solid #d9e2e9; padding: 16px; }
+.scalyn-mail-relay .scalyn-routing-row label { display: flex; flex: 1 1 180px; min-width: 0; flex-direction: column; gap: 6px; }
+.scalyn-mail-relay .scalyn-routing-row select { max-width: 100%; width: 100%; }

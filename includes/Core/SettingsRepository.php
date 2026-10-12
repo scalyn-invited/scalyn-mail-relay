@@ -736,6 +736,54 @@ final class SettingsRepository {
 	}
 
 	/**
+	 * Credential-free current revision for routing. Legacy references cannot replay.
+	 *
+	 * @param string $id Stable configuration ID.
+	 * @return array Pinned public target.
+	 * @throws \RuntimeException For archived, legacy or unconfigured identities.
+	 */
+	public function configuration_target( string $id ): array {
+		$item     = NamedConfigurations::item( $this->data, $id );
+		$snapshot = $this->data['configurations']['revisions'][ $item['revision'] ] ?? array();
+		$config   = $snapshot['config'] ?? array();
+		if ( $item['archived'] || ! empty( $snapshot['legacy'] ) || empty( $config['from_email'] ) || ( 'smtp' === $item['provider'] ? empty( $config['host'] ) : empty( $config['key_cipher'] ) ) ) {
+			throw new \RuntimeException( 'Routing configuration is unavailable. Configure it in the wizard first.' );
+		}
+		return array(
+			'id'       => $id,
+			'revision' => $item['revision'],
+			'provider' => $item['provider'],
+			'from'     => $config['from_email'],
+		);
+	}
+
+	/**
+	 * Transport-only resolution; never expose this return value to Admin or logs.
+	 * Edits, archival and missing keys stop pinned work rather than rerouting it.
+	 *
+	 * @param array $target Pinned routing target.
+	 * @return array Private provider configuration.
+	 * @throws \RuntimeException For stale targets or unavailable credentials.
+	 */
+	public function resolve_target( array $target ): array {
+		$current = $this->configuration_target( $target['id'] ?? '' );
+		if ( $current !== $target ) {
+			throw new \RuntimeException( 'Pinned configuration changed. Review this message before sending.' );
+		}
+		$config = $this->data['configurations']['revisions'][ $target['revision'] ]['config'];
+		$cipher = $this->cipher ?? new CredentialCipher();
+		if ( 'smtp' === $target['provider'] ) {
+			$login  = json_decode( $cipher->decrypt( $config['credentials_cipher'], 'smtp' ), true, 8, JSON_THROW_ON_ERROR );
+			$config = array_merge( self::DEFAULTS['smtp'], $config, $login );
+			unset( $config['credentials_cipher'], $config['has_password'], $config['has_username'] );
+		} else {
+			$config['api_key'] = $cipher->decrypt( $config['key_cipher'], $target['provider'] );
+			unset( $config['key_cipher'] );
+		}
+		return $config;
+	}
+
+	/**
 	 * Applies an authorized catalogue operation atomically with the active slot.
 	 * Controllers must additionally verify their POST nonce.
 	 *

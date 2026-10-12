@@ -46,6 +46,8 @@ delete_option( 'scalyn_mail_relay_postmark_webhook' );
 delete_option( 'scalyn_mail_relay_agency' );
 delete_option( 'scalyn_mail_relay_branding' );
 delete_option( 'scalyn_mail_relay_settings_write_lock' );
+delete_option( 'scalyn_mail_relay_routing' );
+delete_option( 'scalyn_mail_relay_routing_lock' );
 
 // Remove only owned access metadata, and only under explicit deletion opt-in.
 delete_metadata( 'user', 0, 'scalyn_mail_relay_access_profile_' . get_current_blog_id(), '', true );

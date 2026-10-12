@@ -53,13 +53,26 @@ final class MailDispatcher {
 	 * On provider failure or configuration error, fires HookNames::MAIL_FAILED.
 	 *
 	 * @param MailMessage $message The prepared message to send.
+	 * @param array|null  $target Optional pinned target for recovery; never user-controlled.
 	 * @return SendResult The normalized result from the provider.
 	 */
-	public function dispatch( MailMessage $message ): SendResult {
+	public function dispatch( MailMessage $message, ?array $target = null ): SendResult {
+		try {
+			$target ??= ( new RoutingRepository() )->plan( $this->settings, MailOrigin::current() )[0] ?? null;
+		} catch ( \Throwable $error ) {
+			$result = new SendResult( false, '', response_message: 'Routing configuration is unavailable. Review the selected route.', failure_category: 'config' );
+			$this->publish( HookNames::MAIL_FAILED, $result, $message, null );
+			return $result;
+		}
 		$provider_id = $this->settings->get_active_provider_id();
 		// Capture attribution before transport; missing legacy revisions stay unknown.
 		$revision         = $this->settings->get_diagnostic_revision();
 		$configuration_id = preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/D', $revision ) ? $revision : null;
+		if ( null !== $target ) {
+			$provider_id      = $target['provider'];
+			$configuration_id = $target['revision'];
+			$message          = new MailMessage( $message->uuid, $target['from'], $message->to, $message->subject, $message->body, $message->content_type, $message->headers, $message->attachments, $message->context );
+		}
 
 		if ( '' === $provider_id ) {
 			$result = new SendResult( false, '', null, null, 'No mail provider is configured.', false, 'config' );
@@ -75,7 +88,7 @@ final class MailDispatcher {
 
 		$provider = $this->registry->get( $provider_id );
 		try {
-			$config = $this->settings->get_provider_config( $provider_id );
+			$config = null === $target ? $this->settings->get_provider_config( $provider_id ) : $this->settings->resolve_target( $target );
 		} catch ( \Throwable $error ) {
 			$result = new SendResult( false, $provider_id, null, null, 'Stored provider credentials are unavailable. Replace the key in Providers.', false, 'config' );
 			$this->publish( HookNames::MAIL_FAILED, $result, $message, $configuration_id );
@@ -84,7 +97,8 @@ final class MailDispatcher {
 		// Optional tracking must be associated before submission and can never block it.
 		$association = null;
 		try {
-			$association = $this->tracker?->prepare( $message, $provider_id );
+			// Existing sources are active-revision scoped, never bind another revision.
+			$association = null === $target || $configuration_id === $revision ? $this->tracker?->prepare( $message, $provider_id ) : null;
 		} catch ( \Throwable $error ) {
 			$association = null;
 		}

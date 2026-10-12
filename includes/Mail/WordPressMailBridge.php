@@ -42,7 +42,7 @@ final class WordPressMailBridge {
 	 * @return mixed Null for core mail, otherwise the provider acknowledgement boolean.
 	 */
 	public function maybe_send( mixed $pre, mixed $atts ): mixed {
-		if ( null !== $pre || ! in_array( $this->settings->get_active_provider_id(), array( 'sendgrid', 'postmark', 'smtp2go', 'brevo' ), true ) ) {
+		if ( null !== $pre || ( true !== ( new RoutingRepository() )->policy()['enabled'] && ! in_array( $this->settings->get_active_provider_id(), array( 'sendgrid', 'postmark', 'smtp2go', 'brevo' ), true ) ) ) {
 			return $pre;
 		}
 		$uuid = wp_generate_uuid4();
@@ -111,6 +111,7 @@ final class WordPressMailBridge {
 			throw new \InvalidArgumentException( 'Unsupported mail headers.' );
 		}
 		$config = match ( $this->settings->get_active_provider_id() ) {
+			'smtp' => $this->settings->get_smtp_settings(),
 			'postmark' => $this->settings->get_postmark_settings(),
 			'smtp2go' => $this->settings->get_smtp2go_settings(),
 			'brevo' => $this->settings->get_brevo_settings(),
@@ -175,6 +176,11 @@ final class WordPressMailBridge {
 				throw new \InvalidArgumentException( 'Unsupported attachment path.' );
 			}
 		}
+		$origin  = MailOrigin::current();
+		$context = 'unknown/default' === $origin ? array(
+			'source_type' => 'wordpress',
+			'source_name' => 'wp_mail',
+		) : array_combine( array( 'source_type', 'source_name' ), explode( '/', $origin ) );
 		return new MailMessage(
 			uuid: $uuid,
 			from: $from_email,
@@ -184,10 +190,7 @@ final class WordPressMailBridge {
 			content_type: strtolower( $parts[1] ),
 			headers: $forwarded,
 			attachments: $attachments,
-			context: array(
-				'source_type' => 'wordpress',
-				'source_name' => 'wp_mail',
-			)
+			context: $context
 		);
 	}
 
