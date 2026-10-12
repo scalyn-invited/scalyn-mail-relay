@@ -120,7 +120,7 @@ final class ManagedAccessTest extends TestCase {
 			['agency', Capabilities::all()],
 			['support', [Capabilities::VIEW_DASHBOARD, Capabilities::VIEW_LOGS, Capabilities::RUN_DIAGNOSTICS, Capabilities::VIEW_AUDIT]],
 			['auditor', [Capabilities::VIEW_DASHBOARD, Capabilities::VIEW_LOGS, Capabilities::VIEW_AUDIT]],
-			['client', [Capabilities::VIEW_DASHBOARD]],
+			['client', [Capabilities::VIEW_DASHBOARD, Capabilities::VIEW_CLIENT_REPORTS]],
 			['corrupted', []],
 		];
 	}

@@ -6,7 +6,10 @@ Owner: Bernie. Approved plan: 2026-10-12. New providers are excluded.
 
 1. Managed settings and access profiles: implemented locally on
    `feature/m9-t1-managed-access`; owner/live visual acceptance pending. ADR 0031.
-2. Branding and simplified client dashboard/reports: pending.
+2. Branding and simplified client dashboard/reports: implemented locally on
+   `feature/m9-t2-client-branding`, stacked on ticket 1 (`06cee73`). ADR 0032.
+   Live visual and owner acceptance pending; client export is a summary CSV,
+   separate from administrator technical CSV/JSON/PDF exports.
 3. Named configurations, revisions and evidence attribution: pending.
 4. Explicit source/type attribution and ordered routing: pending.
 5. Logical-message/per-attempt correlation and recovery safety evidence: pending.

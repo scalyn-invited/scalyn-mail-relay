@@ -1,5 +1,12 @@
 /* === Scalyn Mail Relay — Admin Styles === */
 
+/* Agency identity remains scoped to plugin pages, including narrow viewports. */
+.scalyn-mail-relay.scalyn-brand-strip { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; padding: 12px 0; }
+.scalyn-brand-strip .scalyn-brand-logo { object-fit: contain; max-width: 120px; max-height: 48px; }
+.scalyn-brand-strip .scalyn-brand-name { font-size: 16px; font-weight: 600; color: var(--scalyn-ink); overflow-wrap: anywhere; }
+.scalyn-brand-strip nav { display: flex; flex-wrap: wrap; gap: 16px; margin-left: auto; }
+.scalyn-client-overview .scalyn-card { min-width: 0; overflow-wrap: anywhere; }
+
 /* ---- Base layout ---- */
 .scalyn-mail-relay { max-width: 1200px; }
 .scalyn-mail-relay .scalyn-lead { font-size: 15px; color: #50575e; margin-bottom: 0; }
@@ -262,7 +269,7 @@
 }
 .scalyn-mail-relay .button:hover { border-color: var(--scalyn-accent); background: #f1f8f6; color: var(--scalyn-accent); }
 .scalyn-mail-relay .button-primary { background: var(--scalyn-accent); color: #fff; border-color: var(--scalyn-accent); }
-.scalyn-mail-relay .button-primary:hover { background: #065e56; color: #fff; border-color: #065e56; }
+.scalyn-mail-relay .button-primary:hover { background: var(--scalyn-accent); color: #fff; border-color: var(--scalyn-accent); text-decoration: underline; }
 .scalyn-mail-relay .button:disabled, .scalyn-mail-relay .button[aria-disabled="true"] { opacity: .65; }
 .scalyn-mail-relay :is(button, a, input, select, summary):focus-visible { outline: 2px solid var(--scalyn-accent); outline-offset: 3px; }
 .scalyn-mail-relay :is(input:not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=submit]), select, textarea) {

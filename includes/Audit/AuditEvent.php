@@ -21,9 +21,12 @@ final readonly class AuditEvent {
 
 	public const FIELDS = array( 'provider.active', 'smtp.host', 'smtp.port', 'smtp.encryption', 'smtp.username', 'smtp.password', 'smtp.from_name', 'smtp.from_email', 'sendgrid.api_key', 'sendgrid.from_name', 'sendgrid.from_email', 'postmark.api_key', 'brevo.api_key', 'brevo.from_email', 'brevo.from_name', 'smtp2go.api_key', 'smtp2go.from_email', 'smtp2go.from_name', 'postmark.from_name', 'postmark.from_email', 'advanced.log_retention_days', 'advanced.log_message_metadata', 'advanced.delete_data_on_uninstall', 'advanced.diagnostic_schedule', 'advanced.alert_webhook_enabled', 'advanced.dkim_selector' );
 
-	public const AGENCY_FIELDS = array( 'agency.managed', 'agency.smtp', 'agency.providers', 'agency.critical' );
+	public const AGENCY_FIELDS   = array( 'agency.managed', 'agency.smtp', 'agency.providers', 'agency.critical' );
+	public const BRANDING_FIELDS = array( 'branding.name', 'branding.logo_id', 'branding.primary', 'branding.secondary', 'branding.support_email', 'branding.support_url', 'branding.docs_url' );
 
 	private const OUTCOMES = array(
+		'client_report'            => array( 'prepared' ),
+		'agency_branding'          => array( 'changed' ),
 		'agency_policy'            => array( 'changed' ),
 		'agency_access'            => array( 'changed' ),
 		'report_export'            => array( 'started', 'prepared', 'failed' ),
@@ -83,7 +86,12 @@ final readonly class AuditEvent {
 			throw new \InvalidArgumentException( 'Invalid audit event.' );
 		}
 		foreach ( $changed_fields as $field ) {
-			if ( ! in_array( $field, 'agency_policy' === $action ? self::AGENCY_FIELDS : self::FIELDS, true ) ) {
+			$allowed_fields = match ( $action ) {
+				'agency_policy' => self::AGENCY_FIELDS,
+				'agency_branding' => self::BRANDING_FIELDS,
+				default => self::FIELDS,
+			};
+			if ( ! in_array( $field, $allowed_fields, true ) ) {
 				throw new \InvalidArgumentException( 'Invalid audit field.' );
 			}
 		}

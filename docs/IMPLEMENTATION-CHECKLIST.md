@@ -217,6 +217,8 @@ Outcome: managed clients have appropriate access and recovery behavior is predic
   - [x] Ticket 1 local implementation: site-bound additive access profiles, administrator override, backend group locks, protected Agency Settings and policy/access auditing. See [ADR 0031](adr/0031-managed-agency-access.md) and [Milestone 9 handoff](MILESTONE-9-AGENCY-RECOVERY.md).
   - [ ] Complete live visual QA and Bernie's acceptance; implementation alone does not complete this gate.
 - [ ] Add client views, branding, and support information.
+  - [x] Ticket 2 local implementation: scoped identity/support, validated raster logo/colors, minimal client health/activity view and protected aggregate CSV. See [ADR 0032](adr/0032-client-branding-and-summary.md).
+  - [ ] Complete live visual QA and Bernie's acceptance for client access and branding.
 - [ ] Add multiple provider configurations and reliable source attribution.
 - [ ] Define and implement explicit routing rules as a separate ticket.
 - [ ] Define attempt-level correlation, bounded retries, and failover policy.

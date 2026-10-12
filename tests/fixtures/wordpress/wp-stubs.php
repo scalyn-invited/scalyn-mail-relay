@@ -1,5 +1,13 @@
 <?php
 
+function get_post_type(int $id): string|false { return $GLOBALS['_test_attachments'][$id]['type'] ?? false; }
+function get_post_mime_type(int $id): string|false { return $GLOBALS['_test_attachments'][$id]['mime'] ?? false; }
+function wp_get_attachment_image_url(int $id, string $size): string|false { return $GLOBALS['_test_attachments'][$id]['url'] ?? false; }
+function is_email(string $email): string|false { return filter_var($email, FILTER_VALIDATE_EMAIL); }
+function wp_add_inline_style(string $handle, string $css): bool { $GLOBALS['_test_inline_styles'][$handle][] = $css; return true; }
+function wp_enqueue_media(): void { $GLOBALS['_test_media_enqueued']=true; }
+function get_current_screen(): ?object { return $GLOBALS['_test_screen'] ?? null; }
+
 function get_current_blog_id(): int {
 	return $GLOBALS['_test_blog_id'] ?? 1;
 }
@@ -40,6 +48,7 @@ if ( ! function_exists( 'esc_textarea' ) ) {
 
 if ( ! function_exists( 'wp_verify_nonce' ) ) {
 	function wp_verify_nonce( $nonce, $action = -1 ) {
+		if ('scalyn_client_report' === $action) return 'valid-client-nonce' === $nonce ? 1 : false;
 		if ( in_array( $action, array( 'scalyn_postmark_webhook', 'scalyn_smtp2go_webhook', 'scalyn_brevo_webhook' ), true ) ) {
 			return 'valid' === $nonce && ( $GLOBALS['_test_wp_nonce_valid'] ?? false ) ? 1 : false;
 		}

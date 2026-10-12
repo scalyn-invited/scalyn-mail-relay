@@ -44,6 +44,7 @@ if ( is_string( $scalyn_webhook_id ) && preg_match( '/^[a-f0-9]{8}-[a-f0-9]{4}-[
 }
 delete_option( 'scalyn_mail_relay_postmark_webhook' );
 delete_option( 'scalyn_mail_relay_agency' );
+delete_option( 'scalyn_mail_relay_branding' );
 
 // Remove only owned access metadata, and only under explicit deletion opt-in.
 delete_metadata( 'user', 0, 'scalyn_mail_relay_access_profile_' . get_current_blog_id(), '', true );

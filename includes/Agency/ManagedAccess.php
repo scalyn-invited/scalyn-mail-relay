@@ -64,13 +64,19 @@ final class ManagedAccess {
 			'agency' => Capabilities::all(),
 			'support' => array( Capabilities::VIEW_DASHBOARD, Capabilities::VIEW_LOGS, Capabilities::RUN_DIAGNOSTICS, Capabilities::VIEW_AUDIT ),
 			'auditor' => array( Capabilities::VIEW_DASHBOARD, Capabilities::VIEW_LOGS, Capabilities::VIEW_AUDIT ),
-			'client' => array( Capabilities::VIEW_DASHBOARD ),
+			'client' => array( Capabilities::VIEW_DASHBOARD, Capabilities::VIEW_CLIENT_REPORTS ),
 			default => array(),
 		};
 		foreach ( Capabilities::all() as $capability ) {
 			$allcaps[ $capability ] = in_array( $capability, $allowed, true );
 		}
 		return $allcaps;
+	}
+
+	/** Whether to replace the operational dashboard with the minimal client view. */
+	public static function is_client(): bool {
+		return ! current_user_can( 'manage_options' ) && ! current_user_can( Capabilities::MANAGE_AGENCY )
+			&& 'client' === get_user_meta( get_current_user_id(), self::profile_key(), true );
 	}
 
 	/**

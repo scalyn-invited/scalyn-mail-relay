@@ -53,4 +53,51 @@ defined( 'ABSPATH' ) || exit;
 			<p><?php esc_html_e( 'Support Engineers can inspect logs and run diagnostics. Auditors can inspect logs and audit history. Client Viewers have read-only dashboard access. No profile grants access to message payloads or provider secrets.', 'scalyn-mail-relay' ); ?></p>
 		</section>
 	</div>
+	<section class="scalyn-card" aria-labelledby="scalyn-brand-title">
+		<h2 id="scalyn-brand-title"><?php esc_html_e( 'Branding and support', 'scalyn-mail-relay' ); ?></h2>
+		<p><?php esc_html_e( 'Applies only to this plugin. WordPress navigation and delivery status meanings are unchanged. Colors must have at least 4.5:1 contrast against white.', 'scalyn-mail-relay' ); ?></p>
+		<form method="post">
+			<?php wp_nonce_field( 'scalyn_agency_settings' ); ?>
+			<input type="hidden" name="agency_action" value="branding">
+			<?php
+			foreach ( array(
+				'name'          => __( 'Brand name', 'scalyn-mail-relay' ),
+				'logo_id'       => __( 'Logo media ID (0 for no logo)', 'scalyn-mail-relay' ),
+				'primary'       => __( 'Primary color', 'scalyn-mail-relay' ),
+				'secondary'     => __( 'Heading color', 'scalyn-mail-relay' ),
+				'support_email' => __( 'Support email', 'scalyn-mail-relay' ),
+				'support_url'   => __( 'Support HTTPS URL', 'scalyn-mail-relay' ),
+				'docs_url'      => __( 'Documentation HTTPS URL', 'scalyn-mail-relay' ),
+			) as $field => $label ) :
+				$input_type = match ( $field ) {
+					'primary', 'secondary' => 'color',
+					'logo_id' => 'number',
+					'support_email' => 'email',
+					'support_url', 'docs_url' => 'url',
+					default => 'text',
+				};
+				?>
+				<p><label for="scalyn-brand-<?php echo esc_attr( $field ); ?>"><?php echo esc_html( $label ); ?></label><br>
+				<input id="scalyn-brand-<?php echo esc_attr( $field ); ?>" name="<?php echo esc_attr( $field ); ?>" type="<?php echo esc_attr( $input_type ); ?>" value="<?php echo esc_attr( (string) $branding[ $field ] ); ?>"
+				<?php
+				if ( 'logo_id' === $field ) :
+					?>
+					min="0" step="1"<?php endif; ?>
+					<?php
+					if ( 'name' === $field ) :
+						?>
+					required maxlength="80"<?php endif; ?>></p>
+			<?php endforeach; ?>
+			<p class="scalyn-actions">
+				<button type="button" class="button" id="scalyn-logo-choose" <?php disabled( ! current_user_can( 'upload_files' ) ); ?> data-title="<?php esc_attr_e( 'Choose an agency logo', 'scalyn-mail-relay' ); ?>" data-select="<?php esc_attr_e( 'Use this logo', 'scalyn-mail-relay' ); ?>" data-invalid="<?php esc_attr_e( 'Choose a PNG, JPEG or WebP image.', 'scalyn-mail-relay' ); ?>" data-selected="<?php esc_attr_e( 'Logo selected. Save branding to apply it.', 'scalyn-mail-relay' ); ?>"><?php esc_html_e( 'Choose logo from Media Library', 'scalyn-mail-relay' ); ?></button>
+				<button type="button" class="button" id="scalyn-logo-clear" data-cleared="<?php esc_attr_e( 'Logo removed. Save branding to apply it.', 'scalyn-mail-relay' ); ?>"><?php esc_html_e( 'Remove logo', 'scalyn-mail-relay' ); ?></button>
+			</p>
+			<p id="scalyn-logo-feedback" role="status" aria-live="polite"></p>
+			<p class="description"><?php esc_html_e( 'Choose a PNG, JPEG or WebP from Media, or enter its attachment ID. Links must not contain credentials, query parameters or fragments. Leave support fields empty to hide them.', 'scalyn-mail-relay' ); ?></p>
+			<?php if ( ! current_user_can( 'upload_files' ) ) : ?>
+				<p class="description"><?php esc_html_e( 'Media Library access requires your existing WordPress media permission. An administrator can supply an existing logo attachment ID instead.', 'scalyn-mail-relay' ); ?></p>
+			<?php endif; ?>
+			<?php submit_button( __( 'Save branding', 'scalyn-mail-relay' ) ); ?>
+		</form>
+	</section>
 </div>

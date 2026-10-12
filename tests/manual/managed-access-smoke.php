@@ -26,7 +26,7 @@ add_filter('pre_option_' . AgencyRepository::OPTION, $read_policy);
 $access->register();
 try {
 	$GLOBALS['current_user'] = $actor;
-	foreach (['client' => [Capabilities::VIEW_DASHBOARD], 'support' => [Capabilities::VIEW_DASHBOARD, Capabilities::VIEW_LOGS, Capabilities::RUN_DIAGNOSTICS, Capabilities::VIEW_AUDIT], 'auditor' => [Capabilities::VIEW_DASHBOARD, Capabilities::VIEW_LOGS, Capabilities::VIEW_AUDIT], 'agency' => Capabilities::all()] as $name => $allowed) {
+	foreach (['client' => [Capabilities::VIEW_DASHBOARD, Capabilities::VIEW_CLIENT_REPORTS], 'support' => [Capabilities::VIEW_DASHBOARD, Capabilities::VIEW_LOGS, Capabilities::RUN_DIAGNOSTICS, Capabilities::VIEW_AUDIT], 'auditor' => [Capabilities::VIEW_DASHBOARD, Capabilities::VIEW_LOGS, Capabilities::VIEW_AUDIT], 'agency' => Capabilities::all()] as $name => $allowed) {
 		$profile = $name;
 		$actor->allcaps = ['read' => true];
 		foreach (Capabilities::all() as $cap) $check(current_user_can($cap) === in_array($cap, $allowed, true));

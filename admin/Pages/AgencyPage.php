@@ -54,17 +54,29 @@ final class AgencyPage {
 						throw new \RuntimeException();
 					}
 					$this->repository->assign_profile( (int) $user, $profile );
+				} elseif ( 'branding' === $action ) {
+					$input = array();
+					foreach ( \Scalyn\MailRelay\Agency\BrandingRepository::defaults() as $field => $default ) {
+						// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Repository validates exact types and rejects HTML/control characters before storage.
+						$input[ $field ] = isset( $_POST[ $field ] ) && is_string( $_POST[ $field ] ) ? wp_unslash( $_POST[ $field ] ) : '';
+					}
+					if ( ! preg_match( '/^(0|[1-9][0-9]{0,9})$/D', $input['logo_id'] ) ) {
+						throw new \RuntimeException();
+					}
+					$input['logo_id'] = (int) $input['logo_id'];
+					( new \Scalyn\MailRelay\Agency\BrandingRepository() )->save( $input );
 				} else {
 					throw new \RuntimeException();
 				}
 				$notice = __( 'Agency settings saved.', 'scalyn-mail-relay' );
 			} catch ( \Throwable $exception ) {
 				$error  = true;
-				$notice = __( 'No changes saved. Check the policy, site member ID, access profile and your permissions, then try again.', 'scalyn-mail-relay' );
+				$notice = __( 'No changes saved. Check your permissions and the form values. Branding needs a plain-text name, raster media ID, readable six-digit colors and valid support links.', 'scalyn-mail-relay' );
 			}
 		}
 		$policy   = $this->repository->policy();
 		$profiles = ManagedAccess::profiles();
+		$branding = ( new \Scalyn\MailRelay\Agency\BrandingRepository() )->get();
 		require SCALYN_MAIL_RELAY_PATH . 'admin/views/agency.php';
 	}
 }

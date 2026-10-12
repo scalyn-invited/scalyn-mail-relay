@@ -35,6 +35,11 @@ final class DashboardPage {
 			wp_die( esc_html__( 'You do not have permission to view Scalyn Mail Relay.', 'scalyn-mail-relay' ) );
 		}
 
+		if ( \Scalyn\MailRelay\Agency\ManagedAccess::is_client() ) {
+			( new ClientPage() )->render();
+			return;
+		}
+
 		$container           = Plugin::instance()->container();
 		$monitoring          = \Scalyn\MailRelay\Admin\MonitoringStatusPresenter::load();
 		$settings            = $container->get( SettingsRepository::class );
