@@ -71,6 +71,7 @@ if ( ! $config['configured'] ) {
 
 		<form method="post" action="<?php echo esc_url( $wh_action_url ); ?>">
 			<?php wp_nonce_field( 'scalyn_postmark_webhook' ); ?>
+			<?php \Scalyn\MailRelay\Admin\ConfigurationGuard::field(); ?>
 			<input type="hidden" name="scalyn_postmark_webhook_draft" value="1" />
 			<input type="hidden" name="wh_op" value="verify" />
 			<p class="description"><?php esc_html_e( 'Verification checks that the server ID above belongs to the Live server of the saved Server API token. No email is sent.', 'scalyn-mail-relay' ); ?></p>
@@ -80,6 +81,7 @@ if ( ! $config['configured'] ) {
 		<?php if ( ! $config['enabled'] ) : ?>
 			<form method="post" action="<?php echo esc_url( $wh_action_url ); ?>" class="scalyn-webhook-enable">
 				<?php wp_nonce_field( 'scalyn_postmark_webhook' ); ?>
+				<?php \Scalyn\MailRelay\Admin\ConfigurationGuard::field(); ?>
 				<input type="hidden" name="scalyn_postmark_webhook_draft" value="1" />
 				<input type="hidden" name="wh_op" value="enable" />
 				<h3><?php esc_html_e( 'Collect delivery and bounce evidence', 'scalyn-mail-relay' ); ?></h3>
@@ -103,6 +105,7 @@ if ( ! $config['configured'] ) {
 		<?php else : ?>
 			<form method="post" action="<?php echo esc_url( $wh_action_url ); ?>">
 				<?php wp_nonce_field( 'scalyn_postmark_webhook' ); ?>
+				<?php \Scalyn\MailRelay\Admin\ConfigurationGuard::field(); ?>
 				<input type="hidden" name="scalyn_postmark_webhook_draft" value="1" />
 				<input type="hidden" name="wh_op" value="disable" />
 				<p class="description"><?php esc_html_e( 'Disabling stops tracking new sends and storing reports immediately. It does not delete retained evidence, which follows normal cleanup, and it does not remove the webhook from Postmark — pause or remove it there too.', 'scalyn-mail-relay' ); ?></p>
@@ -117,6 +120,7 @@ if ( ! $config['configured'] ) {
 	<?php else : ?>
 		<form method="post" autocomplete="off" action="<?php echo esc_url( $wh_action_url ); ?>">
 			<?php wp_nonce_field( 'scalyn_postmark_webhook' ); ?>
+			<?php \Scalyn\MailRelay\Admin\ConfigurationGuard::field(); ?>
 			<input type="hidden" name="scalyn_postmark_webhook_draft" value="1" />
 			<p><label for="wh-server"><?php esc_html_e( 'Postmark Server ID', 'scalyn-mail-relay' ); ?></label><br /><input id="wh-server" name="wh_server_id" type="number" min="1" value="<?php echo $config['server_id'] ? esc_attr( $config['server_id'] ) : ''; ?>" /></p>
 			<p><label for="wh-stream"><?php esc_html_e( 'Message stream', 'scalyn-mail-relay' ); ?></label><br /><input id="wh-stream" name="wh_stream" type="text" maxlength="100" value="<?php echo esc_attr( '' !== $config['stream'] ? $config['stream'] : 'outbound' ); ?>" aria-describedby="wh-stream-help" /></p>

@@ -28,6 +28,7 @@ defined( 'ABSPATH' ) || exit;
 	<?php endif; ?>
 	<form method="post">
 		<?php wp_nonce_field( 'scalyn_' . $config['provider'] . '_webhook' ); ?>
+		<?php \Scalyn\MailRelay\Admin\ConfigurationGuard::field(); ?>
 		<input type="hidden" name="scalyn_api_webhook" value="1">
 		<p><label for="api-wh-action"><?php esc_html_e( 'Token action', 'scalyn-mail-relay' ); ?></label><br><select id="api-wh-action" name="wh_action"><option value="keep" <?php selected( $config['configured'], true ); ?>><?php esc_html_e( 'Keep saved token', 'scalyn-mail-relay' ); ?></option><option value="replace" <?php selected( $config['configured'], false ); ?>><?php esc_html_e( 'Add or replace token', 'scalyn-mail-relay' ); ?></option></select></p>
 		<p><label for="api-wh-token"><?php esc_html_e( 'New dedicated webhook token (32–128 characters)', 'scalyn-mail-relay' ); ?></label><br><input id="api-wh-token" type="password" name="wh_password" autocomplete="new-password" value="" maxlength="128"></p>

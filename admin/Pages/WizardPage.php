@@ -90,17 +90,17 @@ final class WizardPage {
 		}
 
 		// SMTP config for the form — password is intentionally excluded.
-		$smtp_raw    = $settings->get_smtp_config();
+		$smtp_raw    = $settings->get_smtp_settings();
 		$smtp_config = array(
 			'host'       => $smtp_raw['host'],
 			'port'       => $smtp_raw['port'],
 			'encryption' => $smtp_raw['encryption'],
-			'username'   => $smtp_raw['username'],
+			'username'   => '',
 			'from_name'  => $smtp_raw['from_name'],
 			'from_email' => $smtp_raw['from_email'],
 			// 'password' deliberately omitted — never passed to template.
 		);
-		$smtp_has_password = '' !== (string) $smtp_raw['password'];
+		$smtp_has_password = $smtp_raw['has_password'];
 		$sendgrid_settings = $settings->get_sendgrid_settings();
 
 		// Step 3 validation errors (from previous failed POST).
@@ -183,7 +183,7 @@ final class WizardPage {
 				return 3;
 			}
 		} else {
-			$smtp = $settings->get_smtp_config();
+			$smtp = $settings->get_smtp_settings();
 			if ( '' === trim( $smtp['host'] ?? '' )
 				|| 0 === absint( $smtp['port'] ?? 0 )
 				|| '' === trim( $smtp['from_email'] ?? '' ) ) {

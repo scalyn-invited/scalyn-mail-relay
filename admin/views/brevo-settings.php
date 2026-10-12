@@ -31,6 +31,7 @@ defined( 'ABSPATH' ) || exit;
 			?>
 			action="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-wizard&step=3' ) ); ?>"<?php endif; ?>>
 			<?php wp_nonce_field( 'scalyn_brevo_settings' ); ?>
+			<?php \Scalyn\MailRelay\Admin\ConfigurationGuard::field( $this->settings ); ?>
 			<input type="hidden" name="scalyn_brevo_settings" value="1" />
 			<p><label for="brevo-from-email"><?php esc_html_e( 'Sender email', 'scalyn-mail-relay' ); ?></label><br />
 			<input id="brevo-from-email" name="from_email" type="email" maxlength="254" required value="<?php echo esc_attr( $config['from_email'] ); ?>" /></p>

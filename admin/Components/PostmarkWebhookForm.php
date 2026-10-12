@@ -55,6 +55,7 @@ final class PostmarkWebhookForm {
 			wp_die( esc_html__( 'You do not have permission to manage webhook configuration.', 'scalyn-mail-relay' ) );
 		}
 		check_admin_referer( 'scalyn_postmark_webhook' );
+		\Scalyn\MailRelay\Admin\ConfigurationGuard::check();
 		$input = array();
 		foreach ( array( '_wpnonce', 'wh_op', 'wh_action', 'wh_server_id', 'wh_stream', 'wh_ips', 'wh_username', 'wh_password', 'wh_confirm_remove', 'wh_acknowledge' ) as $field ) {
 			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Strict types and service validation; credentials must not be rewritten.

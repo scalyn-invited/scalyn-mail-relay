@@ -7,6 +7,7 @@ if (!function_exists('number_format_i18n')) {
 }
 final class ProviderDeliveryCardTest extends TestCase {
  private function render(bool $active):string {
+  $settings=new \Scalyn\MailRelay\Core\SettingsRepository();
   $active_label='Brevo';$can_configure=true;
   $health=ProviderHealthAssessment::evaluate('brevo','revision',['status'=>'passed'],['accepted'=>20,'failed'=>0],['accepted'=>20,'failed'=>0],[
    'status'=>'available','tracked'=>40,'observed'=>20,'hard_bounced'=>2,

@@ -172,6 +172,17 @@ if ( ! function_exists( 'get_option' ) ) {
 	}
 }
 
+if ( ! function_exists( 'add_option' ) ) {
+	/** Atomic create-only option shim. */
+	function add_option( string $option, $value, string $deprecated = '', $autoload = null ): bool {
+		if ( array_key_exists( $option, $GLOBALS['_test_wp_options'] ?? array() ) || ! empty( $GLOBALS['_test_wp_option_write_failures'][ $option ] ) ) {
+			return false;
+		}
+		$GLOBALS['_test_wp_options'][ $option ] = $value;
+		return true;
+	}
+}
+
 if ( ! function_exists( 'update_option' ) ) {
 	/**
 	 * @param string $option

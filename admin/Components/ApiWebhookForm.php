@@ -45,6 +45,7 @@ final class ApiWebhookForm {
 		if ( ! current_user_can( Capabilities::MANAGE_MAIL ) ) {
 			wp_die( esc_html__( 'Webhook configuration is not authorized.', 'scalyn-mail-relay' ) ); }
 		check_admin_referer( 'scalyn_' . $this->settings->provider() . '_webhook' );
+		\Scalyn\MailRelay\Admin\ConfigurationGuard::check();
 		$input = array();
 		foreach ( array( '_wpnonce', 'wh_op', 'wh_action', 'wh_ips', 'wh_password', 'wh_acknowledge', 'wh_confirm_remove' ) as $field ) {
 			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Strict service validation; never rewrite secrets.

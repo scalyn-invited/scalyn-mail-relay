@@ -36,6 +36,7 @@ $wizard_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 			</a><?php endif; ?>
 		</div>
 	<?php else : ?>
+		<?php ( new \Scalyn\MailRelay\Admin\Components\ConfigurationList( $settings ) )->render(); ?>
 		<div class="scalyn-grid scalyn-provider-grid">
 					<?php foreach ( $providers as $p ) : ?>
 						<section class="scalyn-card scalyn-provider-card">

@@ -57,6 +57,7 @@ final class Smtp2goSettingsForm {
 				wp_die( esc_html__( 'You do not have permission to configure mail providers.', 'scalyn-mail-relay' ) );
 			}
 			check_admin_referer( 'scalyn_smtp2go_settings' );
+			\Scalyn\MailRelay\Admin\ConfigurationGuard::check( $this->settings );
 			$input = array();
 			foreach ( array( 'from_email', 'from_name', 'api_key', 'key_action' ) as $field ) {
 				// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Repository strictly validates types and content; secrets must not be rewritten.

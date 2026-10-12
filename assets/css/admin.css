@@ -485,6 +485,10 @@
 .scalyn-mail-relay .scalyn-wizard-footer { margin-top: 24px; border-top: 1px solid var(--scalyn-line); padding-top: 20px; justify-content: space-between; flex-wrap: wrap; }
 .scalyn-mail-relay .scalyn-wizard-footer:empty { display: none; }
 .scalyn-mail-relay .scalyn-wizard-btn--next { margin-left: auto; }
+.scalyn-mail-relay .scalyn-configuration-item { border-top: 1px solid var(--scalyn-line); padding: 16px 0; }
+.scalyn-mail-relay .scalyn-configurations input, .scalyn-mail-relay .scalyn-configurations select { max-width: 100%; box-sizing: border-box; }
+.scalyn-mail-relay .scalyn-configurations .scalyn-actions { flex-wrap: wrap; }
+.scalyn-mail-relay .scalyn-wizard-body > .scalyn-configurations { border: 0; padding: 0; margin-bottom: 24px; box-shadow: none; }
 @media (max-width: 1000px) {
 	.scalyn-mail-relay .scalyn-wizard-layout { grid-template-columns: 1fr; }
 }
