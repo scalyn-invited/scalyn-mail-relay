@@ -735,6 +735,13 @@ final class SettingsRepository {
 		return $this->data['configurations']['active'] ?? '';
 	}
 
+	/** Fresh repository snapshot with the same server cipher; no credentials exposed. */
+	public function fresh(): self {
+		wp_cache_delete( self::OPTION_KEY, 'options' );
+		wp_cache_delete( 'alloptions', 'options' );
+		return new self( $this->cipher );
+	}
+
 	/**
 	 * Credential-free current revision for routing. Legacy references cannot replay.
 	 *

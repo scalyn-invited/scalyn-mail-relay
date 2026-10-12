@@ -25,6 +25,8 @@ final readonly class AuditEvent {
 	public const BRANDING_FIELDS = array( 'branding.name', 'branding.logo_id', 'branding.primary', 'branding.secondary', 'branding.support_email', 'branding.support_url', 'branding.docs_url' );
 
 	private const OUTCOMES = array(
+		'recovery_policy'          => array( 'enabled', 'disabled' ),
+		'recovery_action'          => array( 'cancelled', 'cancel_denied' ),
 		'routing_policy'           => array( 'changed' ),
 		'configuration'            => array( 'import', 'create', 'select', 'rename', 'archive' ),
 		'client_report'            => array( 'prepared' ),

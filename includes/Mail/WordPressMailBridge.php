@@ -21,12 +21,14 @@ final class WordPressMailBridge {
 	/**
 	 * Connects the bridge to provider settings and the shared dispatcher.
 	 *
-	 * @param SettingsRepository $settings Provider selection and public sender.
-	 * @param MailDispatcher     $dispatcher Shared mail orchestrator.
+	 * @param SettingsRepository                              $settings Provider selection and public sender.
+	 * @param MailDispatcher                                  $dispatcher Shared mail orchestrator.
+	 * @param \Scalyn\MailRelay\Recovery\RecoveryService|null $recovery Explicit opt-in durable queue.
 	 */
 	public function __construct(
 		private readonly SettingsRepository $settings,
-		private readonly MailDispatcher $dispatcher
+		private readonly MailDispatcher $dispatcher,
+		private readonly ?\Scalyn\MailRelay\Recovery\RecoveryService $recovery = null
 	) {}
 
 	/** Registers the WordPress short-circuit at its normal priority. */
@@ -42,7 +44,7 @@ final class WordPressMailBridge {
 	 * @return mixed Null for core mail, otherwise the provider acknowledgement boolean.
 	 */
 	public function maybe_send( mixed $pre, mixed $atts ): mixed {
-		if ( null !== $pre || ( true !== ( new RoutingRepository() )->policy()['enabled'] && ! in_array( $this->settings->get_active_provider_id(), array( 'sendgrid', 'postmark', 'smtp2go', 'brevo' ), true ) ) ) {
+		if ( null !== $pre || ( ! $this->recovery?->enabled() && true !== ( new RoutingRepository() )->policy()['enabled'] && ! in_array( $this->settings->get_active_provider_id(), array( 'sendgrid', 'postmark', 'smtp2go', 'brevo' ), true ) ) ) {
 			return $pre;
 		}
 		$uuid = wp_generate_uuid4();
@@ -71,6 +73,9 @@ final class WordPressMailBridge {
 			return false;
 		}
 		try {
+			if ( $this->recovery?->enabled() ) {
+				return $this->recovery->own( $message );
+			}
 			return $this->dispatcher->dispatch( $message )->success;
 		} catch ( \Throwable $error ) {
 			// Do not fabricate a preparation failure after dispatch may have started.

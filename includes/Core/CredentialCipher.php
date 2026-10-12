@@ -74,8 +74,9 @@ final class CredentialCipher {
 	 * @throws \RuntimeException When authentication or format validation fails.
 	 */
 	public function decrypt( #[\SensitiveParameter] string $envelope, string $provider = 'sendgrid' ): string {
-		$key = $this->key();
-		if ( ! str_starts_with( $envelope, 'v1:' ) || strlen( $envelope ) > ( 'smtp' === $provider ? 8192 : 1024 ) ) {
+		$key     = $this->key();
+		$maximum = 'recovery-payload' === $provider ? 12000000 : ( 'smtp' === $provider ? 8192 : 1024 );
+		if ( ! str_starts_with( $envelope, 'v1:' ) || strlen( $envelope ) > $maximum ) {
 			throw new \RuntimeException( 'Stored credential is unavailable. Replace or remove it.' );
 		}
 		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions -- Decode bounded ciphertext, never executable code.
@@ -98,6 +99,9 @@ final class CredentialCipher {
 	 * @throws \InvalidArgumentException When the context is unsupported.
 	 */
 	private function context( string $provider ): string {
+		if ( 'recovery-payload' === $provider ) {
+			return 'scalyn:recovery:payload:v1';
+		}
 		if ( 'smtp' === $provider ) {
 			return 'scalyn:smtp:login:v1';
 		}

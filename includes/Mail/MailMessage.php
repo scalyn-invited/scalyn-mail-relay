@@ -37,6 +37,7 @@ final class MailMessage {
 	 * @param array  $headers      Additional headers as [ 'Header-Name: value' ].
 	 * @param array  $attachments  Absolute paths to attachment files.
 	 * @param array  $context      Source-tracking metadata (plugin name, hook, post ID, etc.).
+	 * @param array  $attachment_names Optional private names for temporary restored attachments.
 	 */
 	public function __construct(
 		public readonly string $uuid,
@@ -47,6 +48,7 @@ final class MailMessage {
 		public readonly string $content_type = 'text/html',
 		public readonly array $headers = array(),
 		public readonly array $attachments = array(),
-		public readonly array $context = array()
+		public readonly array $context = array(),
+		public readonly array $attachment_names = array()
 	) {}
 }

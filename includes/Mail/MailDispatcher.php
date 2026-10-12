@@ -75,7 +75,7 @@ final class MailDispatcher {
 		if ( null !== $target ) {
 			$provider_id      = $target['provider'];
 			$configuration_id = $target['revision'];
-			$message          = new MailMessage( $message->uuid, $target['from'], $message->to, $message->subject, $message->body, $message->content_type, $message->headers, $message->attachments, $message->context );
+			$message          = new MailMessage( $message->uuid, $target['from'], $message->to, $message->subject, $message->body, $message->content_type, $message->headers, $message->attachments, $message->context, $message->attachment_names );
 		}
 
 		if ( '' === $provider_id ) {
