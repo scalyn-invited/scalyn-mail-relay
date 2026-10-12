@@ -214,6 +214,8 @@ providers as the active transport.
 Outcome: managed clients have appropriate access and recovery behavior is predictable.
 
 - [ ] Implement managed settings and client permissions, enforced in backend actions and UI.
+  - [x] Ticket 1 local implementation: site-bound additive access profiles, administrator override, backend group locks, protected Agency Settings and policy/access auditing. See [ADR 0031](adr/0031-managed-agency-access.md) and [Milestone 9 handoff](MILESTONE-9-AGENCY-RECOVERY.md).
+  - [ ] Complete live visual QA and Bernie's acceptance; implementation alone does not complete this gate.
 - [ ] Add client views, branding, and support information.
 - [ ] Add multiple provider configurations and reliable source attribution.
 - [ ] Define and implement explicit routing rules as a separate ticket.

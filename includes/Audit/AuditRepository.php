@@ -90,6 +90,7 @@ final class AuditRepository {
 			'correlation_id' => '',
 			'changed_fields' => array(),
 			'export'         => array(),
+			'access'         => array(),
 			'created_at'     => '',
 		);
 		$date = $row['created_at'] ?? '';
@@ -98,18 +99,22 @@ final class AuditRepository {
 		}
 		try {
 			$meta = json_decode( $row['metadata'] ?? '', true, 16, JSON_THROW_ON_ERROR );
-			if ( ! is_array( $meta ) || ! in_array( $meta['version'] ?? null, array( 1, 2, 3 ), true ) ) {
+			if ( ! is_array( $meta ) || ! in_array( $meta['version'] ?? null, array( 1, 2, 3, 4 ), true ) ) {
 				return $safe;
 			}
 			if ( ( 3 === $meta['version'] ) !== ( 'report_export' === ( $row['action'] ?? '' ) ) ) {
 				return $safe;
 			}
-			$event                  = new AuditEvent( $row['action'] ?? '', $meta['outcome'] ?? '', $row['resource_id'] ?? '', $meta['changed_fields'] ?? array(), 3 === $meta['version'] ? ( $meta['export'] ?? array() ) : array() );
+			if ( ( 4 === $meta['version'] ) !== ( 'agency_access' === ( $row['action'] ?? '' ) ) ) {
+				return $safe;
+			}
+			$event                  = new AuditEvent( $row['action'] ?? '', $meta['outcome'] ?? '', $row['resource_id'] ?? '', $meta['changed_fields'] ?? array(), 3 === $meta['version'] ? ( $meta['export'] ?? array() ) : array(), 4 === $meta['version'] ? ( $meta['access'] ?? array() ) : array() );
 			$safe['action']         = $event->action;
 			$safe['outcome']        = $event->outcome;
 			$safe['correlation_id'] = $event->correlation_id;
 			$safe['changed_fields'] = $event->metadata()['changed_fields'];
 			$safe['export']         = $event->export;
+			$safe['access']         = $event->access;
 			if ( $meta['version'] >= 2 && in_array( $meta['source'] ?? '', AuditActor::SOURCES, true ) ) {
 				$safe['source']  = $meta['source'];
 				$safe['user_id'] = 'scheduled' === $meta['source'] ? 0 : max( 0, (int) ( $row['user_id'] ?? 0 ) );

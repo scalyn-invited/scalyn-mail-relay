@@ -120,6 +120,8 @@ final class Plugin {
 	 * Registers core services in the container.
 	 */
 	private function register_services(): void {
+		$this->container->set( \Scalyn\MailRelay\Agency\AgencyRepository::class, static fn() => new \Scalyn\MailRelay\Agency\AgencyRepository() );
+		$this->container->set( \Scalyn\MailRelay\Agency\ManagedAccess::class, static fn() => new \Scalyn\MailRelay\Agency\ManagedAccess() );
 		$this->container->set( \Scalyn\MailRelay\Alerts\AlertRepository::class, static fn(): \Scalyn\MailRelay\Alerts\AlertRepository => new \Scalyn\MailRelay\Alerts\AlertRepository() );
 		$this->container->set( \Scalyn\MailRelay\Alerts\ObservationRepository::class, static fn(): \Scalyn\MailRelay\Alerts\ObservationRepository => new \Scalyn\MailRelay\Alerts\ObservationRepository() );
 		$this->container->set( \Scalyn\MailRelay\Alerts\WebhookChannel::class, static fn(): \Scalyn\MailRelay\Alerts\WebhookChannel => new \Scalyn\MailRelay\Alerts\WebhookChannel() );
@@ -261,6 +263,7 @@ final class Plugin {
 	 * Registers WordPress action and filter hooks.
 	 */
 	private function register_hooks(): void {
+		$this->container->get( \Scalyn\MailRelay\Agency\ManagedAccess::class )->register();
 		load_plugin_textdomain( 'scalyn-mail-relay', false, dirname( plugin_basename( SCALYN_MAIL_RELAY_FILE ) ) . '/languages' );
 
 		// Mail logging hooks run on every request (not only admin) because mail

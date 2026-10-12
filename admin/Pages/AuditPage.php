@@ -24,7 +24,7 @@ final class AuditPage {
 
 	/** Checks permission before reading, then renders escaped bounded results. */
 	public function render(): void {
-		if ( ! current_user_can( Capabilities::MANAGE_SETTINGS ) ) {
+		if ( ! current_user_can( Capabilities::MANAGE_SETTINGS ) && ! current_user_can( Capabilities::VIEW_AUDIT ) ) {
 			wp_die( esc_html__( 'You do not have permission to view audit history.', 'scalyn-mail-relay' ) );
 		}
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only pagination, capability checked above.

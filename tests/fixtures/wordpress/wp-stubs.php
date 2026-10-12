@@ -1,5 +1,37 @@
 <?php
 
+function get_current_blog_id(): int {
+	return $GLOBALS['_test_blog_id'] ?? 1;
+}
+function get_user_meta( int $user_id, string $key, bool $single = false ): mixed {
+	return $GLOBALS['_test_user_meta'][ $user_id ][ $key ] ?? ( $single ? '' : array() );
+}
+function update_user_meta( int $user_id, string $key, mixed $value ): bool {
+	if ( ! empty( $GLOBALS['_test_user_meta_write_failure'] ) ) {
+		return false;
+	}
+	$GLOBALS['_test_user_meta'][ $user_id ][ $key ] = $value;
+	return true;
+}
+function delete_metadata( string $type, int $object_id, string $key, mixed $value = '', bool $all = false ): bool {
+	foreach ( $GLOBALS['_test_user_meta'] ?? array() as $user_id => $meta ) {
+		if ( $all || $user_id === $object_id ) {
+			unset( $GLOBALS['_test_user_meta'][ $user_id ][ $key ] );
+		}
+	}
+	return true;
+}
+function get_userdata( int $user_id ): object|false {
+	return $GLOBALS['_test_site_users'][ $user_id ] ?? false;
+}
+function is_user_member_of_blog( int $user_id ): bool {
+	return isset( $GLOBALS['_test_site_users'][ $user_id ] );
+}
+function user_can( int $user_id, string $capability ): bool {
+	$user = get_userdata( $user_id );
+	return $user && ! empty( $user->allcaps[ $capability ] );
+}
+
 if ( ! function_exists( 'esc_textarea' ) ) {
 	function esc_textarea( $text ) {
 		return htmlspecialchars( (string) $text, ENT_QUOTES, 'UTF-8' );
@@ -25,6 +57,11 @@ if ( ! function_exists( 'is_wp_error' ) ) {
 function submit_button(string $text='Save Changes'):void {echo '<p><button type="submit">'.esc_html($text).'</button></p>';}
 function checked(mixed $checked, mixed $current=true, bool $display=true):string {
 	$value=(string)$checked===(string)$current ? ' checked="checked"' : '';
+	if($display) echo $value;
+	return $value;
+}
+function disabled(mixed $disabled, mixed $current=true, bool $display=true):string {
+	$value=(string)$disabled===(string)$current ? ' disabled="disabled"' : '';
 	if($display) echo $value;
 	return $value;
 }

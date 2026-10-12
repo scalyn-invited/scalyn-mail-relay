@@ -115,12 +115,13 @@ final class AdminMenu {
 			'scalyn-mail-relay',
 			__( 'Audit History — Scalyn Mail Relay', 'scalyn-mail-relay' ),
 			__( 'Audit History', 'scalyn-mail-relay' ),
-			Capabilities::MANAGE_SETTINGS,
+			current_user_can( Capabilities::VIEW_AUDIT ) ? Capabilities::VIEW_AUDIT : Capabilities::MANAGE_SETTINGS,
 			'scalyn-mail-relay-audit',
 			array( $this, 'render_audit' )
 		);
 		add_submenu_page( 'scalyn-mail-relay', __( 'Alerts & Recovery', 'scalyn-mail-relay' ), __( 'Alerts & Recovery', 'scalyn-mail-relay' ), Capabilities::MANAGE_SETTINGS, 'scalyn-mail-relay-alerts', array( $this, 'render_alerts' ) );
 		add_submenu_page( 'scalyn-mail-relay', __( 'Reports', 'scalyn-mail-relay' ), __( 'Reports', 'scalyn-mail-relay' ), Capabilities::EXPORT_REPORTS, 'scalyn-mail-relay-reports', array( new \Scalyn\MailRelay\Admin\Pages\ReportsPage(), 'render' ) );
+		add_submenu_page( 'scalyn-mail-relay', __( 'Agency Settings', 'scalyn-mail-relay' ), __( 'Agency Settings', 'scalyn-mail-relay' ), Capabilities::MANAGE_AGENCY, 'scalyn-mail-relay-agency', array( new \Scalyn\MailRelay\Admin\Pages\AgencyPage( Plugin::instance()->container()->get( \Scalyn\MailRelay\Agency\AgencyRepository::class ) ), 'render' ) );
 		add_submenu_page(
 			'scalyn-mail-relay',
 			__( 'Settings — Scalyn Mail Relay', 'scalyn-mail-relay' ),

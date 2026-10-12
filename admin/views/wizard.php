@@ -82,6 +82,10 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 
 			// -----------------------------------------------------------------
 			case 2:
+				if ( \Scalyn\MailRelay\Agency\ManagedAccess::is_locked( 'providers' ) ) {
+					echo '<p role="status">' . esc_html__( 'Provider selection is managed by your administrator or agency manager.', 'scalyn-mail-relay' ) . '</p>';
+					break;
+				}
 				?>
 				<h2><?php esc_html_e( 'Choose a Mail Provider', 'scalyn-mail-relay' ); ?></h2>
 				<p><?php esc_html_e( 'Select the mail provider you want to use with this site.', 'scalyn-mail-relay' ); ?></p>
@@ -139,6 +143,10 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 
 			// -----------------------------------------------------------------
 			case 3:
+				if ( \Scalyn\MailRelay\Agency\ManagedAccess::is_locked( 'smtp' === $active_provider_id ? 'smtp' : 'providers' ) ) {
+					echo '<p role="status">' . esc_html__( 'Provider configuration is managed by your administrator or agency manager.', 'scalyn-mail-relay' ) . '</p>';
+					break;
+				}
 				if ( 'brevo' === $active_provider_id ) {
 					$brevo_form->render( true );
 					$api_webhook_form->render();

@@ -24,6 +24,7 @@ final class Capabilities {
 	public const MANAGE_SETTINGS = 'scalyn_mail_relay_manage_settings';
 	public const EXPORT_REPORTS  = 'scalyn_mail_relay_export_reports';
 	public const MANAGE_AGENCY   = 'scalyn_mail_relay_manage_agency';
+	public const VIEW_AUDIT      = 'scalyn_mail_relay_view_audit';
 
 	/**
 	 * Returns all defined capability strings.
@@ -39,6 +40,7 @@ final class Capabilities {
 			self::MANAGE_SETTINGS,
 			self::EXPORT_REPORTS,
 			self::MANAGE_AGENCY,
+			self::VIEW_AUDIT,
 		);
 	}
 }

@@ -28,10 +28,16 @@ defined( 'ABSPATH' ) || exit;
 	<?php endif; ?>
 	<p><?php esc_html_e( 'Set SCALYN_MAIL_RELAY_ALERT_WEBHOOK_URL and optionally SCALYN_MAIL_RELAY_ALERT_WEBHOOK_TOKEN in protected server configuration. Only public HTTPS destinations are allowed. Values are never displayed here.', 'scalyn-mail-relay' ); ?></p>
 	<p><?php echo esc_html( $configured ? __( 'Webhook configuration is present; connectivity has not been verified.', 'scalyn-mail-relay' ) : __( 'Webhook configuration is missing or invalid.', 'scalyn-mail-relay' ) ); ?></p>
+	<?php $managed_locked = \Scalyn\MailRelay\Agency\ManagedAccess::is_locked( 'critical' ); ?>
+	<?php if ( $managed_locked ) : ?>
+		<p role="status"><?php esc_html_e( 'Alert settings are managed by your administrator or agency manager.', 'scalyn-mail-relay' ); ?></p>
+	<?php endif; ?>
 	<form method="post">
+		<fieldset <?php disabled( $managed_locked ); ?>>
 		<?php wp_nonce_field( 'scalyn_alert_settings' ); ?>
 		<label><input type="checkbox" name="alert_webhook_enabled" value="1" <?php checked( $enabled ); ?> /> <?php esc_html_e( 'Enable webhook notifications for new incident transitions', 'scalyn-mail-relay' ); ?></label>
 		<?php submit_button( __( 'Save alert preference', 'scalyn-mail-relay' ) ); ?>
+		</fieldset>
 	</form>
 	<p><?php esc_html_e( 'Disabled notifications are skipped, not replayed later. Failed HTTP attempts retry up to three times. A 2xx response means the webhook acknowledged the request, not that a person read it. Receivers should deduplicate by notification UUID. Recovery cancels an unsent opening notification.', 'scalyn-mail-relay' ); ?></p>
 	</section>

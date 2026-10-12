@@ -239,6 +239,7 @@ final class SettingsRepository {
 	 * @throws \InvalidArgumentException When input is invalid.
 	 */
 	public function save_sendgrid( #[\SensitiveParameter] array $input, CredentialCipher $cipher ): bool {
+		\Scalyn\MailRelay\Agency\ManagedAccess::assert_unlocked( 'providers' );
 		$action = $input['key_action'] ?? null;
 		$secret = $input['api_key'] ?? '';
 		$email  = $input['from_email'] ?? null;
@@ -321,6 +322,7 @@ final class SettingsRepository {
 	 * @throws \InvalidArgumentException When input is invalid.
 	 */
 	public function save_postmark( #[\SensitiveParameter] array $input, CredentialCipher $cipher ): bool {
+		\Scalyn\MailRelay\Agency\ManagedAccess::assert_unlocked( 'providers' );
 		$action = $input['key_action'] ?? null;
 		$secret = $input['api_key'] ?? '';
 		$email  = $input['from_email'] ?? null;
@@ -403,6 +405,7 @@ final class SettingsRepository {
 	 * @throws \InvalidArgumentException When input is invalid.
 	 */
 	public function save_smtp2go( #[\SensitiveParameter] array $input, CredentialCipher $cipher ): bool {
+		\Scalyn\MailRelay\Agency\ManagedAccess::assert_unlocked( 'providers' );
 		$action = $input['key_action'] ?? null;
 		$secret = $input['api_key'] ?? '';
 		$email  = $input['from_email'] ?? null;
@@ -485,6 +488,7 @@ final class SettingsRepository {
 	 * @throws \InvalidArgumentException When input is invalid.
 	 */
 	public function save_brevo( #[\SensitiveParameter] array $input, CredentialCipher $cipher ): bool {
+		\Scalyn\MailRelay\Agency\ManagedAccess::assert_unlocked( 'providers' );
 		$action = $input['key_action'] ?? null;
 		$secret = $input['api_key'] ?? '';
 		$email  = $input['from_email'] ?? null;
@@ -609,6 +613,15 @@ final class SettingsRepository {
 	 * @return bool True on success; false if the option was not updated.
 	 */
 	public function save( array $new_settings ): bool {
+		foreach ( array(
+			'provider' => 'providers',
+			'smtp'     => 'smtp',
+			'advanced' => 'critical',
+		) as $key => $group ) {
+			if ( array_key_exists( $key, $new_settings ) ) {
+				\Scalyn\MailRelay\Agency\ManagedAccess::assert_unlocked( $group );
+			}
+		}
 		$sanitized  = $this->sanitize( $new_settings );
 		$before     = $this->data;
 		$this->data = array_replace_recursive( $this->data, $sanitized );

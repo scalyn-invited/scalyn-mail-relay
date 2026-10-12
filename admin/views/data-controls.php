@@ -17,7 +17,12 @@ defined( 'ABSPATH' ) || exit;
 		<div class="notice <?php echo $error ? 'notice-error' : 'notice-success'; ?>" role="status"><p><?php echo esc_html( $notice ); ?></p></div>
 	<?php endif; ?>
 	<?php $dkim_form->render(); ?>
+	<?php $managed_locked = \Scalyn\MailRelay\Agency\ManagedAccess::is_locked( 'critical' ); ?>
+	<?php if ( $managed_locked ) : ?>
+		<p role="status"><?php esc_html_e( 'These settings are managed by your administrator or agency manager. You can review the saved policy but cannot change it.', 'scalyn-mail-relay' ); ?></p>
+	<?php endif; ?>
 	<form class="scalyn-card" method="post" action="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-data-controls' ) ); ?>">
+		<fieldset <?php disabled( $managed_locked ); ?>>
 		<?php wp_nonce_field( 'scalyn_retention_settings' ); ?>
 		<section class="scalyn-form-section" id="scalyn-privacy-settings">
 		<h2><?php esc_html_e( 'Operational history retention', 'scalyn-mail-relay' ); ?></h2>
@@ -52,6 +57,7 @@ defined( 'ABSPATH' ) || exit;
 		<?php endif; ?>
 		</section>
 		<div class="scalyn-form-footer"><p><?php esc_html_e( 'Save applies privacy, retention, monitoring and uninstall preferences together. DKIM has a separate save button above.', 'scalyn-mail-relay' ); ?></p><p><button type="submit" class="button button-primary"><?php esc_html_e( 'Save data controls', 'scalyn-mail-relay' ); ?></button></p></div>
+		</fieldset>
 	</form>
 	<section class="scalyn-card" id="scalyn-cleanup-status">
 	<h2><?php esc_html_e( 'Cleanup status', 'scalyn-mail-relay' ); ?></h2>

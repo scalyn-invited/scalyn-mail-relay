@@ -98,6 +98,25 @@ final class UninstallTest extends TestCase {
 		return $GLOBALS['_test_wp_roles']['administrator'];
 	}
 
+	public function test_agency_data_is_retained_by_default_and_deleted_only_for_this_site(): void {
+		$GLOBALS['_test_blog_id'] = 1;
+		$GLOBALS['_test_wp_options']['scalyn_mail_relay_agency'] = ['managed' => true];
+		$GLOBALS['_test_user_meta'][2] = [
+			'scalyn_mail_relay_access_profile_1' => 'client',
+			'scalyn_mail_relay_access_profile_2' => 'agency',
+			'unrelated_meta' => 'keep',
+		];
+		$this->run_uninstall(false);
+		$this->assertArrayHasKey('scalyn_mail_relay_agency', $GLOBALS['_test_wp_options']);
+		$this->assertSame('client', $GLOBALS['_test_user_meta'][2]['scalyn_mail_relay_access_profile_1']);
+		$this->run_uninstall(true);
+		$this->assertArrayNotHasKey('scalyn_mail_relay_agency', $GLOBALS['_test_wp_options']);
+		$this->assertArrayNotHasKey('scalyn_mail_relay_access_profile_1', $GLOBALS['_test_user_meta'][2]);
+		$this->assertSame('agency', $GLOBALS['_test_user_meta'][2]['scalyn_mail_relay_access_profile_2']);
+		$this->assertSame('keep', $GLOBALS['_test_user_meta'][2]['unrelated_meta']);
+		$GLOBALS['_test_user_meta'] = [];
+	}
+
 	public function test_webhook_draft_and_its_budget_follow_explicit_uninstall_policy(): void {
 		$id='12345678-1234-4234-8234-123456789abc';
 		$GLOBALS['_test_wp_options']['scalyn_mail_relay_postmark_webhook']=['id'=>$id,'credentials'=>'synthetic envelope','enabled'=>false];

@@ -43,6 +43,10 @@ if ( is_string( $scalyn_webhook_id ) && preg_match( '/^[a-f0-9]{8}-[a-f0-9]{4}-[
 	delete_option( 'scalyn_webhook_budget_' . $scalyn_webhook_id );
 }
 delete_option( 'scalyn_mail_relay_postmark_webhook' );
+delete_option( 'scalyn_mail_relay_agency' );
+
+// Remove only owned access metadata, and only under explicit deletion opt-in.
+delete_metadata( 'user', 0, 'scalyn_mail_relay_access_profile_' . get_current_blog_id(), '', true );
 foreach ( array( 'smtp2go', 'brevo' ) as $scalyn_provider ) {
 	$scalyn_option = 'scalyn_mail_relay_' . $scalyn_provider . '_webhook';
 	$scalyn_draft  = get_option( $scalyn_option, array() );

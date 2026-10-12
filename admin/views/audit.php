@@ -43,7 +43,9 @@ defined( 'ABSPATH' ) || exit;
 					<td><?php echo esc_html( $row['source'] ); ?></td>
 					<td><code><?php echo esc_html( $row['correlation_id'] ); ?></code></td>
 					<td>
-					<?php if ( array() !== $row['export'] ) : ?>
+					<?php if ( ! empty( $row['access'] ) ) : ?>
+						<?php echo esc_html( sprintf( /* translators: 1: WordPress user ID, 2: plugin access profile. */ __( 'User #%1$d: %2$s', 'scalyn-mail-relay' ), $row['access']['user_id'], $row['access']['profile'] ) ); ?>
+					<?php elseif ( array() !== $row['export'] ) : ?>
 						<?php echo esc_html( strtoupper( $row['export']['format'] ) ); ?><br>
 						<?php echo esc_html( $row['export']['references'] ? __( 'Evidence identifiers: included', 'scalyn-mail-relay' ) : __( 'Evidence identifiers: excluded', 'scalyn-mail-relay' ) ); ?>
 						<?php if ( '' !== $row['export']['report_uuid'] ) : ?>

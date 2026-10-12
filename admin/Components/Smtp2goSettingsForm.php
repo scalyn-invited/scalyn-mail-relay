@@ -48,7 +48,7 @@ final class Smtp2goSettingsForm {
 			return;
 		}
 		$this->handled = true;
-		$can_manage    = current_user_can( Capabilities::MANAGE_MAIL );
+		$can_manage    = current_user_can( Capabilities::MANAGE_MAIL ) && ! \Scalyn\MailRelay\Agency\ManagedAccess::is_locked( 'providers' );
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Form detection only; values are read after nonce validation.
 		$submitted = isset( $_POST['scalyn_smtp2go_settings'] );
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.ValidatedSanitizedInput.MissingUnslash -- Server-controlled method.
@@ -88,7 +88,7 @@ final class Smtp2goSettingsForm {
 	 */
 	public function render( bool $in_wizard = false ): void {
 		$this->handle();
-		$can_manage = current_user_can( Capabilities::MANAGE_MAIL );
+		$can_manage = current_user_can( Capabilities::MANAGE_MAIL ) && ! \Scalyn\MailRelay\Agency\ManagedAccess::is_locked( 'providers' );
 		$notice     = $this->notice;
 		$saved      = $this->saved;
 		if ( $in_wizard && $saved ) {

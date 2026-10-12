@@ -99,6 +99,7 @@ final class WizardController {
 		}
 
 		check_admin_referer( 'scalyn_wizard_step2' );
+		\Scalyn\MailRelay\Agency\ManagedAccess::protect_form( 'providers' );
 
 		// phpcs:disable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized immediately below.
 		$raw_id = isset( $_POST['provider_id'] ) ? wp_unslash( $_POST['provider_id'] ) : '';
@@ -143,6 +144,7 @@ final class WizardController {
 		check_admin_referer( 'scalyn_wizard_step3' );
 		$settings    = $this->get_settings();
 		$provider_id = $settings->get_active_provider_id();
+		\Scalyn\MailRelay\Agency\ManagedAccess::protect_form( 'smtp' === $provider_id ? 'smtp' : 'providers' );
 		if ( in_array( $provider_id, array( 'sendgrid', 'postmark', 'smtp2go', 'brevo' ), true ) ) {
 			try {
 				$valid = $this->get_registry()->get( $provider_id )->validate_config( $settings->get_provider_config( $provider_id ) )->valid;
