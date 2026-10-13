@@ -2,10 +2,14 @@
 (function () {
   'use strict';
   function init() {
-    const choose = document.getElementById('scalyn-logo-choose');
-    const clear = document.getElementById('scalyn-logo-clear');
-    const input = document.getElementById('scalyn-brand-logo_id');
-    const feedback = document.getElementById('scalyn-logo-feedback');
+    bindPicker('logo', 'logo_id');
+    bindPicker('icon', 'menu_icon_id');
+  }
+  function bindPicker(kind, field) {
+    const choose = document.getElementById('scalyn-' + kind + '-choose');
+    const clear = document.getElementById('scalyn-' + kind + '-clear');
+    const input = document.getElementById('scalyn-brand-' + field);
+    const feedback = document.getElementById('scalyn-' + kind + '-feedback');
     if (!choose || !clear || !input || !feedback) return;
     let frame;
     choose.addEventListener('click', function () {

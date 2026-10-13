@@ -60,10 +60,12 @@ final class AgencyPage {
 						// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Repository validates exact types and rejects HTML/control characters before storage.
 						$input[ $field ] = isset( $_POST[ $field ] ) && is_string( $_POST[ $field ] ) ? wp_unslash( $_POST[ $field ] ) : '';
 					}
-					if ( ! preg_match( '/^(0|[1-9][0-9]{0,9})$/D', $input['logo_id'] ) ) {
-						throw new \RuntimeException();
+					foreach ( array( 'logo_id', 'menu_icon_id' ) as $field ) {
+						if ( ! preg_match( '/^(0|[1-9][0-9]{0,9})$/D', $input[ $field ] ) ) {
+							throw new \RuntimeException();
+						}
+						$input[ $field ] = (int) $input[ $field ];
 					}
-					$input['logo_id'] = (int) $input['logo_id'];
 					( new \Scalyn\MailRelay\Agency\BrandingRepository() )->save( $input );
 				} else {
 					throw new \RuntimeException();

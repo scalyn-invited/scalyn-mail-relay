@@ -69,13 +69,13 @@ class PostmarkProvider implements ProviderInterface {
 	 */
 	public function test_connection( array $config ): ConnectionResult {
 		if ( ! $this->validate_config( $config )->valid ) {
-			return new ConnectionResult( false, 'Postmark configuration is incomplete or invalid.' );
+			return new ConnectionResult( false, 'Postmark configuration is incomplete or invalid.', failure_category: TransportFailureCategory::CONFIG );
 		}
 		$response = $this->request( '/server', $config['api_key'] );
 		if ( $response['live'] ) {
 			return new ConnectionResult( true, 'Postmark authenticated a Live Server token. No email was sent; sender authorization and delivery remain unverified.' );
 		}
-		return new ConnectionResult( false, 'Postmark Live Server verification failed. Check the Server API token, account access and server type. Sandbox servers are unsupported; no email was sent.' );
+		return new ConnectionResult( false, 'Postmark Live Server verification failed. Check the Server API token, account access and server type. Sandbox servers are unsupported; no email was sent.', failure_category: TransportFailureCategory::from_http( $response['code'] ) );
 	}
 
 	/**
@@ -99,7 +99,7 @@ class PostmarkProvider implements ProviderInterface {
 		// Check on every attempt: a stored verification flag cannot establish current server type.
 		$server = $this->request( '/server', $config['api_key'] );
 		if ( ! $server['live'] ) {
-			return new SendResult( false, 'postmark', null, null, 'Postmark Live Server verification failed before submission. Check the Server API token and server type. No email was submitted.', false, TransportFailureCategory::CONFIG );
+			return new SendResult( false, 'postmark', null, null, 'Postmark Live Server verification failed before submission. Check the Server API token and server type. No email was submitted.', false, TransportFailureCategory::from_http( $server['code'] ) );
 		}
 		$response = $this->request( '/email', $config['api_key'], $payload );
 		$code     = $response['code'];
@@ -107,7 +107,7 @@ class PostmarkProvider implements ProviderInterface {
 			return new SendResult( true, 'postmark', $response['id'], '200', 'Message accepted by Postmark; delivery is unconfirmed.' );
 		}
 		$rejected = $code >= 400 && $code < 500 && 408 !== $code;
-		return new SendResult( false, 'postmark', null, $code ? (string) $code : null, $this->safe_status( $code, $response['error'] ), false, $rejected ? TransportFailureCategory::PROVIDER_REJECTION : TransportFailureCategory::UNKNOWN, array(), ! $rejected );
+		return new SendResult( false, 'postmark', null, $code ? (string) $code : null, $this->safe_status( $code, $response['error'] ), 429 === $code, TransportFailureCategory::from_http( $code ), array(), ! $rejected, 429 === $code, $response['retry_after'] ?? 0 );
 	}
 
 	/**
@@ -244,7 +244,7 @@ class PostmarkProvider implements ProviderInterface {
 				'Value' => $value,
 			);
 		}
-		$files = $this->attachments( $message->attachments );
+		$files = $this->attachments( $message->attachments, $message->attachment_names );
 		if ( $files ) {
 			$payload['Attachments'] = $files;
 		}
@@ -288,16 +288,17 @@ class PostmarkProvider implements ProviderInterface {
 	 * Reads bounded local attachments. Only filename and base64 content leave PHP.
 	 *
 	 * @param array $paths Local absolute paths.
+	 * @param array $names Private restored attachment names.
 	 * @return array Provider attachment records.
 	 * @throws \InvalidArgumentException When a file is invalid, unreadable or oversized.
 	 */
-	private function attachments( array $paths ): array {
+	private function attachments( array $paths, array $names = array() ): array {
 		if ( count( $paths ) > self::MAX_FILES ) {
 			throw new \InvalidArgumentException( 'Too many attachments were provided.' );
 		}
 		$result = array();
 		$total  = 0;
-		foreach ( $paths as $path ) {
+		foreach ( $paths as $index => $path ) {
 			if ( ! is_string( $path ) || strlen( $path ) > 4096 || ! preg_match( '~^(?:[A-Za-z]:[\\\\/]|/)~', $path ) ) {
 				throw new \InvalidArgumentException( 'An attachment path is unsupported.' );
 			}
@@ -306,7 +307,7 @@ class PostmarkProvider implements ProviderInterface {
 			if ( false === $size || 0 >= $size || $size > self::MAX_FILE_BYTES || $total + $size > self::MAX_FILE_BYTES ) {
 				throw new \InvalidArgumentException( 'An attachment is unreadable or exceeds the size limit.' );
 			}
-			$filename = basename( $path );
+			$filename = $names[ $index ] ?? basename( $path );
 			if ( ! preg_match( '/^[A-Za-z0-9][A-Za-z0-9._ -]{0,199}$/D', $filename ) ) {
 				throw new \InvalidArgumentException( 'An attachment filename is unsupported.' );
 			}
@@ -385,11 +386,12 @@ class PostmarkProvider implements ProviderInterface {
 			$data = is_array( $data ) ? $data : array();
 			$live = '/server' === $path && 200 === $code && is_int( $data['ID'] ?? null ) && $data['ID'] > 0 && 'Live' === ( $data['DeliveryType'] ?? null ) && ! isset( $data['ErrorCode'] );
 			return array(
-				'code'      => $code,
-				'error'     => is_int( $data['ErrorCode'] ?? null ) ? $data['ErrorCode'] : null,
-				'id'        => is_string( $data['MessageID'] ?? null ) && preg_match( self::UUID_PATTERN, $data['MessageID'] ) ? $data['MessageID'] : null,
-				'live'      => $live,
-				'server_id' => $live ? $data['ID'] : null,
+				'code'        => $code,
+				'retry_after' => \Scalyn\MailRelay\Mail\RetryAfter::seconds( $response ),
+				'error'       => is_int( $data['ErrorCode'] ?? null ) ? $data['ErrorCode'] : null,
+				'id'          => is_string( $data['MessageID'] ?? null ) && preg_match( self::UUID_PATTERN, $data['MessageID'] ) ? $data['MessageID'] : null,
+				'live'        => $live,
+				'server_id'   => $live ? $data['ID'] : null,
 			);
 		} catch ( \Throwable $error ) {
 			return $unknown;

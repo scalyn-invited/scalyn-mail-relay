@@ -40,7 +40,10 @@ final class DiagnosticsPage {
 			wp_die( esc_html__( 'You do not have permission to run diagnostics.', 'scalyn-mail-relay' ) );
 		}
 
-		$header_analysis = new \Scalyn\MailRelay\Admin\Components\HeaderAnalysisForm();
+		$assessment_service = Plugin::instance()->container()->get( \Scalyn\MailRelay\Diagnostics\DeliverabilityAssessment::class );
+		$deliverability     = new \Scalyn\MailRelay\Admin\Components\DeliverabilityCard( $assessment_service );
+		$deliverability->handle();
+		$header_analysis = new \Scalyn\MailRelay\Admin\Components\HeaderAnalysisForm( recorder: static fn( array $analysis ) => $assessment_service->record_header( $analysis ) );
 		$header_analysis->handle();
 
 		$provider_configured = $this->is_provider_configured();

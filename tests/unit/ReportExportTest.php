@@ -9,7 +9,21 @@ use Scalyn\MailRelay\Reporting\ReportExporter;
 use Scalyn\MailRelay\Reporting\ReportSnapshot;
 
 final class ReportExportTest extends TestCase {
+	public function test_provider_dropdown_uses_registered_ids_and_escaped_labels(): void {
+		Plugin::instance()->boot();
+		$provider = $this->createMock(\Scalyn\MailRelay\Contracts\ProviderInterface::class);
+		$provider->method('get_id')->willReturn('future-provider');
+		$provider->method('get_label')->willReturn('Future <script>provider</script>');
+		$provider->expects($this->never())->method('test_connection');
+		Plugin::instance()->container()->get(\Scalyn\MailRelay\Core\ProviderRegistry::class)->register($provider);
+		ob_start(); (new ReportsPage())->render(); $html=(string)ob_get_clean();
+		$this->assertStringContainsString('<select id="report-provider" name="provider"', $html);
+		$this->assertStringContainsString('value="future-provider">Future &lt;script&gt;provider&lt;/script&gt;', $html);
+		$this->assertStringNotContainsString('placeholder="smtp"', $html);
+		$this->assertStringNotContainsString('Future <script>', $html);
+	}
 	public function test_redesign_groups_controls_without_inventing_report_templates():void {
+		Plugin::instance()->boot();
 		ob_start();(new ReportsPage())->render();$html=(string)ob_get_clean();
 		$this->assertStringContainsString('Build your report',$html);
 		$this->assertSame(3,substr_count($html,'<fieldset '));
@@ -57,6 +71,7 @@ final class ReportExportTest extends TestCase {
 		(new ReportsPage())->render();
 	}
 	public function test_render_contains_privacy_default_and_nonce():void {
+		Plugin::instance()->boot();
 		ob_start();(new ReportsPage())->render();$html=ob_get_clean();
 		$this->assertStringContainsString('scalyn_export_report',$html);
 		$this->assertStringContainsString('name="_wpnonce"',$html);

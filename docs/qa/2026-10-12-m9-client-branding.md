@@ -59,3 +59,12 @@ When browser access is restored:
    as the client; confirm denial. Confirm administrator override still works.
 
 Tickets 3–7, including multiple configurations, routing and recovery, are pending.
+
+## Subsequent visual retry
+
+Browser access was restored on 2026-10-12. Local administrator visual checks of
+Agency Settings, Diagnostics and Dashboard passed the sampled desktop/mobile
+layout and overflow checks; the logo picker opened/closed without saving.
+Client-role and saved-branding acceptance remain pending. The previous blocker
+above describes the earlier run, not the current browser state. See the
+[visual retry record](2026-10-12-m9-visual-retry.md) for scope and findings.

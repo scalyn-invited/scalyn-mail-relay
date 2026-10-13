@@ -8,6 +8,8 @@
 namespace Scalyn\MailRelay\Admin\Pages;
 
 use Scalyn\MailRelay\Core\Capabilities;
+use Scalyn\MailRelay\Core\Plugin;
+use Scalyn\MailRelay\Core\ProviderRegistry;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -18,6 +20,10 @@ final class ReportsPage {
 	public function render(): void {
 		if ( ! current_user_can( Capabilities::EXPORT_REPORTS ) ) {
 			wp_die( esc_html__( 'You do not have permission to export reports.', 'scalyn-mail-relay' ) );
+		}
+		$providers = array();
+		foreach ( Plugin::instance()->container()->get( ProviderRegistry::class )->all() as $id => $provider ) {
+			$providers[ $id ] = $provider->get_label();
 		}
 		$end   = new \DateTimeImmutable( 'now', wp_timezone() );
 		$start = $end->modify( '-7 days' );

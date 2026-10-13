@@ -28,8 +28,13 @@ final class ProviderDeliveryEvidence {
 		private readonly array $sources
 	) {}
 
-	/** Returns bounded counts or explicit missing-evidence state; never credentials. */
-	public function current(): array {
+	/** Returns bounded counts or explicit missing-evidence state; never credentials.
+	 *
+	 * @param int      $days Requested window; provider health defaults to seven days.
+	 * @param int|null $now Shared evaluation instant, UTC epoch.
+	 * @param bool     $include_source Include public source UUID for persisted trace invalidation only.
+	 */
+	public function current( int $days = 7, ?int $now = null, bool $include_source = false ): array {
 		if ( ! current_user_can( Capabilities::MANAGE_SETTINGS ) ) {
 			return array( 'status' => 'unavailable' ); }
 		$provider = $this->settings->get_active_provider_id();
@@ -44,8 +49,8 @@ final class ProviderDeliveryEvidence {
 			$revision = $this->settings->get_diagnostic_revision();
 			if ( ! is_array( $source ) || ( $source['configuration_id'] ?? '' ) !== $revision ) {
 				return array( 'status' => 'unavailable' ); }
-			$counts = $this->repository->counts( $revision, $provider, $source['id'], min( 7, $this->settings->get_log_retention_days() ), new \DateTimeImmutable( 'now', new \DateTimeZone( 'UTC' ) ) );
-			return null === $counts ? array( 'status' => 'unavailable' ) : array_merge( $counts, array( 'status' => 'available' ) );
+			$counts = $this->repository->counts( $revision, $provider, $source['id'], min( 30, max( 1, $days ), $this->settings->get_log_retention_days() ), new \DateTimeImmutable( '@' . ( $now ?? time() ) ) );
+			return null === $counts ? array( 'status' => 'unavailable' ) : array_merge( $counts, array( 'status' => 'available' ), $include_source ? array( 'source_id' => $source['id'] ) : array() );
 		} catch ( \Throwable $error ) {
 			return array( 'status' => 'unavailable' );
 		}

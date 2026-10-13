@@ -30,8 +30,10 @@ defined( 'ABSPATH' ) || exit;
 		<?php endif; ?>
 	<?php endif; ?>
 	<details class="scalyn-disclosure"><summary><?php esc_html_e( 'Monitoring limitations', 'scalyn-mail-relay' ); ?></summary>
+	<div class="scalyn-helper-highlight">
 	<p><?php esc_html_e( 'Overdue and stale warnings allow five minutes of grace. Manual runs do not refresh scheduled monitoring. Execution status may outlive retained evidence; it is not an email-delivery guarantee.', 'scalyn-mail-relay' ); ?></p>
 	<p><?php esc_html_e( 'WP-Cron relies on site traffic. Low-traffic sites need an external cron trigger. A disabled automatic trigger requires server cron; otherwise scheduled work will not run.', 'scalyn-mail-relay' ); ?></p>
+	</div>
 	</details>
 	<?php if ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ) : ?>
 		<p><?php esc_html_e( 'Traffic-triggered WP-Cron is disabled on this site. Verify that a server cron job calls WordPress cron.', 'scalyn-mail-relay' ); ?></p>

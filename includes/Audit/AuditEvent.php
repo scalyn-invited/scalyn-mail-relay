@@ -22,7 +22,7 @@ final readonly class AuditEvent {
 	public const FIELDS = array( 'provider.active', 'smtp.host', 'smtp.port', 'smtp.encryption', 'smtp.username', 'smtp.password', 'smtp.from_name', 'smtp.from_email', 'sendgrid.api_key', 'sendgrid.from_name', 'sendgrid.from_email', 'postmark.api_key', 'brevo.api_key', 'brevo.from_email', 'brevo.from_name', 'smtp2go.api_key', 'smtp2go.from_email', 'smtp2go.from_name', 'postmark.from_name', 'postmark.from_email', 'advanced.log_retention_days', 'advanced.log_message_metadata', 'advanced.delete_data_on_uninstall', 'advanced.diagnostic_schedule', 'advanced.alert_webhook_enabled', 'advanced.dkim_selector' );
 
 	public const AGENCY_FIELDS   = array( 'agency.managed', 'agency.smtp', 'agency.providers', 'agency.critical' );
-	public const BRANDING_FIELDS = array( 'branding.name', 'branding.logo_id', 'branding.primary', 'branding.secondary', 'branding.support_email', 'branding.support_url', 'branding.docs_url' );
+	public const BRANDING_FIELDS = array( 'branding.name', 'branding.logo_id', 'branding.menu_icon_id', 'branding.primary', 'branding.secondary', 'branding.support_email', 'branding.support_url', 'branding.docs_url' );
 
 	private const OUTCOMES = array(
 		'recovery_work'            => array( 'owned', 'accepted', 'review', 'retry_evaluated', 'stopped' ),

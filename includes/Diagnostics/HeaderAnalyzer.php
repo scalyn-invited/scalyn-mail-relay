@@ -16,7 +16,8 @@ defined( 'ABSPATH' ) || exit;
  * subjects, message IDs, IP addresses or body content leave this class.
  *
  * Evidence scope: one message, as judged by one receiver at one time. It is
- * not a delivery guarantee and is not added to scores or history.
+ * not a delivery guarantee. Only fixed-enum verdict/alignment projections may
+ * be retained under ADR-0026; they do not contribute to scores.
  */
 final class HeaderAnalyzer {
 
@@ -69,9 +70,18 @@ final class HeaderAnalyzer {
 		if ( null === $ar ) {
 			$findings[] = $this->finding( 'Receiver verdict', 'unknown', 'No Authentication-Results header was found. Paste the headers from the copy in the recipient mailbox (for example "Show original" in Gmail), not from your sent folder.' );
 			return array(
-				'status'   => 'unknown',
-				'findings' => $findings,
-				'summary'  => $summary,
+				'status'    => 'unknown',
+				'verdicts'  => array(
+					'spf'   => 'unknown',
+					'dkim'  => 'unknown',
+					'dmarc' => 'unknown',
+				),
+				'alignment' => array(
+					'spf'  => 'unknown',
+					'dkim' => 'unknown',
+				),
+				'findings'  => $findings,
+				'summary'   => $summary,
 			);
 		}
 		$parsed              = $this->parse_results( $ar );
@@ -163,10 +173,21 @@ final class HeaderAnalyzer {
 		if ( 'pass' === $overall && in_array( 'fail', array_column( $findings, 'status' ), true ) ) {
 			$overall = 'warn';
 		}
+		$verdicts = array();
+		foreach ( $findings as $finding ) {
+			if ( in_array( $finding['label'], array( 'SPF', 'DKIM', 'DMARC' ), true ) ) {
+				$verdicts[ strtolower( $finding['label'] ) ] = $finding['status'];
+			}
+		}
 		return array(
-			'status'   => $overall,
-			'findings' => $findings,
-			'summary'  => $summary,
+			'status'    => $overall,
+			'verdicts'  => $verdicts,
+			'alignment' => array(
+				'spf'  => $spf_aligned,
+				'dkim' => $dkim_aligned,
+			),
+			'findings'  => $findings,
+			'summary'   => $summary,
 		);
 	}
 

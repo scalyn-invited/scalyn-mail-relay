@@ -35,5 +35,5 @@ jobs:
           node-version: '20'
       - name: Admin interface checks
         run: |
-          node --check assets/js/admin.js
-          node --test tests/js/admin.test.cjs
+          for script in assets/js/*.js; do node --check "$script"; done
+          node --test tests/js/*.test.cjs

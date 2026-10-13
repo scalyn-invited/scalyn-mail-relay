@@ -74,7 +74,7 @@ class SendGridProvider implements ProviderInterface {
 	 */
 	public function test_connection( array $config ): ConnectionResult {
 		if ( ! $this->validate_config( $config )->valid ) {
-			return new ConnectionResult( false, 'SendGrid configuration is incomplete or invalid.' );
+			return new ConnectionResult( false, 'SendGrid configuration is incomplete or invalid.', failure_category: TransportFailureCategory::CONFIG );
 		}
 		$sender   = $config['from_email'];
 		$probe    = array(
@@ -93,7 +93,7 @@ class SendGridProvider implements ProviderInterface {
 		$code     = $response['code'];
 		return 200 === $code
 			? new ConnectionResult( true, 'SendGrid accepted the sandbox request format. No email was sent.' )
-			: new ConnectionResult( false, $this->safe_status( $code, true, $response['credits_exceeded'] ) );
+			: new ConnectionResult( false, $this->safe_status( $code, true, $response['credits_exceeded'] ), failure_category: ( 401 === $code ? TransportFailureCategory::PROVIDER_REJECTION : TransportFailureCategory::from_http( $code ) ) );
 	}
 
 	/**
@@ -128,10 +128,12 @@ class SendGridProvider implements ProviderInterface {
 			null,
 			0 < $code ? (string) $code : null,
 			$this->safe_status( $code, false, $response['credits_exceeded'] ),
-			false,
-			$rejected ? TransportFailureCategory::PROVIDER_REJECTION : TransportFailureCategory::UNKNOWN,
+			429 === $code,
+			( 401 === $code ? TransportFailureCategory::PROVIDER_REJECTION : TransportFailureCategory::from_http( $code ) ),
 			array(),
-			! $rejected
+			! $rejected,
+			429 === $code,
+			$response['retry_after'] ?? 0
 		);
 	}
 
@@ -226,7 +228,7 @@ class SendGridProvider implements ProviderInterface {
 		if ( $headers ) {
 			$payload['headers'] = $headers;
 		}
-		$files = $this->attachments( $message->attachments );
+		$files = $this->attachments( $message->attachments, $message->attachment_names );
 		if ( $files ) {
 			$payload['attachments'] = $files;
 		}
@@ -270,16 +272,17 @@ class SendGridProvider implements ProviderInterface {
 	 * Reads bounded local attachments. Only filename and base64 content leave PHP.
 	 *
 	 * @param array $paths Local absolute paths.
+	 * @param array $names Private restored attachment names.
 	 * @return array Provider attachment records.
 	 * @throws \InvalidArgumentException When a file is invalid, unreadable or oversized.
 	 */
-	private function attachments( array $paths ): array {
+	private function attachments( array $paths, array $names = array() ): array {
 		if ( count( $paths ) > self::MAX_FILES ) {
 			throw new \InvalidArgumentException( 'Too many attachments were provided.' );
 		}
 		$result = array();
 		$total  = 0;
-		foreach ( $paths as $path ) {
+		foreach ( $paths as $index => $path ) {
 			if ( ! is_string( $path ) || strlen( $path ) > 4096 || ! preg_match( '~^(?:[A-Za-z]:[\\\\/]|/)~', $path ) ) {
 				throw new \InvalidArgumentException( 'An attachment path is unsupported.' );
 			}
@@ -288,7 +291,7 @@ class SendGridProvider implements ProviderInterface {
 			if ( false === $size || 0 >= $size || $size > self::MAX_FILE_BYTES || $total + $size > self::MAX_FILE_BYTES ) {
 				throw new \InvalidArgumentException( 'An attachment is unreadable or exceeds the size limit.' );
 			}
-			$filename = basename( $path );
+			$filename = $names[ $index ] ?? basename( $path );
 			if ( ! preg_match( '/^[A-Za-z0-9][A-Za-z0-9._ -]{0,199}$/D', $filename ) ) {
 				throw new \InvalidArgumentException( 'An attachment filename is unsupported.' );
 			}
@@ -346,6 +349,7 @@ class SendGridProvider implements ProviderInterface {
 			$code = $this->response_code( $response );
 			return array(
 				'code'             => $code >= 100 && $code <= 599 ? $code : 0,
+				'retry_after'      => \Scalyn\MailRelay\Mail\RetryAfter::seconds( $response ),
 				'credits_exceeded' => 401 === $code && $this->credits_exceeded( $response ),
 			);
 		} catch ( \Throwable $error ) {

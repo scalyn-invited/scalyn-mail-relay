@@ -80,7 +80,7 @@ final class SettingsRepository {
 			'alert_webhook_enabled'    => false,
 			'diagnostic_schedule'      => 'disabled',
 			'log_retention_days'       => 30,
-			'log_message_metadata'     => false,
+			'log_message_metadata'     => true,
 			'delete_data_on_uninstall' => false,
 		),
 	);
@@ -105,11 +105,17 @@ final class SettingsRepository {
 	 * @param CredentialCipher|null $cipher Optional credential service for transport use.
 	 */
 	public function __construct( private readonly ?CredentialCipher $cipher = null ) {
-		$stored       = get_option( self::OPTION_KEY, array() );
-		$this->loaded = $stored;
-		$this->data   = is_array( $stored )
-			? array_replace_recursive( self::DEFAULTS, $stored )
-			: self::DEFAULTS;
+		$stored       = get_option( self::OPTION_KEY, null );
+		$this->loaded = null === $stored ? array() : $stored;
+		$defaults     = self::DEFAULTS;
+		// New installations capture metadata by default. Existing installations
+		// without an explicit preference retain their previous off policy.
+		if ( null !== $stored ) {
+			$defaults['advanced']['log_message_metadata'] = false;
+		}
+		$this->data = is_array( $stored )
+			? array_replace_recursive( $defaults, $stored )
+			: $defaults;
 	}
 
 	/**
@@ -604,7 +610,7 @@ final class SettingsRepository {
 		return self::valid_retention_days( $value ) ? (int) $value : 30;
 	}
 
-	/** Returns explicit consent to retain recipient and subject metadata. */
+	/** Returns the effective policy for retaining recipient and subject metadata. */
 	public function get_log_message_metadata(): bool {
 		return true === ( $this->data['advanced']['log_message_metadata'] ?? false );
 	}

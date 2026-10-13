@@ -120,6 +120,16 @@ final class DiagnosticRunService {
 					'status'  => 409,
 				);
 			}
+			// Assessment persistence is separate from atomic diagnostic publication.
+			// A missing score must not turn a completed diagnostic run into a failure.
+			if ( current_user_can( \Scalyn\MailRelay\Core\Capabilities::RUN_DIAGNOSTICS ) && $container->has( DeliverabilityAssessment::class ) ) {
+				try {
+					$container->get( DeliverabilityAssessment::class )->assess();
+				} catch ( \Throwable $assessment_error ) {
+					// The shared card stays empty or requests a refresh; no false number.
+					$assessment_error = null;
+				}
+			}
 			return array(
 				'success'      => true,
 				'results'      => $published['results'],

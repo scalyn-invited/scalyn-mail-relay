@@ -228,3 +228,52 @@ does not claim to complete those rules or ADR-0026's Deliverability Score.
 Rollback: revert this code/UI slice; it writes no data and requires no migration
 or cleanup. Existing delivery retention and delete-on-uninstall behavior are
 unchanged.
+
+### Fifth implementation slice - failure categories (2026-10-07)
+
+Bernie approved additive schema 0.10.0, an optional connection-result category,
+and a 24-hour consecutive-submission window before implementation.
+
+- Versioned, idempotent dbDelta migration adds nullable failure_category varchar(32)
+  to mail logs and connection evidence; both columns are verified before version
+  advancement. Old records are not backfilled or classified from response text.
+- ConnectionResult gains an optional trailing failure_category argument; existing
+  callers remain compatible. Providers emit allowlisted observations only.
+- The repository accepts only the closed category vocabulary, adding rate-limit.
+  Successful/unconfirmed submissions cannot persist a failure category.
+  Pre-migration writes omit the new column and category reads remain unavailable.
+- Connection category and status share the atomic latest-started-wins upsert.
+  Success clears a former category; stale/future/expired evidence cannot supply
+  an authentication/configuration Critical result.
+- The latest three consecutive auth/config Failed submissions within 24 hours
+  establish Critical without the rate-rule's ten-attempt minimum. The sequence is
+  ordered by dispatch-log creation time then ID; Accepted, Prepared/unconfirmed,
+  unknown, or another failure category breaks it. It never skips these records.
+- Any definite provider-rejection or rate-limit Failed submission in 24 hours
+  establishes Warning unless Critical takes precedence. Existing rate, bounce
+  and freshness rules remain in force.
+- The category query is exact revision/provider, excludes future rows, and uses
+  the existing configuration/time index with 1,000 rows plus overflow sentinel.
+  Unavailable/over-limit or unclassified failure evidence cannot establish Healthy.
+- Persistence and read models carry categories/counts only, not raw responses.
+  Capability checks, retention and uninstall boundaries remain unchanged.
+
+HTTP mapping is conservative: 401 establishes auth for Postmark, Brevo and
+SMTP2GO; 429 establishes rate-limit; other definite client rejections remain
+provider-rejection. SendGrid retains its existing 401-as-rejection exception
+because account-credit restrictions can share that status. Timeouts, malformed
+successes and server errors do not establish an authentication failure. Postmark
+pre-submission server-probe failures are no longer all labelled config; they use
+only the observed status classification. SMTP connection failures use its existing
+sanitized transport classifier; a generic false return is not guessed as auth.
+
+Reference checks:
+[Postmark](https://www.postmarkapp.com/developer/api/overview),
+[Brevo](https://developers.brevo.com/docs/how-it-works),
+[SMTP2GO](https://developers.smtp2go.com/docs/getting-started).
+SendGrid's exception is protected by existing repository regression tests.
+
+Rollback leaves the nullable additive columns in place; do not downgrade the
+database version or backfill old records. No new table, retention schedule,
+automatic retry or mail lifecycle state is introduced. Review/controlled QA
+remain required; no live credentials were changed and no email was sent.

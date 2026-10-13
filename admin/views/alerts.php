@@ -10,15 +10,33 @@ defined( 'ABSPATH' ) || exit;
 <div class="wrap scalyn-mail-relay scalyn-alerts">
 	<h1><?php esc_html_e( 'Alerts & Recovery', 'scalyn-mail-relay' ); ?></h1>
 	<p class="scalyn-lead"><?php esc_html_e( 'Track operational incidents and notify your team when their state changes.', 'scalyn-mail-relay' ); ?></p>
+	<?php
+	$alert_tabs = array(
+		'overview'      => __( 'Overview', 'scalyn-mail-relay' ),
+		'notifications' => __( 'Notifications', 'scalyn-mail-relay' ),
+	);
+	if ( current_user_can( \Scalyn\MailRelay\Core\Capabilities::MANAGE_SETTINGS ) ) {
+		$alert_tabs['email-recovery'] = __( 'Email Recovery', 'scalyn-mail-relay' );
+	}
+	$alert_tabs['incident-history'] = __( 'Incident History', 'scalyn-mail-relay' );
+	\Scalyn\MailRelay\Admin\Components\PageTabs::render( $alert_tabs );
+	?>
+	<div id="scalyn-panel-overview" class="scalyn-provider-tab-panel" data-provider-panel="overview">
 	<div class="scalyn-grid scalyn-status-grid">
 		<section class="scalyn-card"><h2><?php esc_html_e( 'Notifications', 'scalyn-mail-relay' ); ?></h2><p class="scalyn-status-value"><?php echo esc_html( $enabled ? __( 'Enabled', 'scalyn-mail-relay' ) : __( 'Disabled', 'scalyn-mail-relay' ) ); ?></p><p><?php esc_html_e( 'Independent webhook channel. This is a preference, not proof of delivery.', 'scalyn-mail-relay' ); ?></p><a href="#scalyn-alert-preferences"><?php esc_html_e( 'Manage notifications', 'scalyn-mail-relay' ); ?></a></section>
 		<section class="scalyn-card"><h2><?php esc_html_e( 'Webhook readiness', 'scalyn-mail-relay' ); ?></h2><p class="scalyn-status-value"><?php echo esc_html( $configured ? __( 'Configuration present', 'scalyn-mail-relay' ) : __( 'Setup required', 'scalyn-mail-relay' ) ); ?></p><p><?php esc_html_e( 'Configuration presence does not verify connectivity. Credentials stay in protected server configuration.', 'scalyn-mail-relay' ); ?></p></section>
 		<section class="scalyn-card"><h2><?php esc_html_e( 'Recovery behavior', 'scalyn-mail-relay' ); ?></h2><p><?php esc_html_e( 'Incident recovery records an observed resolution. Separate opt-in email recovery can queue messages and retry only proven transient nonacceptance. It does not repair configuration or prove inbox delivery.', 'scalyn-mail-relay' ); ?></p><a href="#scalyn-recovery"><?php esc_html_e( 'Manage email recovery', 'scalyn-mail-relay' ); ?></a></section>
 	</div>
-	<?php \Scalyn\MailRelay\Admin\Components\RecoveryPanel::render(); ?>
+	</div>
+	<?php if ( current_user_can( \Scalyn\MailRelay\Core\Capabilities::MANAGE_SETTINGS ) ) : ?>
+	<div id="scalyn-panel-email-recovery" class="scalyn-provider-tab-panel" data-provider-panel="email-recovery">
+		<?php \Scalyn\MailRelay\Admin\Components\RecoveryPanel::render(); ?>
+	</div>
+	<?php endif; ?>
 	<?php if ( $notice ) : ?>
 		<div class="notice notice-info"><p><?php echo esc_html( $notice ); ?></p></div>
 	<?php endif; ?>
+	<div id="scalyn-panel-notifications" class="scalyn-provider-tab-panel" data-provider-panel="notifications">
 	<p><?php esc_html_e( 'Incidents are evaluated every five minutes when WordPress cron runs. Notifications use an independent webhook, not your email provider. A stopped website or cron runner cannot alert about its own outage; use an external uptime monitor.', 'scalyn-mail-relay' ); ?></p>
 	<p><?php echo esc_html( $next ? __( 'An alert tick is scheduled. This is not proof that the cron runner is working.', 'scalyn-mail-relay' ) : __( 'No alert tick is scheduled. Check WordPress cron before relying on alerts.', 'scalyn-mail-relay' ) ); ?></p>
 	<section class="scalyn-card" id="scalyn-alert-preferences">
@@ -50,6 +68,8 @@ defined( 'ABSPATH' ) || exit;
 	</ul>
 	<p><?php esc_html_e( 'Missing or stale observations hold existing incidents open; disabling scheduled diagnostics does not resolve a monitoring incident. Health evidence expires after 24 hours. Reopened incidents have a 15-minute notification cooldown.', 'scalyn-mail-relay' ); ?></p>
 	</details>
+	</div>
+	<div id="scalyn-panel-incident-history" class="scalyn-provider-tab-panel" data-provider-panel="incident-history">
 	<section class="scalyn-card scalyn-history-panel" id="scalyn-incident-history">
 	<div class="scalyn-panel-heading"><h2><?php esc_html_e( 'Incident history (UTC)', 'scalyn-mail-relay' ); ?></h2><p class="description"><?php echo esc_html( sprintf( /* translators: %d: displayed incident count, not a lifetime total. */ __( 'Records on this page: %d', 'scalyn-mail-relay' ), count( $history['rows'] ) ) ); ?></p></div>
 	<p><?php esc_html_e( 'Active incidents are retained. Resolved incidents and their notifications expire together under the retention period configured in Settings.', 'scalyn-mail-relay' ); ?></p>
@@ -85,10 +105,11 @@ defined( 'ABSPATH' ) || exit;
 					'before' => $history['next'],
 				),
 				admin_url( 'admin.php' )
-			)
+			) . '#incident-history'
 		);
 		?>
 					"><?php esc_html_e( 'Older incidents', 'scalyn-mail-relay' ); ?></a></p>
 	<?php endif; ?>
 	</section>
+	</div>
 </div>

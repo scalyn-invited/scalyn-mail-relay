@@ -9,6 +9,7 @@ namespace Scalyn\MailRelay\Providers\Smtp2go;
 
 use Scalyn\MailRelay\Providers\JsonApiProvider;
 use Scalyn\MailRelay\Providers\ConnectionResult;
+use Scalyn\MailRelay\Mail\TransportFailureCategory;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -35,12 +36,12 @@ class Smtp2goProvider extends JsonApiProvider {
 	 */
 	public function test_connection( array $config ): ConnectionResult {
 		if ( ! $this->validate_config( $config )->valid ) {
-			return new ConnectionResult( false, 'SMTP2GO configuration is incomplete or invalid.' );
+			return new ConnectionResult( false, 'SMTP2GO configuration is incomplete or invalid.', failure_category: TransportFailureCategory::CONFIG );
 		}
 		$response = $this->request( '/stats/email_cycle', $config['api_key'], '{}' );
 		$data     = $response['data']['data'] ?? array();
 		$valid    = 200 === $response['code'] && is_array( $data ) && ! isset( $data['error_code'] ) && is_int( $data['cycle_used'] ?? null ) && $data['cycle_used'] >= 0;
-		return new ConnectionResult( $valid, $valid ? 'SMTP2GO authenticated API read access. No email was sent; sending permission, sender authorization and delivery remain unverified.' : 'SMTP2GO verification failed. Check the API key, account access and /stats/email_cycle permission. No email was sent.' );
+		return new ConnectionResult( $valid, $valid ? 'SMTP2GO authenticated API read access. No email was sent; sending permission, sender authorization and delivery remain unverified.' : 'SMTP2GO verification failed. Check the API key, account access and /stats/email_cycle permission. No email was sent.', failure_category: $valid ? null : TransportFailureCategory::from_http( $response['code'] ) );
 	}
 
 	/**

@@ -20,7 +20,7 @@ final class LogFilters {
 	 */
 	public static function validate( array $values ): array {
 		$result = array();
-		foreach ( array( 'start', 'end', 'provider', 'source', 'recipient', 'search' ) as $key ) {
+		foreach ( array( 'start', 'end', 'provider', 'source', 'recipient', 'subject', 'message_id', 'search' ) as $key ) {
 			$value = $values[ $key ] ?? '';
 			if ( ! is_string( $value ) || strlen( $value ) > 255 ) {
 				throw new \InvalidArgumentException( 'Invalid log filter.' );
@@ -28,6 +28,9 @@ final class LogFilters {
 			$value = trim( $value );
 			if ( '' === $value ) {
 				continue;
+			}
+			if ( 'message_id' === $key && 1 !== preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $value ) ) {
+				throw new \InvalidArgumentException( 'Invalid message ID.' );
 			}
 			if ( in_array( $key, array( 'start', 'end' ), true ) ) {
 				$date = \DateTimeImmutable::createFromFormat( '!Y-m-d', $value );

@@ -44,6 +44,27 @@ final class MailRoutingTest extends TestCase {
 	public function test_disabled_policy_preserves_default(): void {
 		$this->assertSame([],$this->routes->plan($this->settings,'unknown/default'));
 	}
+	public function test_disabling_preserves_saved_rules_and_reenabling_restores_them(): void {
+		$id=$this->settings->get_active_configuration_id();
+		$rules=['unknown/default'=>[$id]];
+		$this->routes->save(true,$rules,'',$this->settings);
+		$this->routes->save(false,[],$this->routes->policy()['token'],$this->settings);
+		$this->assertSame($rules,$this->routes->policy()['rules']);
+		$this->assertSame([],$this->routes->plan($this->settings,'unknown/default'));
+		$this->routes->save(true,$this->routes->policy()['rules'],$this->routes->policy()['token'],$this->settings);
+		$this->assertSame($id,$this->routes->plan($this->settings,'unknown/default')[0]['id']);
+	}
+	public function test_disabled_routing_form_has_disabled_rules_but_enabled_save(): void {
+		ob_start();
+		try { \Scalyn\MailRelay\Admin\Components\RoutingForm::render(); $html=ob_get_contents(); }
+		finally { ob_end_clean(); }
+		$dom=new DOMDocument(); @$dom->loadHTML($html); $xpath=new DOMXPath($dom);
+		$this->assertSame(1,$xpath->query('//fieldset[@id="scalyn-routing-rules" and @disabled]')->length);
+		$this->assertSame(1,$xpath->query('//input[@id="scalyn-routing-enabled" and not(@disabled)]')->length);
+		$this->assertSame(1,$xpath->query('//input[@id="scalyn-routing-enabled" and @type="checkbox" and @role="switch"]')->length);
+		$this->assertSame(1,$xpath->query('//button[@name="scalyn_routing_save" and not(ancestor::fieldset[@disabled])]')->length);
+		$this->assertStringContainsString('Saved selections are kept.',$html);
+	}
 	public function test_default_route_is_pinned_and_rename_preserves_target(): void {
 		$id=$this->settings->get_active_configuration_id();
 		$this->routes->save(true,['unknown/default'=>[$id]],'',$this->settings);

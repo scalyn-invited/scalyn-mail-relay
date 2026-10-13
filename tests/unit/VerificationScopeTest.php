@@ -15,6 +15,7 @@ final class VerificationScopeTest extends TestCase {
 		$output = ob_get_clean();
 
 		$this->assertStringContainsString( 'Even 100/100 is a configuration-check score', $output );
+		$this->assertStringContainsString( '<div class="scalyn-helper-highlight">', $output );
 		$this->assertStringContainsString( 'Message authentication and delivery: not verified', $output );
 		$this->assertStringContainsString( 'envelope-sender domain', $output );
 		$this->assertStringContainsString( 'Older findings labelled valid', $output );

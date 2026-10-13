@@ -61,7 +61,7 @@ $setup_steps = array(
 );
 ?>
 <div class="wrap scalyn-mail-relay scalyn-dashboard">
-	<h1><?php esc_html_e( 'Scalyn Mail Relay', 'scalyn-mail-relay' ); ?></h1>
+	<h1><?php esc_html_e( 'Dashboard', 'scalyn-mail-relay' ); ?></h1>
 	<p class="scalyn-lead"><?php esc_html_e( 'Email delivery, diagnostics, monitoring and remediation.', 'scalyn-mail-relay' ); ?></p>
 	<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/dashboard-actions.php'; ?>
 	<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/activity-summary.php'; ?>
@@ -91,6 +91,10 @@ $setup_steps = array(
 			</details>
 		</section>
 		<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/monitoring-status.php'; ?>
+		<?php
+		if ( isset( $deliverability ) ) {
+			$deliverability->render(); }
+		?>
 
 		<section class="scalyn-card" aria-labelledby="scalyn-provider-heading">
 			<h2 id="scalyn-provider-heading"><?php esc_html_e( 'Mail Provider', 'scalyn-mail-relay' ); ?></h2>
@@ -108,6 +112,7 @@ $setup_steps = array(
 						<dd><?php echo esc_html( $provider_verified_at ); ?></dd>
 					<?php endif; ?>
 				</dl>
+				<div class="scalyn-helper-highlight">
 				<p class="description"><?php esc_html_e( 'Verification records a successful connection check or accepted send, not current availability or inbox delivery. It is not the latest attempt result; later failures may exist.', 'scalyn-mail-relay' ); ?></p>
 				<?php if ( 'sendgrid' === $active_provider_id ) : ?>
 					<p class="description"><?php esc_html_e( 'SendGrid connection checks use sandbox mode and do not prove real-send permission.', 'scalyn-mail-relay' ); ?></p>
@@ -118,6 +123,7 @@ $setup_steps = array(
 				<?php elseif ( 'postmark' === $active_provider_id ) : ?>
 					<p class="description"><?php esc_html_e( 'Postmark connection checks verify token access and Live server type only, not sender authorization, sending allowance or delivery.', 'scalyn-mail-relay' ); ?></p>
 				<?php endif; ?>
+				</div>
 				<div class="scalyn-actions">
 					<?php if ( current_user_can( \Scalyn\MailRelay\Core\Capabilities::MANAGE_MAIL ) ) : ?>
 						<a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-providers' ) ); ?>"><?php esc_html_e( 'Manage provider', 'scalyn-mail-relay' ); ?></a>

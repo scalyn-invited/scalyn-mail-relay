@@ -35,7 +35,7 @@ defined( 'ABSPATH' ) || exit;
 	<p><?php esc_html_e( 'Maximum 5 MiB of body and attachments per message, ten attachments, 100 retained payloads and 20 MiB encrypted storage. New ownership fails safely when capacity or encryption is unavailable. No plaintext fallback.', 'scalyn-mail-relay' ); ?></p>
 	<p><?php esc_html_e( 'WordPress cron depends on traffic. Expired content is never sent; physical cleanup runs on the next worker or retention tick. Use reliable system cron if deletion must occur by a strict wall-clock deadline.', 'scalyn-mail-relay' ); ?></p>
 	<p><?php echo esc_html( wp_next_scheduled( \Scalyn\MailRelay\Core\ScheduledHooks::RECOVERY ) ? __( 'A worker tick is scheduled; this is not proof it ran.', 'scalyn-mail-relay' ) : __( 'No worker tick is scheduled. Check WordPress cron.', 'scalyn-mail-relay' ) ); ?></p>
-	<p><a href="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-providers' ) ); ?>"><?php esc_html_e( 'Manage primary and alternate routes', 'scalyn-mail-relay' ); ?></a></p>
+	<p><a href="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-providers#email-routing' ) ); ?>"><?php esc_html_e( 'Manage primary and alternate routes', 'scalyn-mail-relay' ); ?></a></p>
 </section>
 <section class="scalyn-card">
 	<h2><?php esc_html_e( 'Recent recovery work', 'scalyn-mail-relay' ); ?></h2>

@@ -7,6 +7,29 @@ use Scalyn\MailRelay\Core\Plugin;
 use Scalyn\MailRelay\Core\SettingsRepository;
 
 final class ProvidersPageTest extends TestCase {
+	public function test_catalog_preserves_full_cards_and_has_local_marks_and_accessible_dialog(): void {
+		$html = $this->render_page();
+		$dom = new DOMDocument();
+		@$dom->loadHTML( $html );
+		$xpath = new DOMXPath( $dom );
+		$this->assertSame( 5, $xpath->query( '//button[@data-provider-index and @aria-haspopup="dialog"]' )->length );
+		$this->assertSame( 5, $xpath->query( '//section[@class="scalyn-card scalyn-provider-card"]' )->length );
+		$this->assertSame( 10, $xpath->query( '//img[@class="scalyn-provider-logo" and @alt=""]' )->length );
+		$this->assertSame( 1, $xpath->query( '//div[@class="scalyn-provider-catalog" and @hidden]' )->length );
+		$this->assertSame( 1, $xpath->query( '//dialog[@aria-labelledby="scalyn-provider-details-title"]' )->length );
+		$this->assertStringContainsString( 'Viewing details does not change the sending provider.', $html );
+		$this->assertStringNotContainsString( 'https://cdn.', $html );
+		$this->assertStringNotContainsString( 'scalyn-provider-search', $html );
+		$this->assertStringNotContainsString( 'scalyn-provider-filter', $html );
+	}
+	public function test_help_text_escapes_content_and_label(): void {
+		ob_start();
+		try { \Scalyn\MailRelay\Admin\Components\HelpText::render('" onmouseover="unsafe','<script>unsafe</script>'); $html=ob_get_contents(); }
+		finally { ob_end_clean(); }
+		$this->assertStringNotContainsString('<script>', $html);
+		$this->assertStringContainsString('&lt;script&gt;unsafe&lt;/script&gt;', $html);
+		$this->assertStringContainsString('&quot; onmouseover=&quot;unsafe', $html);
+	}
 	protected function setUp(): void {
 		(new ReflectionProperty(Plugin::class, 'instance'))->setValue(null, null);
 		$GLOBALS['wpdb'] = new WpdbStub();
@@ -60,6 +83,9 @@ final class ProvidersPageTest extends TestCase {
 		$this->assertStringContainsString('Not checked for the current configuration', $html);
 		$this->assertStringContainsString('Provider health', $html);
 		$this->assertStringContainsString('Unknown', $html);
+		$this->assertStringContainsString('class="scalyn-help-text"', $html);
+		$this->assertStringContainsString('aria-label="About provider health"', $html);
+		$this->assertStringContainsString('class="scalyn-help-text__content"', $html);
 		$this->assertStringContainsString('Verify connection', $html);
 		$this->assertStringContainsString('Settings saved', $html);
 		$this->assertStringContainsString('current configuration', $html);
@@ -80,5 +106,32 @@ final class ProvidersPageTest extends TestCase {
 		$html = $this->render_page();
 		$this->assertSame($before, $GLOBALS['_test_wp_options']);
 		$this->assertStringNotContainsString('name="api_key"', $html);
+	}
+	public function test_tabs_group_existing_controls_without_hiding_no_script_content(): void {
+		$GLOBALS['_test_current_user_can'][Capabilities::MANAGE_SETTINGS] = true;
+		$before = $GLOBALS['_test_wp_options'];
+		$html = $this->render_page();
+		$this->assertSame($before, $GLOBALS['_test_wp_options']);
+		$dom = new DOMDocument();
+		@$dom->loadHTML('<?xml encoding="utf-8" ?>' . $html);
+		$xpath = new DOMXPath($dom);
+		$this->assertSame(3, $xpath->query('//*[@data-provider-tab]')->length);
+		foreach (array('providers', 'email-routing', 'saved-configurations') as $key) {
+			$this->assertSame(1, $xpath->query('//a[@href="#' . $key . '"]')->length);
+			$this->assertSame(1, $xpath->query('//*[@data-provider-panel="' . $key . '" and not(@hidden)]')->length);
+		}
+		$this->assertStringContainsString('Active sending route', $dom->getElementById('scalyn-panel-providers')->textContent);
+		$this->assertStringContainsString('Email routing', $dom->getElementById('scalyn-panel-email-routing')->textContent);
+		$this->assertStringContainsString('Saved configurations', $dom->getElementById('scalyn-panel-saved-configurations')->textContent);
+		$this->assertSame(1, $xpath->query('//*[@id="scalyn-panel-email-routing"]//form[contains(@action,"#email-routing")]')->length);
+		$this->assertSame(0, $xpath->query('//*[@id="scalyn-panel-providers"]//form')->length);
+	}
+	public function test_restricted_users_receive_no_configuration_tabs_or_panels(): void {
+		$html = $this->render_page();
+		$this->assertStringContainsString('href="#providers"', $html);
+		$this->assertStringNotContainsString('href="#email-routing"', $html);
+		$this->assertStringNotContainsString('href="#saved-configurations"', $html);
+		$this->assertStringNotContainsString('id="scalyn-panel-email-routing"', $html);
+		$this->assertStringNotContainsString('id="scalyn-panel-saved-configurations"', $html);
 	}
 }

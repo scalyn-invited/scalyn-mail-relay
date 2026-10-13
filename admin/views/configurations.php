@@ -23,7 +23,7 @@ $form_fields            = static function () use ( $wizard, $configuration_setti
 	$feedback = isset( $_GET['configuration_saved'] ) && is_string( $_GET['configuration_saved'] ) ? sanitize_text_field( wp_unslash( $_GET['configuration_saved'] ) ) : '';
 	if ( '' !== $feedback ) :
 		?>
-		<p role="status"><?php echo esc_html( 'yes' === $feedback ? __( 'Configuration action saved. Review the selected default below.', 'scalyn-mail-relay' ) : __( 'No changes saved. Reload and check the name, selection, managed locks and server encryption. The active default cannot be archived.', 'scalyn-mail-relay' ) ); ?></p>
+		<p class="scalyn-helper-highlight" role="status"><?php echo esc_html( 'yes' === $feedback ? __( 'Configuration action saved. Review the selected default below.', 'scalyn-mail-relay' ) : __( 'No changes saved. Reload and check the name, selection, managed locks and server encryption. The active default cannot be archived.', 'scalyn-mail-relay' ) ); ?></p>
 	<?php endif; ?>
 	<?php if ( $locked ) : ?>
 		<p><?php esc_html_e( 'Configurations are managed by your administrator or agency manager.', 'scalyn-mail-relay' ); ?></p>

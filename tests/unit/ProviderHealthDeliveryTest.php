@@ -4,7 +4,7 @@ use Scalyn\MailRelay\Health\ProviderHealthAssessment;
 
 final class ProviderHealthDeliveryTest extends TestCase {
  private function assess(array $delivery,?array $day=['accepted'=>20,'failed'=>0],string $connection='passed'):array {
-  return ProviderHealthAssessment::evaluate('brevo','11111111-1111-4111-8111-111111111111',['status'=>$connection,'checked_at'=>'2026-10-06 00:00:00'],$day,['accepted'=>20,'failed'=>0],$delivery);
+  return ProviderHealthAssessment::evaluate('brevo','11111111-1111-4111-8111-111111111111',['status'=>$connection,'checked_at'=>'2026-10-06 00:00:00'],$day,['accepted'=>20,'failed'=>0],$delivery,['auth_config_streak'=>0,'provider_rejections'=>0,'rate_limits'=>0,'unclassified'=>0]);
  }
  private function evidence(int $tracked,int $observed,int $hard):array {return ['status'=>'available','tracked'=>$tracked,'observed'=>$observed,'hard_bounced'=>$hard,'days'=>7,'window_start'=>'2026-09-29 00:00:00.000000','window_end'=>'2026-10-06 00:00:00.000000'];}
  public function test_bounce_threshold_is_strict_and_minimum_sample_required():void {

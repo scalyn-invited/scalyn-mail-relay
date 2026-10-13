@@ -10,11 +10,27 @@ Owner: Bernie. Approved plan: 2026-10-12. New providers are excluded.
    `feature/m9-t2-client-branding`, stacked on ticket 1 (`06cee73`). ADR 0032.
    Live visual and owner acceptance pending; client export is a summary CSV,
    separate from administrator technical CSV/JSON/PDF exports.
-3. Named configurations, revisions and evidence attribution: pending.
-4. Explicit source/type attribution and ordered routing: pending.
-5. Logical-message/per-attempt correlation and recovery safety evidence: pending.
-6. Opt-in encrypted retry queue and conservative failover: pending.
-7. Recovery UI, lifecycle, retention and integrated acceptance QA: pending.
+3. Named configurations, revisions and evidence attribution: implemented locally
+   on `feature/m9-t3-named-configurations`, stacked on tickets 1–2. ADR 0033.
+   Explicit legacy import; archive-only removal; exact-revision evidence and
+   webhook pause semantics. Owner acceptance and populated live workflow QA pending.
+4. Explicit source/type attribution and ordered routing: implemented locally,
+   `feature/m9-t4-explicit-routing`, ADR 0034.
+5. Logical-message/per-attempt correlation and recovery safety evidence:
+   implemented locally, `feature/m9-t5-attempt-evidence`, ADR 0035, schema 0.12.
+6. Opt-in encrypted retry queue and conservative failover: implemented locally,
+   `feature/m9-t6-encrypted-recovery`, ADR 0036, schema 0.13.
+7. Recovery UI, lifecycle, retention and integrated local QA: implemented locally
+   on `feature/m9-t7-recovery-controls`, ADR 0037. Local automated, disposable
+   WordPress/SQL and sampled administrator desktop/mobile QA passed; owner,
+   client/saved-branding, populated workflows and controlled provider staging
+   acceptance remain pending. See [integrated evidence](qa/2026-10-12-m9-recovery.md).
+
+Tickets 5–7 checkpoint commits intentionally exclude shared integration edits
+that overlap preserved Milestone 8 work. The combined working tree, not those
+commits alone, is the validated implementation. Prepare focused PR snapshots
+with the M8 dependency before integration. No remote CI/push/PR or staging
+deployment was performed in this implementation pass.
 
 Use one focused ticket/branch/PR per change; no automatic merges. Existing
 Milestone 8 failure-category and ADR-0026 work is preserved and uncommitted.
@@ -51,6 +67,8 @@ ask privately for missing access or approved recipients. No customer mail or
 volume testing. Rollback must first stop recovery workers; never replay uncertain
 attempts.
 
-Browser automation currently fails before opening a surface because its Windows
-sandbox helper is missing. Live visual QA and file-manager deployment are blocked;
-local implementation/CLI checks can continue. No staging upload has occurred.
+Browser access was restored during the 2026-10-12 visual retry; the earlier
+helper-discovery error did not recur. Local administrator layouts were checked
+on desktop/mobile, including the logo picker, without saving configuration.
+Client-role and saved-branding acceptance remain pending, as do staging checks.
+No staging upload has occurred. See [visual QA evidence](qa/2026-10-12-m9-visual-retry.md).

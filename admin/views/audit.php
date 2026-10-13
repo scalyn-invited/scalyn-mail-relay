@@ -6,6 +6,8 @@
  */
 
 defined( 'ABSPATH' ) || exit;
+$audit_url  = admin_url( 'admin.php?page=scalyn-mail-relay-audit' );
+$newest_url = add_query_arg( 'per_page', $per_page, $audit_url );
 ?>
 <div class="wrap scalyn-mail-relay scalyn-audit">
 	<h1><?php esc_html_e( 'Audit History', 'scalyn-mail-relay' ); ?></h1>
@@ -19,12 +21,24 @@ defined( 'ABSPATH' ) || exit;
 		<div class="notice notice-error" role="status"><p><?php esc_html_e( 'Audit history is unavailable. Check database availability and try again.', 'scalyn-mail-relay' ); ?></p></div>
 	<?php else : ?>
 		<section class="scalyn-card scalyn-history-panel" aria-labelledby="scalyn-audit-records">
-		<div class="scalyn-panel-heading"><h2 id="scalyn-audit-records"><?php esc_html_e( 'Recorded activity', 'scalyn-mail-relay' ); ?></h2><p class="description"><?php echo esc_html( sprintf( /* translators: %d: displayed record count, not a lifetime total. */ __( 'Records on this page: %d', 'scalyn-mail-relay' ), count( $page['rows'] ) ) ); ?></p></div>
-		<p class="description"><?php esc_html_e( 'Newest first · Site time · Up to 50 records per page. Changed fields are listed without their values or credentials.', 'scalyn-mail-relay' ); ?></p>
+		<div class="scalyn-panel-heading"><h2 id="scalyn-audit-records"><?php esc_html_e( 'Recorded activity', 'scalyn-mail-relay' ); ?></h2>
+		<div class="scalyn-audit-result-controls">
+		<p class="description"><?php echo esc_html( sprintf( /* translators: %d: displayed record count, not a lifetime total. */ __( 'Records on this page: %d', 'scalyn-mail-relay' ), count( $page['rows'] ) ) ); ?></p>
+		<form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" id="scalyn-audit-page-size-form">
+			<input type="hidden" name="page" value="scalyn-mail-relay-audit" />
+			<label for="scalyn-audit-per-page"><?php esc_html_e( 'Records per page', 'scalyn-mail-relay' ); ?></label>
+			<select id="scalyn-audit-per-page" name="per_page">
+				<?php foreach ( $page_sizes as $size ) : ?>
+					<option value="<?php echo esc_attr( $size ); ?>" <?php selected( $per_page, $size ); ?>><?php echo esc_html( $size ); ?></option>
+				<?php endforeach; ?>
+			</select>
+			<noscript><button type="submit" class="button"><?php esc_html_e( 'Update records', 'scalyn-mail-relay' ); ?></button></noscript>
+		</form></div></div>
+		<p class="description"><?php esc_html_e( 'Newest first · Site time. Changed fields are listed without their values or credentials.', 'scalyn-mail-relay' ); ?></p>
 		<p class="description"><?php esc_html_e( 'On narrow screens, scroll the table horizontally to view all columns.', 'scalyn-mail-relay' ); ?></p>
 		<div class="scalyn-table-scroll" role="region" aria-label="<?php esc_attr_e( 'Audit events', 'scalyn-mail-relay' ); ?>" tabindex="0">
 		<table class="widefat striped">
-			<caption class="screen-reader-text"><?php esc_html_e( 'Audit events, up to 50 per page', 'scalyn-mail-relay' ); ?></caption>
+			<caption class="screen-reader-text"><?php esc_html_e( 'Recorded audit events', 'scalyn-mail-relay' ); ?></caption>
 			<thead><tr>
 				<?php foreach ( array( __( 'Time', 'scalyn-mail-relay' ), __( 'Action', 'scalyn-mail-relay' ), __( 'Outcome', 'scalyn-mail-relay' ), __( 'Actor', 'scalyn-mail-relay' ), __( 'Source', 'scalyn-mail-relay' ), __( 'Correlation', 'scalyn-mail-relay' ), __( 'Details', 'scalyn-mail-relay' ) ) as $heading ) : ?>
 					<th scope="col"><?php echo esc_html( $heading ); ?></th>
@@ -61,9 +75,9 @@ defined( 'ABSPATH' ) || exit;
 		</table>
 		</div>
 		<nav aria-label="<?php esc_attr_e( 'Audit pagination', 'scalyn-mail-relay' ); ?>">
-			<p><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-audit' ) ); ?>"><?php esc_html_e( 'Newest events', 'scalyn-mail-relay' ); ?></a>
+			<p><a class="button" href="<?php echo esc_url( $newest_url ); ?>"><?php esc_html_e( 'Newest events', 'scalyn-mail-relay' ); ?></a>
 			<?php if ( $page['next'] > 0 ) : ?>
-				<a class="button" href="<?php echo esc_url( add_query_arg( 'before', $page['next'], admin_url( 'admin.php?page=scalyn-mail-relay-audit' ) ) ); ?>"><?php esc_html_e( 'Older events', 'scalyn-mail-relay' ); ?></a>
+				<a class="button" href="<?php echo esc_url( add_query_arg( 'before', $page['next'], $newest_url ) ); ?>"><?php esc_html_e( 'Older events', 'scalyn-mail-relay' ); ?></a>
 			<?php endif; ?></p>
 		</nav>
 		</section>

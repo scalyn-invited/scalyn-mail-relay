@@ -32,11 +32,16 @@ final class RoutingForm {
 			check_admin_referer( 'scalyn_routing' );
 			try {
 				\Scalyn\MailRelay\Admin\ConfigurationGuard::check( $settings );
-				$rules = array();
+				$rules          = array();
+				$current_policy = $repository->policy();
 				foreach ( MailOrigin::types() as $key => $label ) {
 					$field = str_replace( '/', '__', $key );
 					// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Each scalar is validated and sanitized below; repository validates identifiers.
 					$raw = isset( $_POST['routes'][ $field ] ) && is_array( $_POST['routes'][ $field ] ) ? wp_unslash( $_POST['routes'][ $field ] ) : array();
+					// Initial enable without JavaScript submits no disabled selections.
+					if ( ! $current_policy['enabled'] && ! isset( $_POST['routes'] ) ) {
+						$raw = $current_policy['rules'][ $key ] ?? array();
+					}
 					$ids = array();
 					foreach ( $raw as $id ) {
 						if ( ! is_string( $id ) ) {

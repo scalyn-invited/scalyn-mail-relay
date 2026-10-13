@@ -189,7 +189,7 @@ class SmtpProvider implements ProviderInterface {
 	public function test_connection( array $config ): ConnectionResult {
 		$validation = $this->validate_config( $config );
 		if ( ! $validation->valid ) {
-			return new ConnectionResult( false, $this->config_validation_failure_message( $validation ) );
+			return new ConnectionResult( false, $this->config_validation_failure_message( $validation ), failure_category: TransportFailureCategory::CONFIG );
 		}
 
 		PhpMailerLoader::load();
@@ -218,7 +218,7 @@ class SmtpProvider implements ProviderInterface {
 			// smtpConnect() already calls quit() internally on TLS/auth failure
 			// before rethrowing; smtpClose() is idempotent when disconnected.
 			$mailer->smtpClose();
-			return new ConnectionResult( false, $this->normalize_connection_message( $e ) );
+			return new ConnectionResult( false, $this->normalize_connection_message( $e ), failure_category: $this->classify_transport_exception( $e ) );
 		}
 	}
 
@@ -303,17 +303,21 @@ class SmtpProvider implements ProviderInterface {
 			}
 
 			// Attachments — paths only; contents are never read into Scalyn data.
-			foreach ( $message->attachments as $attachment ) {
+			foreach ( $message->attachments as $index => $attachment ) {
 				if ( ! is_string( $attachment ) || ! preg_match( '~^(?:[A-Za-z]:[\\\\/]|/)~', $attachment )
 					|| ! is_file( $attachment ) || ! is_readable( $attachment ) ) {
 					return new SendResult( false, 'smtp', null, null, 'An attachment is unreadable or unsupported.', false, TransportFailureCategory::CONFIG );
 				}
-				$mailer->addAttachment( (string) $attachment );
+				$name = $message->attachment_names[ $index ] ?? basename( $attachment );
+				if ( ! is_string( $name ) || preg_match( '/[\r\n\x00\\\\\/]/', $name ) ) {
+					return new SendResult( false, 'smtp', failure_category: TransportFailureCategory::CONFIG );
+				}
+				$mailer->addAttachment( (string) $attachment, $name );
 			}
 
 			// Establish a known pre-DATA boundary; send() reuses this connection.
 			if ( ! $mailer->smtpConnect() ) {
-				return new SendResult( false, 'smtp', null, null, 'Unable to connect to the SMTP server before sending.', false, TransportFailureCategory::CONNECTIVITY );
+				return new SendResult( false, 'smtp', null, null, 'Unable to connect to the SMTP server before sending.', true, TransportFailureCategory::CONNECTIVITY, safe_to_retry: true );
 			}
 			$send_attempted = true;
 			if ( ! $mailer->send() ) {
@@ -633,9 +637,10 @@ class SmtpProvider implements ProviderInterface {
 			provider_message_id: null,
 			response_code: null,
 			response_message: $message,
-			retryable: false,
+			retryable: ! $send_attempted && in_array( $category, array( TransportFailureCategory::CONNECTIVITY, TransportFailureCategory::TIMEOUT ), true ),
 			failure_category: $category,
-			acceptance_unconfirmed: $unconfirmed
+			acceptance_unconfirmed: $unconfirmed,
+			safe_to_retry: ! $send_attempted
 		);
 	}
 

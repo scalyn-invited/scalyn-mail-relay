@@ -44,6 +44,7 @@ final class BrandingRepository {
 		return array(
 			'name'          => 'Scalyn Mail Relay',
 			'logo_id'       => 0,
+			'menu_icon_id'  => 0,
 			'primary'       => '#08766b',
 			'secondary'     => '#17292e',
 			'support_email' => '',
@@ -101,6 +102,13 @@ final class BrandingRepository {
 		return is_string( $url ) ? $url : '';
 	}
 
+	/** Returns the separate raster sidebar icon, or empty for the envelope fallback. */
+	public function menu_icon_url(): string {
+		$id  = $this->get()['menu_icon_id'];
+		$url = $id ? wp_get_attachment_image_url( $id, 'thumbnail' ) : false;
+		return is_string( $url ) ? $url : '';
+	}
+
 	/** Validates one field without lossy sanitization that could hide mistakes.
 	 *
 	 * @param string $key Fixed field.
@@ -109,7 +117,7 @@ final class BrandingRepository {
 	 * @throws \InvalidArgumentException When invalid.
 	 */
 	private function validate( string $key, mixed $value ): string|int {
-		if ( 'logo_id' === $key ) {
+		if ( in_array( $key, array( 'logo_id', 'menu_icon_id' ), true ) ) {
 			if ( ! is_int( $value ) || $value < 0 || ( $value > 0 && ( 'attachment' !== get_post_type( $value )
 				|| ! in_array( get_post_mime_type( $value ), array( 'image/png', 'image/jpeg', 'image/webp' ), true ) ) ) ) {
 				throw new \InvalidArgumentException( 'Choose a PNG, JPEG or WebP media attachment.' );

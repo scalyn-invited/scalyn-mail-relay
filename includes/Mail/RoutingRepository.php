@@ -51,7 +51,7 @@ final class RoutingRepository {
 			throw new \RuntimeException( 'Too many routing rules.' );
 		}
 		$validated = array();
-		foreach ( $rules as $source => $ids ) {
+		foreach ( $enabled ? $rules : array() as $source => $ids ) {
 			if ( ! isset( MailOrigin::types()[ $source ] ) || ! is_array( $ids ) || count( $ids ) > 3 || count( array_unique( $ids, SORT_REGULAR ) ) !== count( $ids ) ) {
 				throw new \RuntimeException( 'Invalid routing rule.' );
 			}
@@ -72,6 +72,11 @@ final class RoutingRepository {
 			wp_cache_delete( self::OPTION, 'options' );
 			wp_cache_delete( 'alloptions', 'options' );
 			wp_cache_delete( 'notoptions', 'options' );
+			// Disabled fieldsets are not submitted. Keep saved rules, even if a target
+			// is no longer ready; validate all targets again when enabling routing.
+			if ( ! $enabled ) {
+				$validated = $this->policy()['rules'];
+			}
 			if ( $this->policy()['token'] !== $token || ! update_option(
 				self::OPTION,
 				array(

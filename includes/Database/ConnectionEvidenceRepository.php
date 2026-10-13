@@ -14,15 +14,16 @@ final class ConnectionEvidenceRepository {
 	/**
 	 * Persists a result; checks that started earlier cannot replace newer checks.
 	 *
-	 * @param string $revision Captured revision UUID.
-	 * @param string $provider Provider ID.
-	 * @param string $status passed, failed or unknown.
-	 * @param string $started UTC start timestamp with microseconds.
-	 * @param string $checked UTC completion timestamp with microseconds.
+	 * @param string      $revision Captured revision UUID.
+	 * @param string      $provider Provider ID.
+	 * @param string      $status passed, failed or unknown.
+	 * @param string      $started UTC start timestamp with microseconds.
+	 * @param string      $checked UTC completion timestamp with microseconds.
+	 * @param string|null $failure_category Optional observed category.
 	 * @throws \RuntimeException When storage is unavailable.
 	 * @throws \InvalidArgumentException When evidence is invalid.
 	 */
-	public function record( string $revision, string $provider, string $status, string $started, string $checked ): void {
+	public function record( string $revision, string $provider, string $status, string $started, string $checked, ?string $failure_category = null ): void {
 		global $wpdb;
 		if ( ! self::valid_scope( $revision, $provider ) || ! in_array( $status, array( 'passed', 'failed', 'unknown' ), true )
 			|| ! self::valid_time( $started ) || ! self::valid_time( $checked ) || $checked < $started ) {
@@ -31,21 +32,22 @@ final class ConnectionEvidenceRepository {
 		if ( ! self::ready() ) {
 			throw new \RuntimeException( 'Connection evidence unavailable.' );
 		}
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Atomic latest-started-wins upsert; no read/write race.
-		$result = $wpdb->query(
-			$wpdb->prepare(
-				'INSERT INTO %i (configuration_id,provider,status,started_at,checked_at) VALUES (%s,%s,%s,%s,%s)
+
+		$sql  = 'INSERT INTO %i (configuration_id,provider,status,started_at,checked_at) VALUES (%s,%s,%s,%s,%s)
 			ON DUPLICATE KEY UPDATE status=IF(VALUES(started_at)>started_at,VALUES(status),status),
 			checked_at=IF(VALUES(started_at)>started_at,VALUES(checked_at),checked_at),
-			started_at=GREATEST(started_at,VALUES(started_at))',
-				$wpdb->prefix . 'scalyn_connection_evidence',
-				$revision,
-				$provider,
-				$status,
-				$started,
-				$checked
-			)
-		);
+			started_at=GREATEST(started_at,VALUES(started_at))';
+		$args = array( $wpdb->prefix . 'scalyn_connection_evidence', $revision, $provider, $status, $started, $checked );
+		if ( self::categories_ready() ) {
+			$sql    = 'INSERT INTO %i (configuration_id,provider,status,started_at,checked_at,failure_category) VALUES (%s,%s,%s,%s,%s,NULLIF(%s,\'\'))
+			ON DUPLICATE KEY UPDATE failure_category=IF(VALUES(started_at)>started_at,VALUES(failure_category),failure_category),
+			status=IF(VALUES(started_at)>started_at,VALUES(status),status),
+			checked_at=IF(VALUES(started_at)>started_at,VALUES(checked_at),checked_at),
+			started_at=GREATEST(started_at,VALUES(started_at))';
+			$args[] = 'failed' === $status ? ( \Scalyn\MailRelay\Mail\TransportFailureCategory::retained( $failure_category ) ?? '' ) : '';
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared -- Fixed schema-version SQL above, all arguments prepared; latest-started-wins atomic upsert.
+		$result = $wpdb->query( $wpdb->prepare( $sql, ...$args ) );
 		if ( false === $result ) {
 			throw new \RuntimeException( 'Connection evidence unavailable.' );
 		}
@@ -63,13 +65,18 @@ final class ConnectionEvidenceRepository {
 		if ( ! self::ready() || ! self::valid_scope( $revision, $provider ) ) {
 			return null;
 		}
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Bounded exact-key operational read.
-		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT status,started_at,checked_at FROM %i WHERE configuration_id=%s AND provider=%s LIMIT 1', $wpdb->prefix . 'scalyn_connection_evidence', $revision, $provider ), ARRAY_A );
+		$select = self::categories_ready() ? 'SELECT status,started_at,checked_at,failure_category FROM %i WHERE configuration_id=%s AND provider=%s LIMIT 1' : 'SELECT status,started_at,checked_at FROM %i WHERE configuration_id=%s AND provider=%s LIMIT 1';
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared -- Fixed exact-key SELECT chosen by schema version.
+		$row = $wpdb->get_row( $wpdb->prepare( $select, $wpdb->prefix . 'scalyn_connection_evidence', $revision, $provider ), ARRAY_A );
 		if ( ! is_array( $row ) || ! empty( $wpdb->last_error ) || ! in_array( $row['status'] ?? '', array( 'passed', 'failed', 'unknown' ), true )
 			|| ! self::valid_time( $row['started_at'] ?? '' ) || ! self::valid_time( $row['checked_at'] ?? '' ) || $row['checked_at'] < $row['started_at'] ) {
 			return null;
 		}
-		return array_intersect_key( $row, array_flip( array( 'status', 'started_at', 'checked_at' ) ) );
+		$safe     = array_intersect_key( $row, array_flip( array( 'status', 'started_at', 'checked_at' ) ) );
+		$category = 'failed' === $row['status'] && self::categories_ready() ? \Scalyn\MailRelay\Mail\TransportFailureCategory::retained( $row['failure_category'] ?? null ) : null;
+		if ( null !== $category ) {
+			$safe['failure_category'] = $category; }
+		return $safe;
 	}
 
 	/**
@@ -90,6 +97,11 @@ final class ConnectionEvidenceRepository {
 			throw new \RuntimeException( 'Connection evidence cleanup unavailable.' );
 		}
 		return (int) $count;
+	}
+
+	/** Categories are optional until migration completes. */
+	private static function categories_ready(): bool {
+		return version_compare( (string) get_option( 'scalyn_mail_relay_db_version', '0.0.0' ), '0.10.0', '>=' );
 	}
 
 	/** Schema readiness never triggers a migration during verification. */

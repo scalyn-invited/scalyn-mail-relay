@@ -4,12 +4,13 @@ const { readFileSync } = require('node:fs');
 const vm = require('node:vm');
 const source = readFileSync(require('node:path').resolve(__dirname, '../../assets/js/agency-branding.js'), 'utf8');
 
-function setup(attachment) {
+function setup(attachment, kind = 'logo') {
   const callbacks = {};
   const input = { value: '0' }, feedback = { textContent: '' };
   const choose = { dataset: { title: 'Choose logo', select: 'Use logo', invalid: 'Invalid image', selected: 'Save to apply' }, addEventListener: (name, fn) => { callbacks.choose = fn; } };
   const clear = { dataset: { cleared: 'Removed; save to apply' }, addEventListener: (name, fn) => { callbacks.clear = fn; } };
-  const elements = { 'scalyn-logo-choose': choose, 'scalyn-logo-clear': clear, 'scalyn-brand-logo_id': input, 'scalyn-logo-feedback': feedback };
+  const field = kind === 'icon' ? 'menu_icon_id' : 'logo_id';
+  const elements = { ['scalyn-' + kind + '-choose']: choose, ['scalyn-' + kind + '-clear']: clear, ['scalyn-brand-' + field]: input, ['scalyn-' + kind + '-feedback']: feedback };
   let opens = 0, frames = 0;
   const frame = { on: (name, fn) => { callbacks.select = fn; }, open: () => { opens++; }, state: () => ({ get: () => ({ first: () => attachment ? ({ toJSON: () => attachment }) : null }) }) };
   vm.runInNewContext(source, { document: { readyState: 'complete', getElementById: id => elements[id] }, window: { wp: { media: opts => { assert.equal(opts.multiple, false); frames++; return frame; } } } });
@@ -31,4 +32,10 @@ test('active and malformed media is rejected without changing the logo', () => {
 });
 test('unrelated pages do not initialize media UI', () => {
   vm.runInNewContext(source, { document: { readyState: 'complete', getElementById: () => null } });
+});
+test('separate menu icon picker selects raster media and restores the envelope', () => {
+  const ui = setup({ id: 84, mime: 'image/webp' }, 'icon');
+  ui.callbacks.choose(); ui.callbacks.select();
+  assert.equal(ui.input.value, '84');
+  ui.callbacks.clear(); assert.equal(ui.input.value, '0');
 });

@@ -15,6 +15,12 @@ exclude credentials, query strings and fragments. Saved values are validated
 again before display and escaped at output. Branding requires agency authority
 or the administrator override, and changes audit field names only, not values.
 
+Approved follow-up: the plugin's top-level WordPress menu label follows the
+validated saved brand name. The default identity keeps the short "Mail Relay"
+label. Escape the name when applying the visible label after registration;
+preserve WordPress's registered page hooks as well as the menu slug, icon,
+submenus, capability gates, links and all unrelated WordPress navigation.
+
 Client Viewer receives `VIEW_CLIENT_REPORTS`, not `EXPORT_REPORTS`. Its dashboard
 is replaced before operational components are instantiated. The summary page
 contains current-revision configuration health, seven-day site-wide retained
@@ -42,6 +48,15 @@ Unavailable, never zero. Accepted remains provider acknowledgement, never inbox
 delivery. The configuration score is not the ADR-0026 Deliverability Score.
 
 ## Lifecycle and validation
+
+Approved menu-icon follow-up: a separate optional `menu_icon_id` raster attachment
+labels the native sidebar with a compact symbol; the header logo stays independent.
+Existing options default to 0 without migration. Missing, deleted or invalid images
+restore `dashicons-email-alt2`. Media selection uses existing upload permission;
+saving uses the same agency capability and nonce. Audit stores the changed field
+name only. Only the owned menu image slot changes after native registration;
+hooks, slugs, capabilities and submenus remain unchanged. No SVG or arbitrary URL
+input is accepted. Choose a square transparent image readable at 20px.
 
 No database migration, provider, dependency or scheduled action is added. Branding
 is retained by default and removed only under explicit uninstall deletion.

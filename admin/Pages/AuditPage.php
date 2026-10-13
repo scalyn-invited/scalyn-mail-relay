@@ -29,13 +29,17 @@ final class AuditPage {
 		}
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only pagination, capability checked above.
 		$before = isset( $_GET['before'] ) && is_string( $_GET['before'] ) ? absint( wp_unslash( $_GET['before'] ) ) : 0;
-		$page   = array(
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only page size, capability checked above.
+		$raw_size   = isset( $_GET['per_page'] ) && is_string( $_GET['per_page'] ) ? sanitize_text_field( wp_unslash( $_GET['per_page'] ) ) : '';
+		$page_sizes = array( 10, 25, 50, 100 );
+		$per_page   = in_array( $raw_size, array( '10', '25', '50', '100' ), true ) ? (int) $raw_size : 50;
+		$page       = array(
 			'rows' => array(),
 			'next' => 0,
 		);
-		$error  = false;
+		$error      = false;
 		try {
-			$page = $this->repository->page( $before );
+			$page = $this->repository->page( $before, $per_page );
 		} catch ( \Throwable $exception ) {
 			$error = true;
 		}

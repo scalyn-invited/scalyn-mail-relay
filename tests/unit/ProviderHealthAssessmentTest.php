@@ -74,7 +74,9 @@ final class ProviderHealthAssessmentTest extends TestCase {
 			array(
 				'accepted' => 10,
 				'failed'   => 0,
-			)
+			),
+			null,
+			array( 'auth_config_streak'=>0, 'provider_rejections'=>0, 'rate_limits'=>0, 'unclassified'=>0 )
 		);
 
 		$this->assertSame( 'healthy', $assessment['health'] );
@@ -124,7 +126,7 @@ final class ProviderHealthAssessmentTest extends TestCase {
 		);
 
 		$this->assertSame( 'unknown', $assessment['health'] );
-		$this->assertStringContainsString( 'not retained', $assessment['findings'][0] );
+		$this->assertStringContainsString( 'does not establish', $assessment['findings'][0] );
 	}
 
 	/** Tests missing evidence remains explicitly unknown. */

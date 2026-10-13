@@ -32,7 +32,7 @@ $ha_labels = array(
 	<p><?php esc_html_e( 'See how a real receiver authenticated your mail. Send a test email to a mailbox you control, open the received message, copy its original headers (for example "Show original" in Gmail or "View message source" in Outlook), and paste them below.', 'scalyn-mail-relay' ); ?></p>
 	<details class="scalyn-disclosure">
 		<summary><?php esc_html_e( 'Privacy and scope', 'scalyn-mail-relay' ); ?></summary>
-		<p><?php esc_html_e( 'Headers are analyzed once in memory and are not saved, logged or shown again. Results show only domains and the receiver’s verdicts, never addresses, subjects or message IDs. Use only messages you sent to your own mailbox. Results describe one message at one receiver; they are not added to scores or history and do not prove inbox placement elsewhere.', 'scalyn-mail-relay' ); ?></p>
+		<p><?php esc_html_e( 'Raw headers are analyzed once in memory and are not saved, logged or shown again. Only minimal verdict and alignment codes are retained for this configuration, under the same retention policy as health history. They do not contribute to the score. Displayed analysis contains domains and receiver verdicts, never addresses, subjects or message IDs. Use only messages you sent to your own mailbox. These user-supplied results describe one message and are not authenticated webhook evidence or proof of inbox placement elsewhere.', 'scalyn-mail-relay' ); ?></p>
 	</details>
 
 	<?php if ( '' !== $error ) : ?>

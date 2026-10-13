@@ -17,6 +17,7 @@ final class TransactionalTablesSchemaTest extends TestCase {
 			public bool $ignoreConversion=false;
 			public function get_var(string $query): mixed {
 				$call=end($this->prepare_calls);
+				if (in_array($call['args'][0] ?? '',['wp_scalyn_deliverability_evidence','wp_scalyn_submission_attempts','wp_scalyn_recovery_queue'],true)) { return parent::get_var($query); }
 				$this->last_error=$this->metadataError ? 'private database error' : '';
 				return $this->engines[$call['args'][0]] ?? null;
 			}
@@ -38,7 +39,7 @@ final class TransactionalTablesSchemaTest extends TestCase {
 		$db=$GLOBALS['wpdb'];
 		$db->engines['wp_unrelated']='MyISAM';
 		Migrator::migrate();
-		$this->assertSame('0.9.0',get_option('scalyn_mail_relay_db_version'));
+		$this->assertSame(SCALYN_MAIL_RELAY_DB_VERSION,get_option('scalyn_mail_relay_db_version'));
 		$this->assertSame(['wp_scalyn_diagnostics','wp_scalyn_health_scores','wp_scalyn_mail_logs','wp_scalyn_mail_timeline'],$db->altered);
 		$this->assertSame('MyISAM',$db->engines['wp_unrelated']);
 		foreach ($db->prepare_calls as $call) {
@@ -52,7 +53,7 @@ final class TransactionalTablesSchemaTest extends TestCase {
 		$db->engines=array_fill_keys(array_keys($db->engines),'InnoDB');
 		Migrator::migrate();
 		$this->assertSame([],$db->altered);
-		$this->assertSame('0.9.0',get_option('scalyn_mail_relay_db_version'));
+		$this->assertSame(SCALYN_MAIL_RELAY_DB_VERSION,get_option('scalyn_mail_relay_db_version'));
 	}
 	public function test_partial_failure_keeps_version_and_resumes_without_reconverting_success(): void {
 		$db=$GLOBALS['wpdb'];
@@ -62,7 +63,7 @@ final class TransactionalTablesSchemaTest extends TestCase {
 		$db->failure=null;
 		Migrator::migrate();
 		$this->assertSame(['wp_scalyn_diagnostics','wp_scalyn_health_scores','wp_scalyn_health_scores','wp_scalyn_mail_logs','wp_scalyn_mail_timeline'],$db->altered);
-		$this->assertSame('0.9.0',get_option('scalyn_mail_relay_db_version'));
+		$this->assertSame(SCALYN_MAIL_RELAY_DB_VERSION,get_option('scalyn_mail_relay_db_version'));
 	}
 	public function test_missing_or_unexpected_engine_fails_closed(): void {
 		foreach ([null,'MEMORY'] as $engine) {

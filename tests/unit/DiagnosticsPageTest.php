@@ -18,6 +18,18 @@ use Scalyn\MailRelay\Providers\ValidationResult;
  * Covers the capability gate plus configured and not-configured B1 states.
  */
 final class DiagnosticsPageTest extends TestCase {
+	public function test_tab_panels_keep_assessments_and_guidance_separate(): void {
+		$this->grant_run_diagnostics();
+		$this->configure_provider();
+		$html = $this->render_and_capture();
+		$dom = new DOMDocument(); @$dom->loadHTML('<?xml encoding="utf-8" ?>' . $html);
+		$xpath = new DOMXPath($dom);
+		$this->assertSame(4, $xpath->query('//*[@data-provider-tab]')->length);
+		$this->assertStringContainsString('Overall Email Health', $dom->getElementById('scalyn-panel-configuration-checks')->textContent);
+		$this->assertStringNotContainsString('What to address next', $dom->getElementById('scalyn-panel-configuration-checks')->textContent);
+		$this->assertStringContainsString('What to address next', $dom->getElementById('scalyn-panel-failures-guidance')->textContent);
+		$this->assertSame(0, $xpath->query('//*[@data-provider-panel and @hidden]')->length);
+	}
 	public function test_guidance_follows_health_and_preserves_score_disclaimer(): void {
 		$this->grant_run_diagnostics();
 		$this->configure_provider();
@@ -31,7 +43,8 @@ final class DiagnosticsPageTest extends TestCase {
 		$this->assertTrue( $health < $guidance && $guidance < $scope );
 		$this->assertSame( 1, substr_count( $output, 'What to address next' ) );
 		$this->assertStringContainsString( 'Configuration score only; authentication and delivery not verified.', substr( $output, $health, $guidance - $health ) );
-		$this->assertStringContainsString( 'diagnostic cards above', $output );
+		$this->assertStringContainsString( 'diagnostics#configuration-checks', $output );
+		$this->assertStringContainsString( 'matching diagnostic cards for the observed details', $output );
 		$this->assertStringContainsString( '<div class="scalyn-diagnostics-guidance">', $output );
 	}
 	public function test_recommendations_render_refresh_when_no_evidence(): void {
@@ -248,6 +261,9 @@ final class DiagnosticsPageTest extends TestCase {
 		$output = $this->render_and_capture();
 
 		$this->assertStringContainsString( 'Run Diagnostics Now', $output );
+		$this->assertStringContainsString( 'scalyn-panel-heading scalyn-diagnostics-run-toolbar', $output );
+		$this->assertLessThan( strpos( $output, 'Evidence freshness and coverage' ), strpos( $output, 'scalyn-diagnostics-health-card-heading' ) );
+		$this->assertLessThan( strpos( $output, 'id="scalyn-panel-deliverability-score"' ), strpos( $output, 'Evidence freshness and coverage' ) );
 		// Button should now be enabled with the REST endpoint URL.
 		$this->assertStringContainsString( 'data-endpoint="http://example.com/wp-json/scalyn-mail-relay/v1/diagnostics/run"', $output );
 		$this->assertStringContainsString( '<button type="button" class="button button-primary" id="scalyn-run-diagnostics"', $output );
@@ -463,6 +479,7 @@ final class DiagnosticsPageTest extends TestCase {
 		$this->assertStringContainsString( 'Not evaluated', $output );
 		$this->assertStringContainsString( 'Operational reliability', $output );
 		$this->assertStringContainsString( 'Health score based on: Operational reliability.', $output );
+		$this->assertStringContainsString( 'scalyn-health-summary scalyn-finding__action', $output );
 		$this->assertStringContainsString( 'Message authentication and delivery: not verified', $output );
 		$this->assertStringNotContainsString( 'based on the results of all diagnostic checks', $output );
 		// Six checks and three categories remain unknown; only the score has evidence.

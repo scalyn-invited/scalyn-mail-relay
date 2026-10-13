@@ -13,10 +13,10 @@ defined( 'ABSPATH' ) || exit;
 		<p role="status"><?php esc_html_e( 'Activity totals are unavailable. Refresh to retry; unavailable data is not zero activity.', 'scalyn-mail-relay' ); ?></p>
 	<?php else : ?>
 		<dl class="scalyn-metrics">
-			<div><dt><?php esc_html_e( 'Accepted', 'scalyn-mail-relay' ); ?></dt><dd data-scalyn-count="accepted"><?php echo esc_html( $activity_summary['accepted'] ); ?></dd></div>
-			<div><dt><?php esc_html_e( 'Failed', 'scalyn-mail-relay' ); ?></dt><dd data-scalyn-count="failed"><?php echo esc_html( $activity_summary['failed'] ); ?></dd></div>
-			<div><dt><?php esc_html_e( 'Other recorded statuses', 'scalyn-mail-relay' ); ?></dt><dd><?php echo esc_html( $activity_summary['other'] ); ?></dd></div>
-			<div><dt><?php esc_html_e( 'Total retained records', 'scalyn-mail-relay' ); ?></dt><dd><?php echo esc_html( $activity_summary['total'] ); ?></dd></div>
+			<div class="scalyn-metric--accepted"><dt><?php esc_html_e( 'Accepted', 'scalyn-mail-relay' ); ?></dt><dd data-scalyn-count="accepted"><?php echo esc_html( $activity_summary['accepted'] ); ?></dd></div>
+			<div class="scalyn-metric--failed"><dt><?php esc_html_e( 'Failed', 'scalyn-mail-relay' ); ?></dt><dd data-scalyn-count="failed"><?php echo esc_html( $activity_summary['failed'] ); ?></dd></div>
+			<div class="scalyn-metric--other"><dt><?php esc_html_e( 'Other recorded statuses', 'scalyn-mail-relay' ); ?></dt><dd><?php echo esc_html( $activity_summary['other'] ); ?></dd></div>
+			<div class="scalyn-metric--total"><dt><?php esc_html_e( 'Total retained records', 'scalyn-mail-relay' ); ?></dt><dd><?php echo esc_html( $activity_summary['total'] ); ?></dd></div>
 		</dl>
 		<?php if ( 0 === $activity_summary['total'] ) : ?>
 			<p><?php esc_html_e( 'No retained activity in this period. This does not establish email health.', 'scalyn-mail-relay' ); ?></p>
@@ -24,10 +24,12 @@ defined( 'ABSPATH' ) || exit;
 	<?php endif; ?>
 	<p><?php esc_html_e( 'Accepted means the configured provider acknowledged submission, not recipient acceptance or inbox delivery. Failed means the recorded send attempt failed; later bounces are not automatically included.', 'scalyn-mail-relay' ); ?></p>
 	<details class="scalyn-disclosure"><summary><?php esc_html_e( 'Count details and reporting period', 'scalyn-mail-relay' ); ?></summary>
+		<div class="scalyn-helper-highlight">
 		<?php if ( $activity_summary['available'] ) : ?>
 			<p><?php esc_html_e( 'All providers. Period (site time, end exclusive):', 'scalyn-mail-relay' ); ?> <?php echo esc_html( $activity_summary['start'] . ' – ' . $activity_summary['end'] ); ?></p>
 			<p><?php esc_html_e( 'Counts read as of (site time):', 'scalyn-mail-relay' ); ?> <?php echo esc_html( $activity_summary['end'] ); ?>. <?php esc_html_e( 'Refresh this page for updated counts; this is not live monitoring.', 'scalyn-mail-relay' ); ?></p>
 		<?php endif; ?>
 		<p><?php esc_html_e( 'Counts use retained records by creation time and their current status. Retention may remove evidence. Other statuses are not confirmed successes. Health-snapshot freshness is reported separately in Email Health.', 'scalyn-mail-relay' ); ?></p>
+		</div>
 	</details>
 </section>

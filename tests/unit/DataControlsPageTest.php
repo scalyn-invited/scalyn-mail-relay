@@ -7,14 +7,28 @@ use Scalyn\MailRelay\Core\SettingsRepository;
 use Scalyn\MailRelay\Database\RetentionStateRepository;
 
 final class DataControlsPageTest extends TestCase {
+	public function test_metadata_switch_reflects_saved_on_and_off_preferences(): void {
+		foreach (array(true,false) as $enabled) {
+			$GLOBALS['_test_wp_options'][SettingsRepository::OPTION_KEY]=array('advanced'=>array('log_message_metadata'=>$enabled));
+			$dom=new DOMDocument(); @$dom->loadHTML($this->render()); $xpath=new DOMXPath($dom);
+			$input=$xpath->query('//form[@data-tab-shared-form]//input[@name="log_message_metadata" and @role="switch" and @type="checkbox" and @aria-describedby="mail-metadata-help"]');
+			$this->assertSame(1,$input->length);
+			$this->assertSame($enabled,$input->item(0)->hasAttribute('checked'));
+		}
+	}
 	public function test_redesign_section_links_preserve_separate_save_boundaries():void {
 		$html=$this->render();
-		foreach(array('scalyn-privacy-settings','scalyn-monitoring-settings','scalyn-uninstall-settings','scalyn-cleanup-status') as $id){
+		foreach(array('dkim','privacy-retention','monitoring','uninstall','cleanup-status') as $id){
 			$this->assertStringContainsString('href="#'.$id.'"',$html);
-			$this->assertStringContainsString('id="'.$id.'"',$html);
+			$this->assertStringContainsString('id="scalyn-panel-'.$id.'"',$html);
 		}
-		$this->assertStringContainsString('DKIM has a separate save button above.',$html);
+		$this->assertStringContainsString('DKIM has a separate save button in its tab.',$html);
 		$this->assertSame(2,substr_count($html,'<form '));
+		$dom=new DOMDocument(); @$dom->loadHTML($html); $xpath=new DOMXPath($dom);
+		foreach(array('retention_days','diagnostic_schedule','delete_on_uninstall') as $name){
+			$this->assertSame(1,$xpath->query('//form[@data-tab-shared-form]//*[@name="'.$name.'"]')->length);
+		}
+		$this->assertSame(0,$xpath->query('//*[@data-provider-panel and @hidden]')->length);
 	}
 	public function test_settings_page_contains_dkim_and_separate_forms(): void {
 		$html=$this->render();

@@ -20,14 +20,16 @@ final class ConnectionResult {
 	/**
 	 * Creates a new connection test result.
 	 *
-	 * @param bool   $success  Whether the connection test succeeded.
-	 * @param string $message  Human-readable summary of the result.
-	 * @param array  $metadata Optional supplemental data (latency, server banner, etc.).
-	 *                         Must not contain credentials or secrets.
+	 * @param bool        $success  Whether the connection test succeeded.
+	 * @param string      $message  Human-readable summary of the result.
+	 * @param array       $metadata Optional supplemental data (latency, server banner, etc.).
+	 *                              Must not contain credentials or secrets.
+	 * @param string|null $failure_category Optional allowlisted observed failure category.
 	 */
 	public function __construct(
 		public readonly bool $success,
 		public readonly string $message = '',
-		public readonly array $metadata = array()
+		public readonly array $metadata = array(),
+		public readonly ?string $failure_category = null
 	) {}
 }

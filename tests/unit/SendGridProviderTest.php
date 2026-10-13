@@ -239,7 +239,8 @@ namespace {
 				$rejected = $code >= 400 && $code < 500 && 408 !== $code;
 				$this->assertSame( $accepted, $result->success, (string) $code );
 				$this->assertSame( ! $accepted && ! $rejected, $result->acceptance_unconfirmed, (string) $code );
-				$this->assertFalse( $result->retryable );
+				$this->assertSame( 429 === $code, $result->retryable );
+				$this->assertSame( 429 === $code, $result->safe_to_retry );
 				$this->assertCount( 1, $provider->calls );
 				$this->assertStringNotContainsString( 'private recipient', serialize( $result ) );
 				if ( 429 === $code ) {

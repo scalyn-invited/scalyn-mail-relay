@@ -14,13 +14,16 @@ defined( 'ABSPATH' ) || exit;
 	if ( $notice ) :
 		?>
 		<p role="status"><?php echo esc_html( $notice ); ?></p><?php endif; ?>
-	<form method="post">
+	<form method="post" action="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-providers' ) . '#email-routing' ); ?>">
 		<?php
 		wp_nonce_field( 'scalyn_routing' );
 		\Scalyn\MailRelay\Admin\ConfigurationGuard::field( $settings );
 		?>
 		<input type="hidden" name="routing_token" value="<?php echo esc_attr( $policy['token'] ); ?>">
-		<p><label><input type="checkbox" name="routing_enabled" value="1" <?php checked( true, $policy['enabled'] ); ?>> <?php esc_html_e( 'Enable explicit routing', 'scalyn-mail-relay' ); ?></label></p>
+		<p><label class="scalyn-switch"><input type="checkbox" role="switch" id="scalyn-routing-enabled" name="routing_enabled" value="1" aria-describedby="scalyn-routing-disabled" <?php checked( true, $policy['enabled'] ); ?>><span class="scalyn-switch__track" aria-hidden="true"></span><span><?php esc_html_e( 'Enable explicit routing', 'scalyn-mail-relay' ); ?></span><span class="scalyn-switch__off" aria-hidden="true"><?php esc_html_e( 'Off', 'scalyn-mail-relay' ); ?></span><span class="scalyn-switch__on" aria-hidden="true"><?php esc_html_e( 'On', 'scalyn-mail-relay' ); ?></span></label></p>
+		<p id="scalyn-routing-disabled" class="scalyn-helper-highlight" role="status" <?php echo $policy['enabled'] ? 'hidden' : ''; ?>><?php esc_html_e( 'Routing is disabled. All emails use the site-default configuration. Enable explicit routing to edit these rules. Saved selections are kept.', 'scalyn-mail-relay' ); ?></p>
+		<fieldset id="scalyn-routing-rules" <?php disabled( ! $policy['enabled'] ); ?>>
+		<legend class="screen-reader-text"><?php esc_html_e( 'Source routing rules', 'scalyn-mail-relay' ); ?></legend>
 		<?php foreach ( \Scalyn\MailRelay\Mail\MailOrigin::types() as $key => $label ) : ?>
 		<fieldset class="scalyn-routing-row">
 			<legend><?php echo esc_html( $label ); ?></legend>
@@ -36,6 +39,7 @@ defined( 'ABSPATH' ) || exit;
 			<?php endforeach; ?>
 		</fieldset>
 		<?php endforeach; ?>
+		</fieldset>
 		<p><button class="button button-primary" name="scalyn_routing_save" value="1"><?php esc_html_e( 'Save routing', 'scalyn-mail-relay' ); ?></button></p>
 	</form>
 </section>

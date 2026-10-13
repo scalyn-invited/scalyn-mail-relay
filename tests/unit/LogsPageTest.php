@@ -36,11 +36,48 @@ final class LogsPageTest extends TestCase {
 		$output = (string) ob_get_clean();
 		$this->assertStringContainsString('Records on this page: 1 · Page 2', $output);
 		$this->assertStringContainsString('Filtered by: Failed', $output);
-		$this->assertStringContainsString('name="message_uuid"', $output);
-		$this->assertStringContainsString('aria-describedby="scalyn-message-lookup-help"', $output);
+		$this->assertStringContainsString('name="message_id"', $output);
+		$this->assertStringContainsString('Advanced filters', $output);
 		$this->assertStringContainsString('role="region" aria-labelledby="scalyn-log-results-heading" tabindex="0"', $output);
 		$this->assertStringContainsString('aria-label="Email log pages"', $output);
 		$this->assertStringContainsString('Log privacy and retention', $output);
+	}
+	public function test_primary_and_advanced_filters_share_one_form(): void {
+		$this->grant_view_logs();
+		$html=$this->render_and_capture();
+		$dom=new DOMDocument(); @$dom->loadHTML($html); $xpath=new DOMXPath($dom);
+		foreach(array('status','recipient','subject','per_page') as $name){
+			$this->assertSame(1,$xpath->query('//form[@class="scalyn-filter-form"]//*[@name="'.$name.'" and not(ancestor::details)]')->length);
+		}
+		foreach(array('start','end','provider','source','message_id') as $name){
+			$this->assertSame(1,$xpath->query('//form[@class="scalyn-filter-form"]//details//*[@name="'.$name.'"]')->length);
+		}
+		$this->assertSame(0,$xpath->query('//form//form')->length);
+	}
+	public function test_page_size_is_bounded_and_preserved_in_pagination(): void {
+		$this->grant_view_logs();
+		foreach(array('10'=>10,'50'=>50,'100'=>100,'999'=>25,'-10'=>25,'invalid'=>25) as $input=>$expected){
+			$_GET=array('per_page'=>(string)$input,'paged'=>'2');
+			$this->wpdb->get_results_return=array_fill(0,$expected+1,$this->make_log_row());
+			$html=$this->render_and_capture();
+			$last=end($this->wpdb->prepare_calls);
+			$this->assertSame(array($expected+1,$expected),$last['args']);
+			$this->assertStringContainsString('per_page='.$expected,$html);
+			$this->assertStringContainsString('Records on this page: '.$expected,$html);
+		}
+	}
+
+	public function test_page_size_is_beside_results_and_associated_with_filter_form(): void {
+		$this->grant_view_logs();
+		$this->wpdb->get_results_return = array( $this->make_log_row() );
+		$dom = new DOMDocument();
+		@$dom->loadHTML( $this->render_and_capture() );
+		$xpath = new DOMXPath( $dom );
+		$this->assertSame( 1, $xpath->query( '//select[@name="per_page"]' )->length );
+		$this->assertSame( 1, $xpath->query( '//div[@class="scalyn-log-result-controls"]//select[@form="scalyn-log-filter-form"]' )->length );
+		$this->assertSame( 1, $xpath->query( '//form[@id="scalyn-log-filter-form"]' )->length );
+		$this->assertSame( 0, $xpath->query( '//form//input[@name="paged"]' )->length );
+		$this->assertSame( 1, $xpath->query( '//noscript/button[@form="scalyn-log-filter-form"]' )->length );
 	}
 
 	public function test_list_provides_accessible_drawer_and_full_page_fallback(): void {

@@ -23,8 +23,11 @@ final class UninstallTest extends TestCase {
 		'wp_scalyn_delivery_keys',
 		'wp_scalyn_mail_logs',
 		'wp_scalyn_mail_timeline',
+		'wp_scalyn_submission_attempts',
+		'wp_scalyn_recovery_queue',
 		'wp_scalyn_diagnostics',
 		'wp_scalyn_health_scores',
+		'wp_scalyn_deliverability_evidence',
 		'wp_scalyn_alerts',
 		'wp_scalyn_alert_notifications',
 		'wp_scalyn_audit_logs',
@@ -236,6 +239,7 @@ final class UninstallTest extends TestCase {
 				'scalyn_mail_relay_run_daily_diagnostics',
 				'scalyn_mail_relay_generate_health_snapshot',
 				'scalyn_mail_relay_send_alerts',
+				'scalyn_mail_relay_recovery_tick',
 			),
 			$GLOBALS['_test_wp_cleared_hooks']
 		);

@@ -61,7 +61,7 @@ final class BrevoProviderTest extends TestCase {
 	public function test_rejections_and_uncertainty_never_retry(int $code,string $body,bool $uncertain): void {
 		$p=new StubBrevoProvider(); $p->response=['response'=>['code'=>$code],'body'=>$body];
 		$r=$p->send($this->message(),$this->config()); $this->assertFalse($r->success); $this->assertSame($uncertain,$r->acceptance_unconfirmed);
-		$this->assertFalse($r->retryable); $this->assertCount(1,$p->calls); $this->assertStringNotContainsString('private',serialize($r));
+		$this->assertSame(429 === $code,$r->retryable); $this->assertSame(429 === $code,$r->safe_to_retry); $this->assertCount(1,$p->calls); $this->assertStringNotContainsString('private',serialize($r));
 	}
 	public static function outcomes(): array {return [
 		[200,'{"data":{"succeeded":0,"failed":1,"failures":["private"]}}',true],
@@ -73,7 +73,7 @@ final class BrevoProviderTest extends TestCase {
 	];}
 	public function test_timeout_is_uncertain_and_not_retried(): void {
 		$p=new StubBrevoProvider(); $p->response=new RuntimeException('private');
-		$r=$p->send($this->message(),$this->config()); $this->assertTrue($r->acceptance_unconfirmed); $this->assertFalse($r->retryable); $this->assertCount(1,$p->calls);
+		$r=$p->send($this->message(),$this->config()); $this->assertTrue($r->acceptance_unconfirmed); $this->assertFalse($r->retryable); $this->assertFalse($r->safe_to_retry); $this->assertCount(1,$p->calls);
 	}
 	#[DataProvider('invalid_messages')]
 	public function test_invalid_content_never_reaches_http(array $changes): void {

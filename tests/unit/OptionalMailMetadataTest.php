@@ -28,7 +28,8 @@ final class OptionalMailMetadataTest extends TestCase {
 			new SendResult(true, 'smtp'), 'accepted'
 		);
 	}
-	public function test_capture_requires_explicit_boolean_consent_and_schema(): void {
+	public function test_capture_respects_disabled_policy_and_schema(): void {
+		(new SettingsRepository())->save(array('advanced'=>array('log_message_metadata'=>false)));
 		$this->assertFalse((new SettingsRepository())->get_log_message_metadata());
 		$this->record();
 		$this->assertArrayNotHasKey('logged_subject', $GLOBALS['wpdb']->inserts[0]['data']);
@@ -36,6 +37,20 @@ final class OptionalMailMetadataTest extends TestCase {
 		$GLOBALS['_test_wp_options']['scalyn_mail_relay_db_version']='0.2.0';
 		$this->record();
 		$this->assertArrayNotHasKey('logged_subject', $GLOBALS['wpdb']->inserts[1]['data']);
+	}
+	public function test_new_install_defaults_to_bounded_capture_and_persists_it(): void {
+		$this->assertTrue((new SettingsRepository())->get_log_message_metadata());
+		$this->record();
+		$this->assertSame('to@example.com', $GLOBALS['wpdb']->inserts[0]['data']['logged_recipients']);
+		$this->assertSame(str_repeat('S',255), $GLOBALS['wpdb']->inserts[0]['data']['logged_subject']);
+		(new SettingsRepository())->save(array('advanced'=>array('log_retention_days'=>15)));
+		$this->assertTrue((new SettingsRepository())->get_log_message_metadata());
+	}
+	public function test_existing_install_without_preference_remains_disabled(): void {
+		$GLOBALS['_test_wp_options'][SettingsRepository::OPTION_KEY]=array('provider'=>array('active'=>'smtp'));
+		$this->assertFalse((new SettingsRepository())->get_log_message_metadata());
+		(new SettingsRepository())->save(array('advanced'=>array('log_retention_days'=>15)));
+		$this->assertFalse((new SettingsRepository())->get_log_message_metadata());
 	}
 	public function test_opt_in_captures_bounded_metadata_only_once(): void {
 		(new SettingsRepository())->save(array('advanced'=>array('log_message_metadata'=>true)));
@@ -65,6 +80,18 @@ final class OptionalMailMetadataTest extends TestCase {
 		$this->assertContains('2026-09-30 23:59:59', $call['args']);
 		$this->assertContains('%person@example.com%', $call['args']);
 		$this->assertSame(array(250,0),array_slice($call['args'],-2));
+	}
+	public function test_subject_and_message_id_filters_are_separate_and_combined(): void {
+		$uuid='550e8400-e29b-41d4-a716-446655440000';
+		(new MailLogRepository())->search(array('subject'=>'invoice%','message_id'=>$uuid),'accepted',51,50);
+		$call=end($GLOBALS['wpdb']->prepare_calls);
+		$this->assertStringContainsString('logged_subject LIKE %s AND message_uuid = %s',$call['query']);
+		$this->assertContains('%invoice\\%%',$call['args']);
+		$this->assertContains($uuid,$call['args']);
+	}
+	public function test_invalid_message_id_filter_is_rejected(): void {
+		$this->expectException(InvalidArgumentException::class);
+		LogFilters::validate(array('message_id'=>'not-a-uuid'));
 	}
 	public function test_impossible_date_rejected(): void {
 		$this->expectException(InvalidArgumentException::class);

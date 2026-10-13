@@ -40,7 +40,9 @@ final class DashboardPage {
 			return;
 		}
 
-		$container           = Plugin::instance()->container();
+		$container      = Plugin::instance()->container();
+		$deliverability = new \Scalyn\MailRelay\Admin\Components\DeliverabilityCard( $container->get( \Scalyn\MailRelay\Diagnostics\DeliverabilityAssessment::class ) );
+		$deliverability->handle();
 		$monitoring          = \Scalyn\MailRelay\Admin\MonitoringStatusPresenter::load();
 		$settings            = $container->get( SettingsRepository::class );
 		$provider_configured = $this->is_provider_configured();

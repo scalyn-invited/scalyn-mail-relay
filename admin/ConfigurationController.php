@@ -40,7 +40,7 @@ final class ConfigurationController {
 			),
 			admin_url( 'admin.php' )
 		);
-		wp_safe_redirect( $url );
+		wp_safe_redirect( $url . ( 'scalyn-mail-relay-providers' === $page ? '#saved-configurations' : '' ) );
 		exit;
 	}
 }

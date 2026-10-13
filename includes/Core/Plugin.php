@@ -166,6 +166,7 @@ final class Plugin {
 		$this->container->set( PostmarkWebhookEndpoint::class, static fn( Container $c ): PostmarkWebhookEndpoint => new PostmarkWebhookEndpoint( $c->get( PostmarkWebhookSettings::class ), $c->get( SettingsRepository::class ), $c->get( WebhookRateLimitRepository::class ), $c->get( DeliveryAttemptRepository::class ), $c->get( DeliveryKeyRepository::class ), $c->get( DeliveryEventRepository::class ) ) );
 		$this->container->set( SettingsRepository::class, static fn( Container $c ): SettingsRepository => new SettingsRepository( $c->get( CredentialCipher::class ) ) );
 		$this->container->set( ProviderRegistry::class, static fn(): ProviderRegistry => new ProviderRegistry() );
+		$this->container->set( \Scalyn\MailRelay\Database\SubmissionAttemptRepository::class, static fn() => new \Scalyn\MailRelay\Database\SubmissionAttemptRepository() );
 		$this->container->set( \Scalyn\MailRelay\Database\ConnectionEvidenceRepository::class, static fn(): \Scalyn\MailRelay\Database\ConnectionEvidenceRepository => new \Scalyn\MailRelay\Database\ConnectionEvidenceRepository() );
 		$this->container->set( ConnectionVerification::class, static fn( Container $c ): ConnectionVerification => new ConnectionVerification( $c->get( SettingsRepository::class ), $c->get( ProviderRegistry::class ), $c->get( \Scalyn\MailRelay\Database\ConnectionEvidenceRepository::class ) ) );
 		$this->container->set(
@@ -173,10 +174,15 @@ final class Plugin {
 			static fn( Container $c ): MailDispatcher => new MailDispatcher(
 				$c->get( ProviderRegistry::class ),
 				$c->get( SettingsRepository::class ),
-				$c->get( DeliveryTracker::class )
+				$c->get( DeliveryTracker::class ),
+				$c->get( \Scalyn\MailRelay\Database\SubmissionAttemptRepository::class )
 			)
 		);
-		$this->container->set( WordPressMailBridge::class, static fn( Container $c ): WordPressMailBridge => new WordPressMailBridge( $c->get( SettingsRepository::class ), $c->get( MailDispatcher::class ) ) );
+		$this->container->set( \Scalyn\MailRelay\Database\RecoveryQueueRepository::class, static fn() => new \Scalyn\MailRelay\Database\RecoveryQueueRepository() );
+		$this->container->set( \Scalyn\MailRelay\Recovery\RecoveryPolicyRepository::class, static fn() => new \Scalyn\MailRelay\Recovery\RecoveryPolicyRepository() );
+		$this->container->set( \Scalyn\MailRelay\Recovery\RecoveryPayload::class, static fn( Container $c ) => new \Scalyn\MailRelay\Recovery\RecoveryPayload( $c->get( CredentialCipher::class ) ) );
+		$this->container->set( \Scalyn\MailRelay\Recovery\RecoveryService::class, static fn( Container $c ) => new \Scalyn\MailRelay\Recovery\RecoveryService( $c->get( \Scalyn\MailRelay\Database\RecoveryQueueRepository::class ), $c->get( \Scalyn\MailRelay\Recovery\RecoveryPolicyRepository::class ), $c->get( \Scalyn\MailRelay\Recovery\RecoveryPayload::class ), $c->get( MailDispatcher::class ), $c->get( SettingsRepository::class ) ) );
+		$this->container->set( WordPressMailBridge::class, static fn( Container $c ): WordPressMailBridge => new WordPressMailBridge( $c->get( SettingsRepository::class ), $c->get( MailDispatcher::class ), $c->get( \Scalyn\MailRelay\Recovery\RecoveryService::class ) ) );
 
 		$this->container->set( MailLogRepository::class, static fn(): MailLogRepository => new MailLogRepository() );
 		$this->container->set( \Scalyn\MailRelay\Database\ProviderDeliveryRepository::class, static fn() => new \Scalyn\MailRelay\Database\ProviderDeliveryRepository() );
@@ -229,6 +235,8 @@ final class Plugin {
 			)
 		);
 		$this->container->set( HealthScorer::class, static fn(): HealthScorer => new HealthScorer() );
+		$this->container->set( \Scalyn\MailRelay\Database\DeliverabilityRepository::class, static fn() => new \Scalyn\MailRelay\Database\DeliverabilityRepository() );
+		$this->container->set( \Scalyn\MailRelay\Diagnostics\DeliverabilityAssessment::class, static fn( Container $c ) => new \Scalyn\MailRelay\Diagnostics\DeliverabilityAssessment( $c->get( SettingsRepository::class ), $c->get( \Scalyn\MailRelay\Diagnostics\CurrentDiagnostics::class ), $c->get( \Scalyn\MailRelay\Database\DeliverabilityRepository::class ), $c->get( \Scalyn\MailRelay\Health\ProviderDeliveryEvidence::class ) ) );
 		$this->container->set( HealthScoreRepository::class, static fn(): HealthScoreRepository => new HealthScoreRepository() );
 		$this->container->set( \Scalyn\MailRelay\Diagnostics\CurrentDiagnostics::class, static fn( Container $c ): \Scalyn\MailRelay\Diagnostics\CurrentDiagnostics => new \Scalyn\MailRelay\Diagnostics\CurrentDiagnostics( $c->get( DiagnosticRepository::class ), $c->get( HealthScoreRepository::class ), $c->get( SettingsRepository::class ), $c->get( DiagnosticContextBuilder::class ) ) );
 		$this->container->set( \Scalyn\MailRelay\Diagnostics\RecommendationEngine::class, static fn(): \Scalyn\MailRelay\Diagnostics\RecommendationEngine => new \Scalyn\MailRelay\Diagnostics\RecommendationEngine() );
@@ -270,6 +278,7 @@ final class Plugin {
 		// can be dispatched from frontend, REST, WP-CLI, and cron contexts.
 		$this->container->get( MailEventSubscriber::class )->register();
 		$this->container->get( WordPressMailBridge::class )->register();
+		$this->container->get( \Scalyn\MailRelay\Recovery\RecoveryService::class )->register();
 		$this->container->get( AuditRecorder::class )->register();
 		$this->container->get( RetentionService::class )->register();
 		$this->container->get( DiagnosticSchedule::class )->register();
