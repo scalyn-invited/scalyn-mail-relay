@@ -49,6 +49,8 @@ delete_option( 'scalyn_mail_relay_settings_write_lock' );
 delete_option( 'scalyn_mail_relay_routing' );
 delete_option( 'scalyn_mail_relay_routing_lock' );
 delete_option( 'scalyn_mail_relay_recovery' );
+delete_option( 'scalyn_mail_relay_ai' );
+delete_option( 'scalyn_mail_relay_ai_write_lock' );
 delete_option( 'scalyn_mail_relay_recovery_lock' );
 delete_option( 'scalyn_mail_relay_queue_capacity_lock' );
 
@@ -65,6 +67,8 @@ foreach ( array( 'smtp2go', 'brevo' ) as $scalyn_provider ) {
 }
 
 $owned_tables = array(
+	'scalyn_ai_sessions',
+	'scalyn_ai_usage',
 	'scalyn_connection_evidence',
 	'scalyn_delivery_events',
 	'scalyn_delivery_recipients',

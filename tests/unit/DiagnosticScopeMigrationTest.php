@@ -22,7 +22,7 @@ final class DiagnosticScopeMigrationTest extends TestCase {
 		$this->assertStringContainsString('KEY configuration_created (configuration_id,created_at,id)',$sql);
 		$this->assertStringNotContainsString('DROP',$sql);
 		Migrator::migrate();
-		$this->assertCount(13,$GLOBALS['_test_dbdelta_queries']);
+		$this->assertCount(15,$GLOBALS['_test_dbdelta_queries']);
 	}
 	public function test_missing_index_does_not_advance_schema_version(): void {
 		$GLOBALS['wpdb']->get_col_return=['configuration_id','provider_id','sending_domain'];

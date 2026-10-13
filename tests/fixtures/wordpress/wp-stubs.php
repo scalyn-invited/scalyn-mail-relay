@@ -1,4 +1,8 @@
 <?php
+if ( ! defined( 'DAY_IN_SECONDS' ) ) { define( 'DAY_IN_SECONDS', 86400 ); }
+if ( ! function_exists( 'wp_strip_all_tags' ) ) {
+	function wp_strip_all_tags( string $text ): string { return strip_tags( preg_replace( '@<(script|style)[^>]*?>.*?</\1>@si', '', $text ) ); }
+}
 
 function get_post_type(int $id): string|false { return $GLOBALS['_test_attachments'][$id]['type'] ?? false; }
 function get_post_mime_type(int $id): string|false { return $GLOBALS['_test_attachments'][$id]['mime'] ?? false; }
@@ -48,6 +52,7 @@ if ( ! function_exists( 'esc_textarea' ) ) {
 
 if ( ! function_exists( 'wp_verify_nonce' ) ) {
 	function wp_verify_nonce( $nonce, $action = -1 ) {
+		if ( 'wp_rest' === $action ) return 'valid-ai-nonce' === $nonce ? 1 : false;
 		if ('scalyn_client_report' === $action) return 'valid-client-nonce' === $nonce ? 1 : false;
 		if ( in_array( $action, array( 'scalyn_postmark_webhook', 'scalyn_smtp2go_webhook', 'scalyn_brevo_webhook' ), true ) ) {
 			return 'valid' === $nonce && ( $GLOBALS['_test_wp_nonce_valid'] ?? false ) ? 1 : false;
@@ -552,6 +557,14 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
 
 		public function get_headers(): array {
 			return $this->headers;
+		}
+
+		public function get_header( string $name ): string {
+			return $this->headers[ str_replace( '-', '_', strtolower( $name ) ) ][0] ?? '';
+		}
+
+		public function get_json_params(): mixed {
+			return json_decode( $this->body, true );
 		}
 
 		public function set_body( string $body ): void {

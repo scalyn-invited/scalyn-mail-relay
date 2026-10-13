@@ -123,10 +123,10 @@ final class ConnectionEvidenceTest extends TestCase {
 		$GLOBALS['wpdb']=new DeliverySchemaWpdbStub();
 		Migrator::migrate();
 		$this->assertSame(SCALYN_MAIL_RELAY_DB_VERSION,get_option('scalyn_mail_relay_db_version'));
-		$this->assertCount(6,$GLOBALS['_test_dbdelta_queries']);
+		$this->assertCount(8,$GLOBALS['_test_dbdelta_queries']);
 		$this->assertStringNotContainsString('INSERT',$GLOBALS['_test_dbdelta_queries'][0]);
 		Migrator::migrate();
-		$this->assertCount(6,$GLOBALS['_test_dbdelta_queries']);
+		$this->assertCount(8,$GLOBALS['_test_dbdelta_queries']);
 	}
 	public function test_missing_schema_never_advances_version(): void {
 		$GLOBALS['_test_wp_options']['scalyn_mail_relay_db_version']='0.8.0';

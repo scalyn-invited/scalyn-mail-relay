@@ -12,10 +12,10 @@ final class DeliverabilityRepositoryTest extends TestCase {
  protected function tearDown():void {unset($GLOBALS['wpdb']);$GLOBALS['_test_wp_options']=[];$GLOBALS['_test_dbdelta_queries']=[];}
  public function test_additive_schema_is_verified_idempotent_and_retryable():void {
   $GLOBALS['_test_wp_options']['scalyn_mail_relay_db_version']='0.10.0';$GLOBALS['wpdb']=new DeliverySchemaWpdbStub();Migrator::migrate();
-  $this->assertSame(SCALYN_MAIL_RELAY_DB_VERSION,get_option('scalyn_mail_relay_db_version'));$this->assertCount(3,$GLOBALS['_test_dbdelta_queries']);
+  $this->assertSame(SCALYN_MAIL_RELAY_DB_VERSION,get_option('scalyn_mail_relay_db_version'));$this->assertCount(5,$GLOBALS['_test_dbdelta_queries']);
   $sql=$GLOBALS['_test_dbdelta_queries'][0];foreach(['ENGINE=InnoDB','computation_uuid char(36)','configuration_kind (configuration_id,provider,kind,id)','created_at (created_at,id)'] as $part){$this->assertStringContainsString($part,$sql);}
   foreach(['recipient','subject','body','headers','UPDATE','DROP'] as $part){$this->assertStringNotContainsString($part,$sql);}
-  Migrator::migrate();$this->assertCount(3,$GLOBALS['_test_dbdelta_queries']);
+  Migrator::migrate();$this->assertCount(5,$GLOBALS['_test_dbdelta_queries']);
   foreach(['missingDeliverability','brokenDeliverabilityIndex'] as $bad){$GLOBALS['_test_wp_options']['scalyn_mail_relay_db_version']='0.10.0';$GLOBALS['wpdb']->$bad=true;try{Migrator::migrate();$this->fail('Must fail verification');}catch(RuntimeException $e){$this->assertSame('Deliverability schema could not be verified.',$e->getMessage());}$this->assertSame('0.10.0',get_option('scalyn_mail_relay_db_version'));$GLOBALS['wpdb']->$bad=false;Migrator::migrate();$this->assertSame(SCALYN_MAIL_RELAY_DB_VERSION,get_option('scalyn_mail_relay_db_version'));}
  }
  public function test_score_round_trip_replays_exact_inputs_and_rejects_tampering():void {

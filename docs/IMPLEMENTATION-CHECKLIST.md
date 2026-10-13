@@ -267,6 +267,8 @@ Outcome: each expansion ships as a separately validated project.
 - [ ] Define opt-in cloud registration, authenticated synchronization, tenant isolation, and a versioned minimal-data contract.
 - [ ] Implement offline synchronization behavior and data-sharing controls.
 - [ ] Add AI explanations grounded in structured, redacted diagnostic evidence.
+  - [x] Local AI/MCP feature implementation: administrator-only OpenAI settings, private encrypted sessions, minimal evidence projection, confirmed diagnostics and read-only MCP. See [Milestone 10 AI handoff](MILESTONE-10-AI-ASSISTANT.md) and [ADR 0038](adr/0038-administrator-ai-and-read-only-mcp.md).
+  - [ ] Complete consented live OpenAI/model evaluation, approved HTTPS MCP client verification and owner acceptance; mocks and local UI checks do not complete this gate.
 - [ ] Keep deterministic checks authoritative and require human approval for consequential configuration changes.
 - [ ] Completion gate: multisite, cloud, and AI each meet their own contract, privacy, testing, and release criteria.
 

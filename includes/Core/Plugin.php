@@ -120,6 +120,13 @@ final class Plugin {
 	 * Registers core services in the container.
 	 */
 	private function register_services(): void {
+		$this->container->set( \Scalyn\MailRelay\AI\AiSettings::class, static fn( Container $c ) => new \Scalyn\MailRelay\AI\AiSettings( $c->get( CredentialCipher::class ) ) );
+		$this->container->set( \Scalyn\MailRelay\AI\AiRepository::class, static fn( Container $c ) => new \Scalyn\MailRelay\AI\AiRepository( $c->get( CredentialCipher::class ) ) );
+		$this->container->set( \Scalyn\MailRelay\AI\OpenAiAdapter::class, static fn( Container $c ) => new \Scalyn\MailRelay\AI\OpenAiAdapter( $c->get( \Scalyn\MailRelay\AI\AiSettings::class ) ) );
+		$this->container->set( \Scalyn\MailRelay\AI\AiEvidence::class, static fn( Container $c ) => new \Scalyn\MailRelay\AI\AiEvidence( $c->get( SettingsRepository::class ), $c->get( \Scalyn\MailRelay\Diagnostics\CurrentDiagnostics::class ), $c->get( \Scalyn\MailRelay\Logging\MailLogRepository::class ), $c->get( \Scalyn\MailRelay\Database\RecoveryQueueRepository::class ) ) );
+		$this->container->set( \Scalyn\MailRelay\AI\AiService::class, static fn( Container $c ) => new \Scalyn\MailRelay\AI\AiService( $c->get( \Scalyn\MailRelay\AI\AiSettings::class ), $c->get( \Scalyn\MailRelay\AI\AiRepository::class ), $c->get( \Scalyn\MailRelay\AI\OpenAiAdapter::class ), $c->get( \Scalyn\MailRelay\AI\AiEvidence::class ) ) );
+		$this->container->set( \Scalyn\MailRelay\Rest\AiEndpoint::class, static fn( Container $c ) => new \Scalyn\MailRelay\Rest\AiEndpoint( $c->get( \Scalyn\MailRelay\AI\AiRepository::class ), $c->get( \Scalyn\MailRelay\AI\AiService::class ), $c->get( \Scalyn\MailRelay\AI\AiEvidence::class ), $c->get( SettingsRepository::class ), $c->get( \Scalyn\MailRelay\Diagnostics\DiagnosticRunService::class ) ) );
+		$this->container->set( \Scalyn\MailRelay\Rest\AiMcpEndpoint::class, static fn( Container $c ) => new \Scalyn\MailRelay\Rest\AiMcpEndpoint( $c->get( \Scalyn\MailRelay\AI\AiSettings::class ), $c->get( \Scalyn\MailRelay\AI\AiEvidence::class ), $c->get( \Scalyn\MailRelay\AI\AiRepository::class ) ) );
 		$this->container->set( \Scalyn\MailRelay\Agency\AgencyRepository::class, static fn() => new \Scalyn\MailRelay\Agency\AgencyRepository() );
 		$this->container->set( \Scalyn\MailRelay\Agency\ManagedAccess::class, static fn() => new \Scalyn\MailRelay\Agency\ManagedAccess() );
 		$this->container->set( \Scalyn\MailRelay\Alerts\AlertRepository::class, static fn(): \Scalyn\MailRelay\Alerts\AlertRepository => new \Scalyn\MailRelay\Alerts\AlertRepository() );
@@ -271,6 +278,12 @@ final class Plugin {
 	 * Registers WordPress action and filter hooks.
 	 */
 	private function register_hooks(): void {
+		$ai_container = $this->container;
+		add_action( 'rest_api_init', static fn() => $ai_container->get( \Scalyn\MailRelay\Rest\AiEndpoint::class )->register() );
+		add_action( 'rest_api_init', static fn() => $ai_container->get( \Scalyn\MailRelay\Rest\AiMcpEndpoint::class )->route() );
+		add_action( 'application_password_did_authenticate', static fn( $user ) => $ai_container->get( \Scalyn\MailRelay\Rest\AiMcpEndpoint::class )->authenticated( $user ), 10, 1 );
+		add_filter( 'rest_pre_serve_request', static fn( $served, $result, $request, $server ) => '/' . SCALYN_MAIL_RELAY_REST_NAMESPACE . '/ai/mcp' === $request->get_route() ? $ai_container->get( \Scalyn\MailRelay\Rest\AiMcpEndpoint::class )->serve_notification( $served, $result, $request, $server ) : $served, 10, 4 );
+		add_action( ScheduledHooks::CLEANUP, static fn() => $ai_container->get( \Scalyn\MailRelay\AI\AiRepository::class )->cleanup() );
 		$this->container->get( \Scalyn\MailRelay\Agency\ManagedAccess::class )->register();
 		load_plugin_textdomain( 'scalyn-mail-relay', false, dirname( plugin_basename( SCALYN_MAIL_RELAY_FILE ) ) . '/languages' );
 

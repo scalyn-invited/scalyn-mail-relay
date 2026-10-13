@@ -294,6 +294,15 @@
 .scalyn-mail-relay :is(button, a, input, select, summary):focus-visible { outline: 2px solid var(--scalyn-accent); outline-offset: 3px; }
 .scalyn-mail-relay #report-format { min-width: 100px; padding-right: 32px; }
 .scalyn-mail-relay #report-provider { min-width: 200px; max-width: 100%; padding-right: 32px; }
+.scalyn-ai .scalyn-ai-workspace { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(0, 3fr); gap: 20px; }
+.scalyn-ai [data-ai-sessions] { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.scalyn-ai [data-ai-sessions] .button { text-align: left; overflow-wrap: anywhere; }
+.scalyn-ai [data-ai-compose] { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.scalyn-ai textarea { box-sizing: border-box; width: 100%; max-width: 100%; }
+.scalyn-ai .scalyn-ai-message { background: var(--scalyn-canvas); padding: 16px; margin: 16px 0; border-radius: 6px; overflow-wrap: anywhere; }
+.scalyn-ai .scalyn-ai-message p { white-space: pre-wrap; }
+.scalyn-ai #scalyn-ai-model { max-width: 100%; padding-right: 32px; }
+@media (max-width: 700px) { .scalyn-ai .scalyn-ai-workspace { grid-template-columns: 1fr; } }
 .scalyn-mail-relay :is(input:not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=submit]), select, textarea) {
 	border: 1px solid #879da6;
 	border-radius: 6px;

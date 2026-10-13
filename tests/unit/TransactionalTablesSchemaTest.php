@@ -17,7 +17,7 @@ final class TransactionalTablesSchemaTest extends TestCase {
 			public bool $ignoreConversion=false;
 			public function get_var(string $query): mixed {
 				$call=end($this->prepare_calls);
-				if (in_array($call['args'][0] ?? '',['wp_scalyn_deliverability_evidence','wp_scalyn_submission_attempts','wp_scalyn_recovery_queue'],true)) { return parent::get_var($query); }
+				if (in_array($call['args'][0] ?? '',['wp_scalyn_deliverability_evidence','wp_scalyn_submission_attempts','wp_scalyn_recovery_queue','wp_scalyn_ai_sessions','wp_scalyn_ai_usage'],true)) { return parent::get_var($query); }
 				$this->last_error=$this->metadataError ? 'private database error' : '';
 				return $this->engines[$call['args'][0]] ?? null;
 			}

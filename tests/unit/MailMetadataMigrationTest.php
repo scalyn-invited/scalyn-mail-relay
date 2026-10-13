@@ -26,7 +26,7 @@ final class MailMetadataMigrationTest extends TestCase {
 		$this->assertStringContainsString('logged_subject varchar(255) NULL',$GLOBALS['_test_dbdelta_queries'][0]);
 		$this->assertStringNotContainsString('DROP',$GLOBALS['_test_dbdelta_queries'][0]);
 		Migrator::migrate();
-		$this->assertCount(14,$GLOBALS['_test_dbdelta_queries']);
+		$this->assertCount(16,$GLOBALS['_test_dbdelta_queries']);
 	}
 	public function test_failed_verification_does_not_advance_version(): void {
 		try { Migrator::migrate(); $this->fail('Expected migration failure'); }

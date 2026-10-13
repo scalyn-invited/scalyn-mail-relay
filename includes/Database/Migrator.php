@@ -68,6 +68,9 @@ final class Migrator {
 		if ( version_compare( $installed, '0.13.0', '<' ) ) {
 			RecoveryQueueSchema::migrate();
 		}
+		if ( version_compare( $installed, '0.14.0', '<' ) ) {
+			AiSchema::migrate();
+		}
 		update_option( 'scalyn_mail_relay_db_version', SCALYN_MAIL_RELAY_DB_VERSION, false );
 		if ( SCALYN_MAIL_RELAY_DB_VERSION !== get_option( 'scalyn_mail_relay_db_version' ) ) {
 			throw new \RuntimeException( 'Database version could not be saved.' );

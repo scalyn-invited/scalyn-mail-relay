@@ -20,9 +20,9 @@ final class DeliveryEvidenceSchemaTest extends TestCase {
 	public function test_additive_transactional_schema_is_verified_and_idempotent(): void {
 		Migrator::migrate();
 		$this->assertSame(SCALYN_MAIL_RELAY_DB_VERSION,get_option('scalyn_mail_relay_db_version'));
-		$this->assertCount(12,$GLOBALS['_test_dbdelta_queries']);
+		$this->assertCount(14,$GLOBALS['_test_dbdelta_queries']);
 		$sql=implode("\n",$GLOBALS['_test_dbdelta_queries']);
-		$this->assertSame(9,substr_count($sql,'ENGINE=InnoDB'));
+		$this->assertSame(11,substr_count($sql,'ENGINE=InnoDB'));
 		$this->assertStringContainsString('UNIQUE KEY source_event (source_id,event_key)',$sql);
 		$this->assertStringContainsString('PRIMARY KEY  (message_uuid,recipient_token)',$sql);
 		$this->assertStringContainsString('KEY source_message (source_id,provider,provider_message_id)',$sql);
@@ -31,7 +31,7 @@ final class DeliveryEvidenceSchemaTest extends TestCase {
 		$this->assertStringNotContainsString('DROP',$sql);
 		$this->assertSame([],$GLOBALS['wpdb']->inserts);
 		Migrator::migrate();
-		$this->assertCount(12,$GLOBALS['_test_dbdelta_queries']);
+		$this->assertCount(14,$GLOBALS['_test_dbdelta_queries']);
 	}
 	public function test_partial_schema_failure_never_advances_version_and_retry_is_safe(): void {
 		foreach (['engine'=>'MyISAM','missingColumn'=>true,'brokenIndex'=>true] as $property=>$value) {
@@ -55,6 +55,6 @@ final class DeliveryEvidenceSchemaTest extends TestCase {
 		Migrator::migrate();
 		$this->assertSame(SCALYN_MAIL_RELAY_DB_VERSION,get_option('scalyn_mail_relay_db_version'));
 		$this->assertStringContainsString('retired_at datetime NULL',$GLOBALS['_test_dbdelta_queries'][0]);
-		$this->assertCount(9,$GLOBALS['_test_dbdelta_queries']);
+		$this->assertCount(11,$GLOBALS['_test_dbdelta_queries']);
 	}
 }
