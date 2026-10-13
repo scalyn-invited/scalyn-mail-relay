@@ -453,6 +453,7 @@ final class PostmarkWebhookSettings {
 	 * @throws \RuntimeException When access is denied.
 	 */
 	private function authorize( string $nonce ): void {
+		\Scalyn\MailRelay\Agency\ManagedAccess::assert_unlocked( 'providers' );
 		if ( ! current_user_can( Capabilities::MANAGE_MAIL ) || ! wp_verify_nonce( $nonce, 'scalyn_postmark_webhook' ) ) {
 			throw new \RuntimeException( 'Webhook configuration is not authorized.' );
 		}

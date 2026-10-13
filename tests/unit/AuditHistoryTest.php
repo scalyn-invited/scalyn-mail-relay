@@ -8,13 +8,32 @@ use Scalyn\MailRelay\Admin\Pages\AuditPage;
 use Scalyn\MailRelay\Core\Capabilities;
 
 final class AuditHistoryTest extends TestCase {
+	public function test_page_sizes_are_allowlisted_and_retained_in_cursor_links(): void {
+		foreach ( array( '10' => 10, '25' => 25, '50' => 50, '100' => 100, '999' => 50, 'invalid' => 50 ) as $input => $size ) {
+			$_GET = array( 'per_page' => (string) $input, 'before' => '500' );
+			$this->db->get_results_return = array_fill( 0, $size + 1, $this->row() );
+			ob_start();
+			( new AuditPage( new AuditRepository() ) )->render();
+			$html = (string) ob_get_clean();
+			$call = end( $this->db->prepare_calls );
+			$this->assertSame( array( 500, 500, $size + 1 ), $call['args'] );
+			$this->assertStringContainsString( 'Records on this page: ' . $size, $html );
+			$this->assertStringContainsString( 'per_page=' . $size, $html );
+			$this->assertStringNotContainsString( 'name="before"', $html );
+		}
+	}
+	public function test_repository_bounds_requested_page_size(): void {
+		$this->db->get_results_return = array_fill( 0, 102, $this->row() );
+		$this->assertCount( 100, ( new AuditRepository() )->page( 0, 1000 )['rows'] );
+		$this->assertCount( 1, ( new AuditRepository() )->page( 0, -1 )['rows'] );
+	}
 	public function test_redesign_labels_bounded_history_and_keeps_scroll_region():void {
 		ob_start();(new AuditPage(new AuditRepository()))->render();$html=(string)ob_get_clean();
 		$this->assertStringContainsString('Records on this page: 0',$html);
 		$this->assertStringContainsString('id="scalyn-audit-records"',$html);
 		$this->assertStringContainsString('role="region" aria-label="Audit events" tabindex="0"',$html);
 		$this->assertStringContainsString('without their values or credentials',$html);
-		$this->assertStringNotContainsString('<form ',$html);
+		$this->assertStringContainsString('id="scalyn-audit-page-size-form"',$html);
 	}
 	private WpdbStub $db;
 	protected function setUp(): void {
@@ -98,8 +117,8 @@ final class AuditHistoryTest extends TestCase {
 		$page=(new AuditRepository())->page(123);
 		$this->assertCount(50,$page['rows']);
 		$this->assertSame(10,$page['next']);
-		$this->assertStringContainsString('LIMIT 51',$this->db->prepare_calls[0]['query']);
-		$this->assertSame([123,123],$this->db->prepare_calls[0]['args']);
+		$this->assertStringContainsString('LIMIT %d',$this->db->prepare_calls[0]['query']);
+		$this->assertSame([123,123,51],$this->db->prepare_calls[0]['args']);
 		$this->assertStringNotContainsString('secret-value',json_encode($page));
 		$this->assertSame('manual',$page['rows'][0]['source']);
 	}

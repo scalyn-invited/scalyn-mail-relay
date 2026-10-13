@@ -36,7 +36,7 @@ final class ProvidersPage {
 		$registry  = $container->get( ProviderRegistry::class );
 
 		$active_provider_id = $settings->get_active_provider_id();
-		$smtp_settings      = $settings->get_smtp_config();
+		$smtp_settings      = $settings->get_smtp_settings();
 		$sendgrid_settings  = $settings->get_sendgrid_settings();
 		$postmark_settings  = $settings->get_postmark_settings();
 		$smtp2go_settings   = $settings->get_smtp2go_settings();

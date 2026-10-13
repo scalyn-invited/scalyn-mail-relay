@@ -70,6 +70,14 @@ final class MailDispatcherTest extends TestCase {
 	// Configuration failures
 	// -------------------------------------------------------------------------
 
+	public function test_direct_wizard_style_dispatch_ignores_ordinary_mail_routes(): void {
+		$settings = $this->make_settings( 'smtp' );
+		$GLOBALS['_test_wp_options'][\Scalyn\MailRelay\Mail\RoutingRepository::OPTION] = ['enabled'=>true,'rules'=>['unknown/default'=>['missing-route']]];
+		$registry = new ProviderRegistry();
+		$registry->register( $this->make_provider( 'smtp', true ) );
+		$this->assertTrue( (new MailDispatcher($registry,$settings))->dispatch($this->make_message())->success );
+	}
+
 	public function test_returns_failure_when_no_provider_is_configured(): void {
 		$dispatcher = new MailDispatcher(
 			new ProviderRegistry(),

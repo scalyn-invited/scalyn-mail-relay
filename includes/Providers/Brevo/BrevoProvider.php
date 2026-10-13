@@ -9,6 +9,7 @@ namespace Scalyn\MailRelay\Providers\Brevo;
 
 use Scalyn\MailRelay\Providers\JsonApiProvider;
 use Scalyn\MailRelay\Providers\ConnectionResult;
+use Scalyn\MailRelay\Mail\TransportFailureCategory;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -35,12 +36,12 @@ class BrevoProvider extends JsonApiProvider {
 	 */
 	public function test_connection( array $config ): ConnectionResult {
 		if ( ! $this->validate_config( $config )->valid ) {
-			return new ConnectionResult( false, 'Brevo configuration is incomplete or invalid.' );
+			return new ConnectionResult( false, 'Brevo configuration is incomplete or invalid.', failure_category: TransportFailureCategory::CONFIG );
 		}
 		$response = $this->request( '/account', $config['api_key'] );
 		$data     = $response['data'];
 		$valid    = 200 === $response['code'] && ! isset( $data['code'] ) && is_string( $data['email'] ?? null ) && false !== filter_var( $data['email'], FILTER_VALIDATE_EMAIL ) && is_array( $data['plan'] ?? null );
-		return new ConnectionResult( $valid, $valid ? 'Brevo authenticated API account access. No email was sent; transactional activation, sender authorization, allowance and delivery remain unverified.' : 'Brevo verification failed. Check the API key (not an SMTP key), account access and authorized IP restrictions. No email was sent.' );
+		return new ConnectionResult( $valid, $valid ? 'Brevo authenticated API account access. No email was sent; transactional activation, sender authorization, allowance and delivery remain unverified.' : 'Brevo verification failed. Check the API key (not an SMTP key), account access and authorized IP restrictions. No email was sent.', failure_category: $valid ? null : TransportFailureCategory::from_http( $response['code'] ) );
 	}
 
 	/**

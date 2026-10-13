@@ -15,6 +15,7 @@ final class ScheduledHooks {
 	public const CLEANUP     = 'scalyn_mail_relay_cleanup_logs';
 	public const ALERTS      = 'scalyn_mail_relay_send_alerts';
 	public const DIAGNOSTICS = 'scalyn_mail_relay_run_daily_diagnostics';
+	public const RECOVERY    = 'scalyn_mail_relay_recovery_tick';
 
 	/**
 	 * Lists every hook ever scheduled by the plugin.
@@ -22,7 +23,7 @@ final class ScheduledHooks {
 	 * @return string[] Owned hook names.
 	 */
 	public static function all(): array {
-		return array( self::CLEANUP, self::DIAGNOSTICS, 'scalyn_mail_relay_generate_health_snapshot', self::ALERTS );
+		return array( self::CLEANUP, self::DIAGNOSTICS, 'scalyn_mail_relay_generate_health_snapshot', self::ALERTS, self::RECOVERY );
 	}
 
 	/** Clears scheduled work without deleting operational data. */

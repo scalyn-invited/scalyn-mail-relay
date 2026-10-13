@@ -31,6 +31,7 @@ defined( 'ABSPATH' ) || exit;
 			?>
 			action="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-wizard&step=3' ) ); ?>"<?php endif; ?>>
 			<?php wp_nonce_field( 'scalyn_sendgrid_settings' ); ?>
+			<?php \Scalyn\MailRelay\Admin\ConfigurationGuard::field( $this->settings ); ?>
 			<input type="hidden" name="scalyn_sendgrid_settings" value="1" />
 			<p><label for="sg-from-email"><?php esc_html_e( 'Sender email', 'scalyn-mail-relay' ); ?></label><br />
 			<input id="sg-from-email" name="from_email" type="email" maxlength="254" required value="<?php echo esc_attr( $config['from_email'] ); ?>" /></p>

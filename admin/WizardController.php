@@ -99,6 +99,8 @@ final class WizardController {
 		}
 
 		check_admin_referer( 'scalyn_wizard_step2' );
+		ConfigurationGuard::check( $this->get_settings() );
+		\Scalyn\MailRelay\Agency\ManagedAccess::protect_form( 'providers' );
 
 		// phpcs:disable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized immediately below.
 		$raw_id = isset( $_POST['provider_id'] ) ? wp_unslash( $_POST['provider_id'] ) : '';
@@ -141,8 +143,10 @@ final class WizardController {
 		}
 
 		check_admin_referer( 'scalyn_wizard_step3' );
+		ConfigurationGuard::check( $this->get_settings() );
 		$settings    = $this->get_settings();
 		$provider_id = $settings->get_active_provider_id();
+		\Scalyn\MailRelay\Agency\ManagedAccess::protect_form( 'smtp' === $provider_id ? 'smtp' : 'providers' );
 		if ( in_array( $provider_id, array( 'sendgrid', 'postmark', 'smtp2go', 'brevo' ), true ) ) {
 			try {
 				$valid = $this->get_registry()->get( $provider_id )->validate_config( $settings->get_provider_config( $provider_id ) )->valid;
@@ -164,7 +168,18 @@ final class WizardController {
 		// is blank, substitute the currently stored password so that
 		// SmtpProvider::validate_config() tests the real authentication config.
 		$submitted_password = (string) ( $smtp_post['password'] ?? '' );
-		$stored_password    = (string) $settings->get_smtp_config()['password'];
+		try {
+			$stored_login = $settings->get_smtp_config();
+		} catch ( \RuntimeException $error ) {
+			if ( '' === $submitted_password || empty( $smtp_post['username'] ) ) {
+				wp_die( esc_html__( 'The saved SMTP login is unavailable. Enter both a replacement username and password, and check server encryption. No changes were saved.', 'scalyn-mail-relay' ) );
+			}
+			$stored_login = array(
+				'username' => '',
+				'password' => '',
+			);
+		}
+		$stored_password    = (string) $stored_login['password'];
 		$effective_password = '' !== $submitted_password ? $submitted_password : $stored_password;
 
 		$effective_config = array(
@@ -177,7 +192,10 @@ final class WizardController {
 			'from_email' => sanitize_email( (string) ( $smtp_post['from_email'] ?? '' ) ),
 		);
 
-		$provider   = $this->get_registry()->get( 'smtp' );
+		$provider = $this->get_registry()->get( 'smtp' );
+		if ( '' === $effective_config['username'] ) {
+			$effective_config['username'] = $stored_login['username'];
+		}
 		$validation = $provider->validate_config( $effective_config );
 
 		if ( ! $validation->valid ) {
@@ -195,7 +213,14 @@ final class WizardController {
 		// Save the raw submitted SMTP block. SettingsRepository::sanitize()
 		// will preserve the existing stored password when the submitted
 		// password field is blank.
-		$settings->save( array( 'smtp' => $smtp_post ) );
+		try {
+			$saved = $settings->save( array( 'smtp' => $smtp_post ) );
+		} catch ( \Throwable $error ) {
+			$saved = false;
+		}
+		if ( ! $saved ) {
+			wp_die( esc_html__( 'SMTP settings could not be saved. Check server encryption and reload before trying again. No mail was sent.', 'scalyn-mail-relay' ) );
+		}
 
 		wp_safe_redirect( $this->step_url( 4 ) );
 		exit;
@@ -219,6 +244,7 @@ final class WizardController {
 		}
 
 		check_admin_referer( 'scalyn_wizard_step4' );
+		ConfigurationGuard::check( $this->get_settings() );
 		$audit_uuid = wp_generate_uuid4();
 		do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'provider_verification', 'started', $audit_uuid ) );
 
@@ -282,6 +308,7 @@ final class WizardController {
 		}
 
 		check_admin_referer( 'scalyn_wizard_step5' );
+		ConfigurationGuard::check( $this->get_settings() );
 
 		// phpcs:disable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized immediately below.
 		$raw_recipient = isset( $_POST['test_recipient'] ) ? wp_unslash( $_POST['test_recipient'] ) : '';

@@ -1,7 +1,8 @@
 # ADR 0026: Deliverability assessment coverage, freshness and scoring policy
 
 Status: **Accepted** by Bernie on 2026-10-05 (Milestone 8 ticket 7).
-D1–D4 are accepted; D5 is deferred. Implementation remains pending.
+D1–D4 are accepted; D5 is deferred. Implemented locally on 2026-10-12;
+automated validation is recorded below. Owner/live visual QA remains pending.
 No numerical Deliverability Score may be displayed until this policy is
 implemented and validated. The configuration-only Email Health score (ADR-0021) is unchanged
 and must never be relabelled as deliverability.
@@ -16,11 +17,11 @@ evidence each component can actually rely on is:
 | Component | Evidence available | Persisted? | Accepted treatment |
 | --- | --- | --- | --- |
 | Authentication | `spf_record`, `dkim_record`, `dmarc_policy` (ADR-0023), revision-scoped | Yes (diagnostic runs) | Scored |
-| Domain alignment | DMARC configuration assessment (ADR-0023); message-level analysis (ADR-0025) | Configuration only; minimal header-result persistence approved but not implemented | Scored on configuration only; message-level stays informational until sufficient persisted evidence and scoring rules are implemented (D4) |
+| Domain alignment | DMARC configuration assessment (ADR-0023); message-level analysis (ADR-0025) | Configuration plus minimal informational header-result codes | Scored on configuration only; message-level stays informational until sufficient persisted evidence and scoring rules are implemented (D4) |
 | DNS quality | `mx_record`; `reverse_dns` for SMTP only (ADR-0024) | Yes | Scored where applicable; API providers exclude reverse DNS |
-| Header quality | ADR-0025 transient analysis | No; minimal result persistence approved but not implemented | **Not assessed** (weight 0); future scoring requires sufficient persisted evidence and explicit scoring rules |
+| Header quality | ADR-0025 in-memory analysis | Minimal verdict/alignment codes under D4; raw headers remain transient | **Not assessed** (weight 0); future scoring requires sufficient persisted evidence and explicit scoring rules |
 | Provider reputation | None (no provider reputation API integrated) | No | **Unavailable** (weight 0); never inferred |
-| Historical performance | Mail-log Accepted/Failed outcomes; authenticated delivery/bounce evidence (ADR-0022, Postmark only, opt-in) | Yes | Scored when sample and coverage minimums are met |
+| Historical performance | Mail-log Accepted/Failed outcomes; authenticated delivery/bounce evidence (Postmark, SMTP2GO and Brevo, opt-in) | Yes | Scored when sample and coverage minimums are met |
 
 ## Accepted policy
 
@@ -99,9 +100,47 @@ Otherwise only the submission-reliability sub-score is used, and the UI says so.
 - **D5 — Deferred:** no provider reputation source at this stage. The component
   remains "Unavailable", weight 0, and must never be inferred.
 
-## Implementation consequences (pending)
+## Implementation consequences
 
-Implementation needs a versioned migration for persisted score inputs, a read
-model shared by Dashboard and Diagnostics, and tests for the gate, freshness,
-exclusions and determinism. Until then the existing Email Health score remains the
-only number shown, with its configuration-only caveat.
+Schema 0.11.0 adds `scalyn_deliverability_evidence`, with append-only computation
+UUIDs, configuration/provider attribution, diagnostic-run correlation, weights
+version and allowlisted JSON traces. `DeliverabilityScorer` replays the persisted
+inputs; the repository rejects incompatible or non-reproducible traces.
+No old results are backfilled. This follows the existing, separately implemented
+0.10.0 failure-category migration; the version gates must remain ordered.
+
+`DeliverabilityAssessment` is shared by Dashboard and Diagnostics. An explicit
+nonce/capability-checked refresh computes and saves an assessment, including
+Not assessed outcomes. Authorized interactive diagnostic runs also refresh it
+after successful publication. A score-save failure never rolls back or relabels
+a completed diagnostic run. Scheduled runs do not bypass user capabilities;
+their new evidence requires an authorized score refresh.
+
+Implementation interpretations of the accepted rules:
+
+- History requires both provider and configuration revision, following ADR-0027
+  D1. Unattributed, other-revision/provider and future-dated logs are excluded.
+- The existing DMARC configuration verdict
+  `possible_with_configured_selector` contributes **warn = 50**, only with a
+  fresh, eligible DMARC result. It never contributes an actual-message pass.
+  Other alignment states are Not assessed. Header verdicts remain informational.
+- Postmark, SMTP2GO and Brevo opt-in authenticated current-source aggregates are
+  supported over the retained 30-day window. The existing provider-health caller
+  retains its default seven-day window. Over-limit/unreadable cohorts are
+  unavailable, not zero or a truncated sample. Submission reliability remains
+  eligible independently when bounce minimums cannot be met.
+- The UI labels the historical window and recorded calculation time explicitly;
+  new mail/webhooks require refresh to be incorporated. Changed diagnostic run,
+  configuration, retention/cadence or collection source/state hides the saved
+  number pending refresh. Expired/future diagnostic evidence also hides it.
+- Only fixed-enum SPF/DKIM/DMARC verdicts and SPF/DKIM alignment codes are retained
+  from the protected header-analysis action. No header text, domains, receiver
+  identifiers, addresses, subjects, message IDs or bodies are copied into this
+  new storage. User-pasted verdicts are not authenticated webhook evidence.
+- Both kinds of evidence use existing health-history retention, bounded to 100
+  deletions per cleanup batch. Uninstall retains by default and deletes the new
+  owned table only with the existing explicit administrator deletion opt-in.
+
+Tests cover policy thresholds, gates, staleness, exact revision reads, replay,
+privacy projections, capability/nonce enforcement, shared markup, schema retry
+and uninstall. See [implementation QA and remaining live checks](../qa/2026-10-12-deliverability-score.md).

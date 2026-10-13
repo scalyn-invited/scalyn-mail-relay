@@ -12,7 +12,7 @@ use Scalyn\MailRelay\Diagnostics\HeaderAnalyzer;
 
 defined( 'ABSPATH' ) || exit;
 
-/** Never stores, logs or re-renders the pasted headers. */
+/** Never stores, logs or re-renders raw headers; optionally records safe verdicts. */
 final class HeaderAnalysisForm {
 
 	/** Nonce action. */
@@ -36,8 +36,9 @@ final class HeaderAnalysisForm {
 	 * Creates the form.
 	 *
 	 * @param HeaderAnalyzer $analyzer Pure analyzer.
+	 * @param \Closure|null  $recorder Minimal verdict recorder, ADR-0026.
 	 */
-	public function __construct( private readonly HeaderAnalyzer $analyzer = new HeaderAnalyzer() ) {}
+	public function __construct( private readonly HeaderAnalyzer $analyzer = new HeaderAnalyzer(), private readonly ?\Closure $recorder = null ) {}
 
 	/** Handles this form's POST after capability and nonce validation. */
 	public function handle(): void {
@@ -53,10 +54,15 @@ final class HeaderAnalysisForm {
 		$headers = isset( $_POST['scalyn_headers'] ) && is_string( $_POST['scalyn_headers'] ) ? wp_unslash( $_POST['scalyn_headers'] ) : '';
 		try {
 			$this->result = $this->analyzer->analyze( $headers );
+			if ( null !== $this->recorder ) {
+				( $this->recorder )( $this->result );
+			}
 		} catch ( \InvalidArgumentException $error ) {
 			$this->error = strlen( $headers ) > HeaderAnalyzer::MAX_BYTES
 				? __( 'The pasted text is larger than 64 KB. Paste only the message headers.', 'scalyn-mail-relay' )
 				: __( 'No message headers were found. Paste the full original headers of the received message.', 'scalyn-mail-relay' );
+		} catch ( \Throwable $error ) {
+			$this->error = __( 'Analysis completed, but minimal verdict evidence could not be saved. Raw headers have not been stored.', 'scalyn-mail-relay' );
 		}
 		unset( $headers );
 		$_POST['scalyn_headers'] = '';

@@ -27,8 +27,20 @@ $status_labels = array(
 	'failed'   => __( 'Failed', 'scalyn-mail-relay' ),
 );
 
-$previous_page_args = array_merge( $filters, array( 'paged' => $page - 1 ) );
-$next_page_args     = array_merge( $filters, array( 'paged' => $page + 1 ) );
+$previous_page_args = array_merge(
+	$filters,
+	array(
+		'paged'    => $page - 1,
+		'per_page' => $per_page,
+	)
+);
+$next_page_args     = array_merge(
+	$filters,
+	array(
+		'paged'    => $page + 1,
+		'per_page' => $per_page,
+	)
+);
 if ( '' !== $status ) {
 	$previous_page_args['status'] = $status;
 	$next_page_args['status']     = $status;
@@ -39,33 +51,18 @@ $next_page_url     = add_query_arg( $next_page_args, $logs_base_url );
 <div class="wrap scalyn-mail-relay scalyn-logs">
 	<h1><?php esc_html_e( 'Email Logs', 'scalyn-mail-relay' ); ?></h1>
 	<p class="scalyn-lead"><?php esc_html_e( 'Recent email outcomes recorded by Scalyn Mail Relay.', 'scalyn-mail-relay' ); ?></p>
-	<p class="scalyn-log-context"><?php esc_html_e( 'Accepted means the sending provider acknowledged the message—not that it reached the inbox. Open a timeline to inspect the recorded events.', 'scalyn-mail-relay' ); ?></p>
+	<p class="scalyn-log-context scalyn-helper-highlight"><?php esc_html_e( 'Accepted means the sending provider acknowledged the message—not that it reached the inbox. Open a timeline to inspect the recorded events.', 'scalyn-mail-relay' ); ?></p>
 
 	<div class="scalyn-card scalyn-logs-filters">
 		<h2><?php esc_html_e( 'Find email activity', 'scalyn-mail-relay' ); ?></h2>
 		<?php if ( $filter_error ) : ?>
 			<p role="alert"><?php esc_html_e( 'Unable to apply these filters. Check the date range and filter lengths (maximum 255 characters), or ask an administrator to check the database upgrade.', 'scalyn-mail-relay' ); ?></p>
 		<?php endif; ?>
-		<form method="get" action="<?php echo esc_url( $logs_form_url ); ?>" class="scalyn-filter-form">
+		<form id="scalyn-log-filter-form" method="get" action="<?php echo esc_url( $logs_form_url ); ?>" class="scalyn-filter-form">
 			<input type="hidden" name="page" value="scalyn-mail-relay-logs" />
 			<fieldset>
 					<legend class="screen-reader-text"><?php esc_html_e( 'Filter email logs', 'scalyn-mail-relay' ); ?></legend>
 					<div class="scalyn-filter-controls">
-						<?php
-						foreach ( array(
-							'search'    => __( 'Search subject or exact message ID', 'scalyn-mail-relay' ),
-							'start'     => __( 'From date', 'scalyn-mail-relay' ),
-							'end'       => __( 'To date', 'scalyn-mail-relay' ),
-							'provider'  => __( 'Provider ID (exact)', 'scalyn-mail-relay' ),
-							'source'    => __( 'Plugin / source contains', 'scalyn-mail-relay' ),
-							'recipient' => __( 'Recipient contains', 'scalyn-mail-relay' ),
-						) as $key => $filter_label ) :
-							?>
-							<div class="scalyn-filter-group">
-								<label for="scalyn-filter-<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $filter_label ); ?></label>
-								<input id="scalyn-filter-<?php echo esc_attr( $key ); ?>" type="<?php echo in_array( $key, array( 'start', 'end' ), true ) ? 'date' : 'text'; ?>" name="<?php echo esc_attr( $key ); ?>" value="<?php echo esc_attr( $filters[ $key ] ?? '' ); ?>" maxlength="255" />
-							</div>
-						<?php endforeach; ?>
 						<div class="scalyn-filter-group">
 							<label for="scalyn-filter-status" class="scalyn-filter-label">
 								<?php esc_html_e( 'Status:', 'scalyn-mail-relay' ); ?>
@@ -76,6 +73,20 @@ $next_page_url     = add_query_arg( $next_page_args, $logs_base_url );
 								<option value="failed" <?php selected( $status, 'failed' ); ?>><?php esc_html_e( 'Failed', 'scalyn-mail-relay' ); ?></option>
 							</select>
 						</div>
+						<?php
+						foreach ( array(
+							'recipient' => __( 'Recipient contains', 'scalyn-mail-relay' ),
+							'subject'   => __( 'Subject contains', 'scalyn-mail-relay' ),
+						) as $key => $filter_label ) :
+							?>
+							<div class="scalyn-filter-group">
+								<label for="scalyn-filter-<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $filter_label ); ?></label>
+								<input id="scalyn-filter-<?php echo esc_attr( $key ); ?>" type="text" name="<?php echo esc_attr( $key ); ?>" value="<?php echo esc_attr( $filters[ $key ] ?? '' ); ?>" maxlength="255" />
+							</div>
+						<?php endforeach; ?>
+						<?php if ( empty( $rows ) ) : ?>
+							<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/logs-page-size.php'; ?>
+						<?php endif; ?>
 						<div class="scalyn-actions">
 						<button type="submit" class="button button-primary" aria-label="<?php esc_attr_e( 'Apply filters', 'scalyn-mail-relay' ); ?>">
 							<?php esc_html_e( 'Filter', 'scalyn-mail-relay' ); ?>
@@ -90,20 +101,32 @@ $next_page_url     = add_query_arg( $next_page_args, $logs_base_url );
 						</div>
 					</div>
 			</fieldset>
-		</form>
-		<p class="description"><?php esc_html_e( 'Dates include both selected days in site time. Search and recipient filters cover only metadata retained with administrator consent; older or unrecorded values cannot match. Provider examples: smtp, sendgrid, postmark.', 'scalyn-mail-relay' ); ?></p>
-		<details class="scalyn-disclosure scalyn-log-lookup">
-			<summary><?php esc_html_e( 'Have a message ID?', 'scalyn-mail-relay' ); ?></summary>
-			<form method="get" action="<?php echo esc_url( $logs_form_url ); ?>">
-				<input type="hidden" name="page" value="scalyn-mail-relay-logs" />
-				<label for="scalyn-message-lookup"><?php esc_html_e( 'Message ID', 'scalyn-mail-relay' ); ?></label>
+		<details class="scalyn-disclosure scalyn-log-lookup" <?php echo $filter_error || array_intersect_key( $filters, array_flip( array( 'start', 'end', 'provider', 'source', 'message_id', 'search' ) ) ) ? 'open' : ''; ?>>
+			<summary><?php esc_html_e( 'Advanced filters', 'scalyn-mail-relay' ); ?></summary>
 				<div class="scalyn-filter-controls">
-					<input type="text" id="scalyn-message-lookup" name="message_uuid" class="regular-text" maxlength="36" required pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}" aria-describedby="scalyn-message-lookup-help" autocomplete="off" />
-					<button type="submit" class="button"><?php esc_html_e( 'Open timeline', 'scalyn-mail-relay' ); ?></button>
+					<?php
+					foreach ( array(
+						'start'      => __( 'From date', 'scalyn-mail-relay' ),
+						'end'        => __( 'To date', 'scalyn-mail-relay' ),
+						'provider'   => __( 'Provider ID (exact)', 'scalyn-mail-relay' ),
+						'source'     => __( 'Plugin / source contains', 'scalyn-mail-relay' ),
+						'message_id' => __( 'Message ID (exact UUID)', 'scalyn-mail-relay' ),
+					) as $key => $filter_label ) :
+						?>
+						<div class="scalyn-filter-group">
+							<label for="scalyn-filter-<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $filter_label ); ?></label>
+							<input id="scalyn-filter-<?php echo esc_attr( $key ); ?>" type="<?php echo in_array( $key, array( 'start', 'end' ), true ) ? 'date' : 'text'; ?>" name="<?php echo esc_attr( $key ); ?>" value="<?php echo esc_attr( $filters[ $key ] ?? '' ); ?>" maxlength="<?php echo 'message_id' === $key ? '36' : '255'; ?>" />
+						</div>
+					<?php endforeach; ?>
 				</div>
-				<p id="scalyn-message-lookup-help" class="description"><?php esc_html_e( 'Paste the full message UUID from a log or report. This opens its timeline; it does not search email content.', 'scalyn-mail-relay' ); ?></p>
-			</form>
+				<p class="description"><?php esc_html_e( 'Message ID filters the list by its full UUID. Use View Timeline on a matching record to inspect its events.', 'scalyn-mail-relay' ); ?></p>
+				<?php if ( isset( $filters['search'] ) ) : ?>
+					<label for="scalyn-filter-search"><?php esc_html_e( 'Legacy subject / message ID search', 'scalyn-mail-relay' ); ?></label>
+					<input id="scalyn-filter-search" name="search" value="<?php echo esc_attr( $filters['search'] ); ?>" maxlength="255" />
+				<?php endif; ?>
 		</details>
+		</form>
+		<p class="description"><?php esc_html_e( 'Dates include both selected days in site time. Subject and recipient filters cover only retained metadata; older or unrecorded values cannot match. Provider examples: smtp, sendgrid, postmark.', 'scalyn-mail-relay' ); ?></p>
 	</div>
 
 	<?php if ( $filter_error ) : ?>
@@ -140,12 +163,15 @@ $next_page_url     = add_query_arg( $next_page_args, $logs_base_url );
 		<div class="scalyn-card scalyn-log-results">
 			<div class="scalyn-panel-heading">
 				<h2 id="scalyn-log-results-heading"><?php esc_html_e( 'Recorded messages', 'scalyn-mail-relay' ); ?></h2>
+				<div class="scalyn-log-result-controls">
 				<p class="description">
 				<?php
 				/* translators: 1: displayed record count, 2: page number. */
 				echo esc_html( sprintf( __( 'Records on this page: %1$d · Page %2$d', 'scalyn-mail-relay' ), count( $rows ), $page ) );
 				?>
 				</p>
+				<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/logs-page-size.php'; ?>
+				</div>
 			</div>
 			<p class="description"><?php echo esc_html( '' !== $status ? sprintf( /* translators: %s: selected outcome. */ __( 'Filtered by: %s. Newest first; timestamps use site time.', 'scalyn-mail-relay' ), $status_labels[ $status ] ) : ( $filters ? __( 'Matching selected filters. Newest first; timestamps use site time.', 'scalyn-mail-relay' ) : __( 'All recorded outcomes. Newest first; timestamps use site time.', 'scalyn-mail-relay' ) ) ); ?></p>
 			<div class="scalyn-log-table-wrapper" role="region" aria-labelledby="scalyn-log-results-heading" tabindex="0">
@@ -239,13 +265,13 @@ $next_page_url     = add_query_arg( $next_page_args, $logs_base_url );
 			<?php endif; ?>
 		</div>
 
-		<p class="description scalyn-log-note">
+		<p class="description scalyn-log-note scalyn-helper-highlight">
 			<?php esc_html_e( 'Accepted means the configured provider acknowledged the message. Accepted does not guarantee inbox delivery. The recipient server may reject it later; check provider delivery logs and bounce reports. Later bounces are not automatically reflected in this status.', 'scalyn-mail-relay' ); ?>
 		</p>
 
 	<?php endif; ?>
 	<details class="scalyn-disclosure scalyn-log-privacy"><summary><?php esc_html_e( 'Log privacy and retention', 'scalyn-mail-relay' ); ?></summary>
-		<p><?php esc_html_e( 'Recipient and subject capture is optional and off by default in Settings. Not recorded means no retained value is available. Bodies, raw headers and raw provider responses are excluded. Metadata expires with the log under your retention settings; disabling capture does not delete existing values. Counts describe this page, not lifetime totals.', 'scalyn-mail-relay' ); ?></p>
+		<p><?php esc_html_e( 'Recipient and subject capture is on by default for new installations and can be disabled in Settings. Existing sites keep their previous preference. Not recorded means no retained value is available. Bodies, raw headers and raw provider responses are excluded. Metadata expires with the log under your retention settings; disabling capture does not delete existing values. Counts describe this page, not lifetime totals.', 'scalyn-mail-relay' ); ?></p>
 	</details>
 	<dialog class="scalyn-timeline-drawer" aria-labelledby="scalyn-drawer-heading">
 		<div class="scalyn-panel-heading">

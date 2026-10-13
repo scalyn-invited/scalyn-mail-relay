@@ -43,6 +43,17 @@ if ( is_string( $scalyn_webhook_id ) && preg_match( '/^[a-f0-9]{8}-[a-f0-9]{4}-[
 	delete_option( 'scalyn_webhook_budget_' . $scalyn_webhook_id );
 }
 delete_option( 'scalyn_mail_relay_postmark_webhook' );
+delete_option( 'scalyn_mail_relay_agency' );
+delete_option( 'scalyn_mail_relay_branding' );
+delete_option( 'scalyn_mail_relay_settings_write_lock' );
+delete_option( 'scalyn_mail_relay_routing' );
+delete_option( 'scalyn_mail_relay_routing_lock' );
+delete_option( 'scalyn_mail_relay_recovery' );
+delete_option( 'scalyn_mail_relay_recovery_lock' );
+delete_option( 'scalyn_mail_relay_queue_capacity_lock' );
+
+// Remove only owned access metadata, and only under explicit deletion opt-in.
+delete_metadata( 'user', 0, 'scalyn_mail_relay_access_profile_' . get_current_blog_id(), '', true );
 foreach ( array( 'smtp2go', 'brevo' ) as $scalyn_provider ) {
 	$scalyn_option = 'scalyn_mail_relay_' . $scalyn_provider . '_webhook';
 	$scalyn_draft  = get_option( $scalyn_option, array() );
@@ -61,8 +72,11 @@ $owned_tables = array(
 	'scalyn_delivery_keys',
 	'scalyn_mail_logs',
 	'scalyn_mail_timeline',
+	'scalyn_submission_attempts',
+	'scalyn_recovery_queue',
 	'scalyn_diagnostics',
 	'scalyn_health_scores',
+	'scalyn_deliverability_evidence',
 	'scalyn_alerts',
 	'scalyn_alert_notifications',
 	'scalyn_audit_logs',

@@ -25,7 +25,7 @@ final class ProviderDeliveryRepositoryTest extends TestCase {
   $this->assertSame(0,$this->counts()['tracked']);
  }
  public function test_invalid_scope_never_queries_and_short_retention_changes_cutoff():void {
-  $this->assertNull($this->counts('smtp'));$this->assertNull($this->counts('brevo',0));$this->assertNull($this->counts('brevo',8));
+  $this->assertNull($this->counts('smtp'));$this->assertNull($this->counts('brevo',0));$this->assertNull($this->counts('brevo',31));
   $this->assertSame([],$GLOBALS['wpdb']->prepare_calls);
   $GLOBALS['wpdb']->get_row_return=['attempts'=>0,'tracked'=>0,'observed'=>0,'hard_bounced'=>0];
   $this->assertSame('2026-10-05 00:00:00.000000',$this->counts('smtp2go',1)['window_start']);

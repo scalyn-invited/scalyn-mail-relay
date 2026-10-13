@@ -36,6 +36,7 @@ final class AlertsPage {
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.ValidatedSanitizedInput.MissingUnslash -- Server-controlled request method.
 		if ( 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) {
 			check_admin_referer( 'scalyn_alert_settings' );
+			\Scalyn\MailRelay\Agency\ManagedAccess::protect_form( 'critical' );
 			$enabled = isset( $_POST['alert_webhook_enabled'] ) && '1' === $_POST['alert_webhook_enabled'];
 			if ( $enabled && ! $this->channel->configured() ) {
 				$notice = __( 'Configure a valid HTTPS webhook in server configuration before enabling notifications.', 'scalyn-mail-relay' );

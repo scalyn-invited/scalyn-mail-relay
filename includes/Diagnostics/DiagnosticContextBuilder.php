@@ -65,7 +65,7 @@ final class DiagnosticContextBuilder {
 			}
 			return new DiagnosticContext( '' !== $domain ? $domain : $fallback_domain, $safe );
 		}
-		$smtp = $settings->get_smtp_config();
+		$smtp = $settings->get_smtp_settings();
 
 		$safe = array();
 		foreach ( self::SMTP_CONTEXT_KEYS as $key ) {

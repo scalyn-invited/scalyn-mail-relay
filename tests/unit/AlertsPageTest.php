@@ -8,13 +8,25 @@ use Scalyn\MailRelay\Core\Capabilities;
 use Scalyn\MailRelay\Core\SettingsRepository;
 
 final class AlertsPageTest extends TestCase {
+	public function test_tabs_isolate_controls_history_and_read_only_overview():void {
+		$html=$this->render();
+		$dom=new DOMDocument(); @$dom->loadHTML($html); $xpath=new DOMXPath($dom);
+		$this->assertSame(4,$xpath->query('//*[@data-provider-tab]')->length);
+		$this->assertSame(0,$xpath->query('//*[@id="scalyn-panel-overview"]//form')->length);
+		$this->assertSame(1,$xpath->query('//*[@id="scalyn-panel-notifications"]//form')->length);
+		$this->assertSame(1,$xpath->query('//*[@id="scalyn-panel-email-recovery"]//form')->length);
+		$this->assertSame(1,$xpath->query('//*[@id="scalyn-panel-incident-history"]//table')->length);
+		$this->assertSame(0,$xpath->query('//*[@data-provider-panel and @hidden]')->length);
+	}
 	public function test_redesign_distinguishes_configuration_from_delivery_and_repair():void {
 		$html=$this->render();
 		$this->assertStringContainsString('id="scalyn-alert-preferences"',$html);
 		$this->assertStringContainsString('id="scalyn-incident-history"',$html);
 		$this->assertStringContainsString('Records on this page: 0',$html);
-		$this->assertStringContainsString('It does not repair configuration, resend email or automatically switch providers.',$html);
-		$this->assertSame(1,substr_count($html,'<form '));
+		$this->assertStringContainsString('It does not repair configuration or prove inbox delivery.',$html);
+		$this->assertSame(2,substr_count($html,'<form '));
+		$this->assertStringContainsString('id="scalyn-recovery"',$html);
+		$this->assertStringContainsString('Queued is not Accepted or Delivered.',$html);
 	}
 	protected function setUp():void {
 		$GLOBALS['wpdb']=new WpdbStub();

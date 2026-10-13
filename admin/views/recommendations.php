@@ -27,5 +27,5 @@ defined( 'ABSPATH' ) || exit;
 			<?php endforeach; ?>
 		</ol>
 	<?php endif; ?>
-	<p><?php esc_html_e( 'Review the matching diagnostic cards above for the observed details. Guidance covers SPF, DKIM, DMARC, MX and SMTP/TLS only; it cannot diagnose a later bounce without receiver evidence.', 'scalyn-mail-relay' ); ?></p>
+	<p><a href="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-diagnostics#configuration-checks' ) ); ?>"><?php esc_html_e( 'Review the matching diagnostic cards for the observed details.', 'scalyn-mail-relay' ); ?></a> <?php esc_html_e( 'Guidance covers SPF, DKIM, DMARC, MX and SMTP/TLS only; it cannot diagnose a later bounce without receiver evidence.', 'scalyn-mail-relay' ); ?></p>
 </section>

@@ -17,13 +17,15 @@ defined( 'ABSPATH' ) || exit;
  * a subset of these capabilities.
  */
 final class Capabilities {
-	public const VIEW_DASHBOARD  = 'scalyn_mail_relay_view_dashboard';
-	public const VIEW_LOGS       = 'scalyn_mail_relay_view_logs';
-	public const RUN_DIAGNOSTICS = 'scalyn_mail_relay_run_diagnostics';
-	public const MANAGE_MAIL     = 'scalyn_mail_relay_manage_mail';
-	public const MANAGE_SETTINGS = 'scalyn_mail_relay_manage_settings';
-	public const EXPORT_REPORTS  = 'scalyn_mail_relay_export_reports';
-	public const MANAGE_AGENCY   = 'scalyn_mail_relay_manage_agency';
+	public const VIEW_DASHBOARD      = 'scalyn_mail_relay_view_dashboard';
+	public const VIEW_LOGS           = 'scalyn_mail_relay_view_logs';
+	public const RUN_DIAGNOSTICS     = 'scalyn_mail_relay_run_diagnostics';
+	public const MANAGE_MAIL         = 'scalyn_mail_relay_manage_mail';
+	public const MANAGE_SETTINGS     = 'scalyn_mail_relay_manage_settings';
+	public const EXPORT_REPORTS      = 'scalyn_mail_relay_export_reports';
+	public const MANAGE_AGENCY       = 'scalyn_mail_relay_manage_agency';
+	public const VIEW_AUDIT          = 'scalyn_mail_relay_view_audit';
+	public const VIEW_CLIENT_REPORTS = 'scalyn_mail_relay_view_client_reports';
 
 	/**
 	 * Returns all defined capability strings.
@@ -39,6 +41,8 @@ final class Capabilities {
 			self::MANAGE_SETTINGS,
 			self::EXPORT_REPORTS,
 			self::MANAGE_AGENCY,
+			self::VIEW_AUDIT,
+			self::VIEW_CLIENT_REPORTS,
 		);
 	}
 }

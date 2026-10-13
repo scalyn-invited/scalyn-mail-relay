@@ -17,14 +17,14 @@ final class ProviderDeliveryRepository {
 	 * @param string             $revision Configuration UUID.
 	 * @param string             $provider Supported provider.
 	 * @param string             $source Source UUID.
-	 * @param int                $days Retained window, at most seven days.
+	 * @param int                $days Retained window, at most thirty days.
 	 * @param \DateTimeImmutable $now Evaluation instant.
 	 * @return array|null Null for unreadable, malformed or over-limit evidence.
 	 */
 	public function counts( string $revision, string $provider, string $source, int $days, \DateTimeImmutable $now ): ?array {
 		global $wpdb;
 		$uuid = '/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/D';
-		if ( ! preg_match( $uuid, $revision ) || ! preg_match( $uuid, $source ) || ! in_array( $provider, array( 'postmark', 'smtp2go', 'brevo' ), true ) || $days < 1 || $days > 7 ) {
+		if ( ! preg_match( $uuid, $revision ) || ! preg_match( $uuid, $source ) || ! in_array( $provider, array( 'postmark', 'smtp2go', 'brevo' ), true ) || $days < 1 || $days > 30 ) {
 			return null;
 		}
 		$now        = $now->setTimezone( new \DateTimeZone( 'UTC' ) );

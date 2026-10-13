@@ -94,7 +94,7 @@ final class BoundedApiMessage {
 			'subject'      => $message->subject,
 			'body'         => $message->body,
 			'content_type' => $message->content_type,
-			'attachments'  => $this->attachments( $message->attachments ),
+			'attachments'  => $this->attachments( $message->attachments, $message->attachment_names ),
 		);
 		// phpcs:ignore WordPress.WP.AlternativeFunctions -- Strict JSON_THROW_ON_ERROR rejects malformed UTF-8 rather than replacing message content.
 		$json = json_encode( $payload, JSON_THROW_ON_ERROR );
@@ -164,16 +164,17 @@ final class BoundedApiMessage {
 	 * Reads bounded local attachments. Only filename and base64 content leave PHP.
 	 *
 	 * @param array $paths Local absolute paths.
+	 * @param array $names Private restored attachment names.
 	 * @return array Provider attachment records.
 	 * @throws \InvalidArgumentException When a file is invalid, unreadable or oversized.
 	 */
-	private function attachments( array $paths ): array {
+	private function attachments( array $paths, array $names = array() ): array {
 		if ( count( $paths ) > self::MAX_FILES ) {
 			throw new \InvalidArgumentException( 'Too many attachments were provided.' );
 		}
 		$result = array();
 		$total  = 0;
-		foreach ( $paths as $path ) {
+		foreach ( $paths as $index => $path ) {
 			if ( ! is_string( $path ) || strlen( $path ) > 4096 || ! preg_match( '~^(?:[A-Za-z]:[\\\\/]|/)~', $path ) ) {
 				throw new \InvalidArgumentException( 'An attachment path is unsupported.' );
 			}
@@ -182,7 +183,7 @@ final class BoundedApiMessage {
 			if ( false === $size || 0 >= $size || $size > self::MAX_FILE_BYTES || $total + $size > self::MAX_FILE_BYTES ) {
 				throw new \InvalidArgumentException( 'An attachment is unreadable or exceeds the size limit.' );
 			}
-			$filename = basename( $path );
+			$filename = $names[ $index ] ?? basename( $path );
 			if ( ! preg_match( '/^[A-Za-z0-9][A-Za-z0-9._ -]{0,199}$/D', $filename ) ) {
 				throw new \InvalidArgumentException( 'An attachment filename is unsupported.' );
 			}

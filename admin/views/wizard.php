@@ -82,6 +82,14 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 
 			// -----------------------------------------------------------------
 			case 2:
+				( new \Scalyn\MailRelay\Admin\Components\ConfigurationList( $settings ) )->render( true );
+				if ( ! empty( $settings->get_configurations() ) ) {
+					break;
+				}
+				if ( \Scalyn\MailRelay\Agency\ManagedAccess::is_locked( 'providers' ) ) {
+					echo '<p role="status">' . esc_html__( 'Provider selection is managed by your administrator or agency manager.', 'scalyn-mail-relay' ) . '</p>';
+					break;
+				}
 				?>
 				<h2><?php esc_html_e( 'Choose a Mail Provider', 'scalyn-mail-relay' ); ?></h2>
 				<p><?php esc_html_e( 'Select the mail provider you want to use with this site.', 'scalyn-mail-relay' ); ?></p>
@@ -139,6 +147,15 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 
 			// -----------------------------------------------------------------
 			case 3:
+				foreach ( $settings->get_configurations() as $saved_configuration ) {
+					if ( $saved_configuration['active'] ) {
+						echo '<p><strong>' . esc_html__( 'Selected configuration:', 'scalyn-mail-relay' ) . '</strong> ' . esc_html( $saved_configuration['name'] ) . '</p>';
+					}
+				}
+				if ( \Scalyn\MailRelay\Agency\ManagedAccess::is_locked( 'smtp' === $active_provider_id ? 'smtp' : 'providers' ) ) {
+					echo '<p role="status">' . esc_html__( 'Provider configuration is managed by your administrator or agency manager.', 'scalyn-mail-relay' ) . '</p>';
+					break;
+				}
 				if ( 'brevo' === $active_provider_id ) {
 					$brevo_form->render( true );
 					$api_webhook_form->render();
@@ -183,6 +200,7 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 
 				<form method="post" action="<?php echo esc_url( $wizard_base_url ); ?>">
 					<?php wp_nonce_field( 'scalyn_wizard_step3' ); ?>
+					<?php \Scalyn\MailRelay\Admin\ConfigurationGuard::field( $settings ); ?>
 					<input type="hidden" name="wizard_step" value="3" />
 
 					<table class="form-table" role="presentation">
@@ -248,6 +266,7 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 									class="regular-text"
 									autocomplete="username"
 								/>
+								<p class="description"><?php esc_html_e( 'The saved username is never displayed. Leave username and password blank to keep the saved login. Enter both to replace an unreadable login.', 'scalyn-mail-relay' ); ?></p>
 							</td>
 						</tr>
 						<tr<?php echo $has_error( 'password' ) ? ' class="scalyn-field-error"' : ''; ?>>
@@ -348,6 +367,7 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 
 				<form method="post" action="<?php echo esc_url( $wizard_base_url ); ?>">
 					<?php wp_nonce_field( 'scalyn_wizard_step4' ); ?>
+					<?php \Scalyn\MailRelay\Admin\ConfigurationGuard::field( $settings ); ?>
 					<input type="hidden" name="wizard_step" value="4" />
 					<p>
 						<button type="submit" class="button button-primary">
@@ -378,6 +398,7 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 
 				<form method="post" action="<?php echo esc_url( $wizard_base_url ); ?>">
 					<?php wp_nonce_field( 'scalyn_wizard_step5' ); ?>
+					<?php \Scalyn\MailRelay\Admin\ConfigurationGuard::field( $settings ); ?>
 					<input type="hidden" name="wizard_step" value="5" />
 					<table class="form-table" role="presentation">
 						<tr>

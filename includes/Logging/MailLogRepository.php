@@ -159,13 +159,14 @@ final class MailLogRepository {
 						'response_code'    => (string) ( $result->response_code ?? '' ),
 						'response_message' => $result->response_message,
 						'attachment_count' => count( $message->attachments ),
-						'retry_count'      => 0,
+						'retry_count'      => is_int( $message->context['attempt_number'] ?? null ) && \Scalyn\MailRelay\Database\SubmissionAttemptRepository::uuid( $message->context['logical_uuid'] ?? null ) ? max( 0, min( 2, $message->context['attempt_number'] - 1 ) ) : 0,
 						'created_at'       => $now,
 						'sent_at'          => MailStatus::ACCEPTED === $status ? $now : null,
 						'failed_at'        => MailStatus::FAILED === $status ? $now : null,
 					),
 					$this->optional_metadata( $message ),
-					$this->configuration_metadata( $configuration_id )
+					$this->configuration_metadata( $configuration_id ),
+					$this->failure_metadata( $result, $status )
 				)
 			);
 			if ( false === $inserted ) {
@@ -176,13 +177,16 @@ final class MailLogRepository {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Intentional repository UPDATE; no cache layer is appropriate for log write-backs.
 			$updated = $wpdb->update(
 				$table,
-				array(
-					'status'           => $status,
-					'provider'         => $result->provider,
-					'response_code'    => (string) ( $result->response_code ?? '' ),
-					'response_message' => $result->response_message,
-					'sent_at'          => MailStatus::ACCEPTED === $status ? $now : null,
-					'failed_at'        => MailStatus::FAILED === $status ? $now : null,
+				array_merge(
+					$this->failure_metadata( $result, $status ),
+					array(
+						'status'           => $status,
+						'provider'         => $result->provider,
+						'response_code'    => (string) ( $result->response_code ?? '' ),
+						'response_message' => $result->response_message,
+						'sent_at'          => MailStatus::ACCEPTED === $status ? $now : null,
+						'failed_at'        => MailStatus::FAILED === $status ? $now : null,
+					)
 				),
 				array( 'message_uuid' => $message->uuid )
 			);
@@ -191,6 +195,22 @@ final class MailLogRepository {
 				throw new \RuntimeException( 'Mail log update failed.' );
 			}
 		}
+	}
+
+	/**
+	 * Persists categories only for definite failures after the additive migration.
+	 *
+	 * @param SendResult $result Actual provider outcome.
+	 * @param string     $status Lifecycle status.
+	 * @return array Schema-safe category column.
+	 */
+	private function failure_metadata( SendResult $result, string $status ): array {
+		if ( version_compare( (string) get_option( 'scalyn_mail_relay_db_version', '0.0.0' ), '0.10.0', '<' ) ) {
+			return array(); }
+		return array(
+			'failure_category' => MailStatus::FAILED === $status && ! $result->success && ! $result->acceptance_unconfirmed
+							? \Scalyn\MailRelay\Mail\TransportFailureCategory::retained( $result->failure_category ) : null,
+		);
 	}
 
 	/**
@@ -326,7 +346,7 @@ final class MailLogRepository {
 	public function search( array $filters, string $status = '', int $limit = 25, int $offset = 0 ): array {
 		global $wpdb;
 		$filters = LogFilters::validate( $filters );
-		if ( ( isset( $filters['search'] ) || isset( $filters['recipient'] ) ) && version_compare( (string) get_option( 'scalyn_mail_relay_db_version', '0.0.0' ), '0.3.0', '<' ) ) {
+		if ( ( isset( $filters['search'] ) || isset( $filters['recipient'] ) || isset( $filters['subject'] ) ) && version_compare( (string) get_option( 'scalyn_mail_relay_db_version', '0.0.0' ), '0.3.0', '<' ) ) {
 			throw new \RuntimeException( 'Email log search requires the database upgrade.' );
 		}
 		$args  = array( $wpdb->prefix . 'scalyn_mail_logs' );
@@ -357,6 +377,14 @@ final class MailLogRepository {
 				case 'recipient':
 					$where[] = 'logged_recipients LIKE %s';
 					$args[]  = '%' . $wpdb->esc_like( $value ) . '%';
+					break;
+				case 'subject':
+					$where[] = 'logged_subject LIKE %s';
+					$args[]  = '%' . $wpdb->esc_like( $value ) . '%';
+					break;
+				case 'message_id':
+					$where[] = 'message_uuid = %s';
+					$args[]  = $value;
 					break;
 				case 'search':
 					$where[] = '(message_uuid = %s OR logged_subject LIKE %s)';
@@ -465,6 +493,54 @@ final class MailLogRepository {
 		}
 		$counts['total'] = $counts['accepted'] + $counts['failed'];
 		return $counts;
+	}
+
+	/**
+	 * Reads the latest 24-hour sequence without skipping unknown/prepared outcomes.
+	 *
+	 * @param string $configuration_id Current revision.
+	 * @param string $provider Active provider.
+	 * @return array|null Count-only evidence; null on schema/read/overflow failure.
+	 */
+	public function configuration_failure_evidence( string $configuration_id, string $provider ): ?array {
+		global $wpdb;
+		if ( ! self::valid_configuration_scope( $configuration_id, $provider ) || version_compare( (string) get_option( 'scalyn_mail_relay_db_version', '0.0.0' ), '0.10.0', '<' ) ) {
+			return null; }
+		$now        = current_time( 'mysql' );
+		$suppressed = $wpdb->suppress_errors( true );
+		try {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Indexed revision/time-bounded sequence; sentinel prevents silently truncated evidence.
+			$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT status,failure_category FROM %i WHERE configuration_id=%s AND provider=%s AND created_at >= DATE_SUB(%s, INTERVAL 24 HOUR) AND created_at <= %s ORDER BY created_at DESC,id DESC LIMIT 1001', $wpdb->prefix . 'scalyn_mail_logs', $configuration_id, $provider, $now, $now ), ARRAY_A );
+			if ( ! is_array( $rows ) || ! empty( $wpdb->last_error ) || count( $rows ) > 1000 ) {
+				return null; }
+			$result = array(
+				'auth_config_streak'  => 0,
+				'provider_rejections' => 0,
+				'rate_limits'         => 0,
+				'unclassified'        => 0,
+				'window_end'          => $now,
+			);
+			$streak = true;
+			foreach ( $rows as $row ) {
+				$category = \Scalyn\MailRelay\Mail\TransportFailureCategory::retained( $row['failure_category'] ?? null );
+				$failed   = MailStatus::FAILED === ( $row['status'] ?? '' );
+				if ( $streak && $failed && in_array( $category, array( 'auth', 'config' ), true ) ) {
+					++$result['auth_config_streak'];
+				} else {
+					$streak = false; }
+				if ( $failed && 'provider-rejection' === $category ) {
+					++$result['provider_rejections']; }
+				if ( $failed && 'rate-limit' === $category ) {
+					++$result['rate_limits']; }
+				if ( $failed && ( null === $category || 'unknown' === $category ) ) {
+					++$result['unclassified']; }
+			}
+			return $result;
+		} catch ( \Throwable $error ) {
+			return null;
+		} finally {
+			$wpdb->suppress_errors( $suppressed );
+		}
 	}
 
 	/**

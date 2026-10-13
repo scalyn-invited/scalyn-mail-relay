@@ -44,7 +44,7 @@ final class ConnectionVerification {
 		}
 		try {
 			// Deliberately excludes result messages, metadata and transport config.
-			$this->evidence->record( $revision, $provider, $status, $started, self::now() );
+			$this->evidence->record( $revision, $provider, $status, $started, self::now(), 'failed' === $status ? $result->failure_category : null );
 		} catch ( \Throwable $error ) {
 			// Evidence storage cannot change the observed transport outcome.
 			unset( $error );
@@ -79,9 +79,13 @@ final class ConnectionVerification {
 		if ( $checked > $now || $checked < $now->modify( '-' . $this->settings->get_log_retention_days() . ' days' ) ) {
 			return $unknown;
 		}
-		return array(
-			'status'     => $checked < $now->modify( '-7 days' ) ? 'stale' : $row['status'],
-			'checked_at' => $row['checked_at'],
+		$category = $checked >= $now->modify( '-7 days' ) && 'failed' === $row['status'] ? ( $row['failure_category'] ?? null ) : null;
+		return array_merge(
+			null !== $category ? array( 'failure_category' => $category ) : array(),
+			array(
+				'status'     => $checked < $now->modify( '-7 days' ) ? 'stale' : $row['status'],
+				'checked_at' => $row['checked_at'],
+			)
 		);
 	}
 

@@ -24,7 +24,7 @@ final class DkimSettingsForm {
 
 	/** Renders and handles only this form, with capability and nonce enforcement. */
 	public function render(): void {
-		$can_manage = current_user_can( Capabilities::MANAGE_SETTINGS );
+		$can_manage = current_user_can( Capabilities::MANAGE_SETTINGS ) && ! \Scalyn\MailRelay\Agency\ManagedAccess::is_locked( 'critical' );
 		$notice     = '';
 		$error      = false;
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Form detection only; nonce checked before reading values or saving.

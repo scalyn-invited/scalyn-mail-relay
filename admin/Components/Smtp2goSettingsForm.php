@@ -48,7 +48,7 @@ final class Smtp2goSettingsForm {
 			return;
 		}
 		$this->handled = true;
-		$can_manage    = current_user_can( Capabilities::MANAGE_MAIL );
+		$can_manage    = current_user_can( Capabilities::MANAGE_MAIL ) && ! \Scalyn\MailRelay\Agency\ManagedAccess::is_locked( 'providers' );
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Form detection only; values are read after nonce validation.
 		$submitted = isset( $_POST['scalyn_smtp2go_settings'] );
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.ValidatedSanitizedInput.MissingUnslash -- Server-controlled method.
@@ -57,6 +57,7 @@ final class Smtp2goSettingsForm {
 				wp_die( esc_html__( 'You do not have permission to configure mail providers.', 'scalyn-mail-relay' ) );
 			}
 			check_admin_referer( 'scalyn_smtp2go_settings' );
+			\Scalyn\MailRelay\Admin\ConfigurationGuard::check( $this->settings );
 			$input = array();
 			foreach ( array( 'from_email', 'from_name', 'api_key', 'key_action' ) as $field ) {
 				// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Repository strictly validates types and content; secrets must not be rewritten.
@@ -88,7 +89,7 @@ final class Smtp2goSettingsForm {
 	 */
 	public function render( bool $in_wizard = false ): void {
 		$this->handle();
-		$can_manage = current_user_can( Capabilities::MANAGE_MAIL );
+		$can_manage = current_user_can( Capabilities::MANAGE_MAIL ) && ! \Scalyn\MailRelay\Agency\ManagedAccess::is_locked( 'providers' );
 		$notice     = $this->notice;
 		$saved      = $this->saved;
 		if ( $in_wizard && $saved ) {

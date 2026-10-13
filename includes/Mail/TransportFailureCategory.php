@@ -39,6 +39,9 @@ final class TransportFailureCategory {
 	/** The provider rejected the message itself (recipient rejected, relay denied). */
 	public const PROVIDER_REJECTION = 'provider-rejection';
 
+	/** Explicit API throttling (HTTP 429), never inferred from a timeout. */
+	public const RATE_LIMIT = 'rate-limit';
+
 	/** The failure could not be classified into any of the categories above. */
 	public const UNKNOWN = 'unknown';
 
@@ -74,6 +77,31 @@ final class TransportFailureCategory {
 		return match ( $legacy ) {
 			'timeout' => self::TIMEOUT,
 			'refused', 'dns' => self::CONNECTIVITY,
+			default => self::UNKNOWN,
+		};
+	}
+
+	/**
+	 * Filters a provider category without interpreting text or metadata.
+	 *
+	 * @param mixed $category Provider classification.
+	 * @return string|null Null means unavailable, not a successful outcome.
+	 */
+	public static function retained( mixed $category ): ?string {
+		return is_string( $category ) && in_array( $category, array_merge( self::transport_categories(), array( self::CONFIG, self::UNKNOWN, self::RATE_LIMIT ) ), true ) ? $category : null;
+	}
+
+	/**
+	 * Conservative HTTP classification; 403 alone is not proof of bad credentials.
+	 *
+	 * @param int $code Observed status.
+	 * @return string Closed failure category.
+	 */
+	public static function from_http( int $code ): string {
+		return match ( true ) {
+			401 === $code => self::AUTH,
+			429 === $code => self::RATE_LIMIT,
+			$code >= 400 && $code < 500 && 408 !== $code => self::PROVIDER_REJECTION,
 			default => self::UNKNOWN,
 		};
 	}

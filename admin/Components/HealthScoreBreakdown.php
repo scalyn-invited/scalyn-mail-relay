@@ -44,7 +44,7 @@ final class HealthScoreBreakdown {
 		echo '</ul>';
 
 		if ( '' !== $summary ) {
-			echo '<p class="scalyn-card__note scalyn-health-summary">' . esc_html( $summary ) . '</p>';
+			echo '<p class="scalyn-card__note scalyn-health-summary scalyn-finding__action">' . esc_html( $summary ) . '</p>';
 		}
 	}
 }

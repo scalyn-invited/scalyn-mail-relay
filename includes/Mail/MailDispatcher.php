@@ -25,9 +25,9 @@ defined( 'ABSPATH' ) || exit;
  *   5. Publish a lifecycle hook so other modules can respond without coupling.
  *   6. Return the normalized SendResult to the caller.
  *
- * MailDispatcher intentionally has no knowledge of database repositories,
- * timeline writers, or logging services. Those modules subscribe to
- * HookNames::MAIL_SENT and HookNames::MAIL_FAILED and act independently.
+ * Submission evidence is an explicit repository dependency. Timeline and log
+ * writers remain independent hook subscribers. Ordinary-mail route selection
+ * belongs to WordPressMailBridge; direct wizard dispatch uses the site default.
  *
  * Ownership: Bernie / Core.
  */
@@ -36,14 +36,16 @@ final class MailDispatcher {
 	/**
 	 * Creates a new mail dispatcher.
 	 *
-	 * @param ProviderRegistry     $registry The registry of available mail providers.
-	 * @param SettingsRepository   $settings The repository for reading plugin settings.
-	 * @param DeliveryTracker|null $tracker Optional opted-in delivery evidence associations.
+	 * @param ProviderRegistry                                            $registry The registry of available mail providers.
+	 * @param SettingsRepository                                          $settings The repository for reading plugin settings.
+	 * @param DeliveryTracker|null                                        $tracker Optional opted-in delivery evidence associations.
+	 * @param \Scalyn\MailRelay\Database\SubmissionAttemptRepository|null $attempts Submission evidence repository.
 	 */
 	public function __construct(
 		private readonly ProviderRegistry $registry,
 		private readonly SettingsRepository $settings,
-		private readonly ?DeliveryTracker $tracker = null
+		private readonly ?DeliveryTracker $tracker = null,
+		private readonly ?\Scalyn\MailRelay\Database\SubmissionAttemptRepository $attempts = null
 	) {}
 
 	/**
@@ -53,13 +55,21 @@ final class MailDispatcher {
 	 * On provider failure or configuration error, fires HookNames::MAIL_FAILED.
 	 *
 	 * @param MailMessage $message The prepared message to send.
+	 * @param array|null  $target Optional pinned target for recovery; never user-controlled.
+	 * @param bool        $require_evidence Recovery must establish durable evidence before any transport call.
+	 * @throws \RuntimeException If mandatory recovery evidence cannot be established.
 	 * @return SendResult The normalized result from the provider.
 	 */
-	public function dispatch( MailMessage $message ): SendResult {
+	public function dispatch( MailMessage $message, ?array $target = null, bool $require_evidence = false ): SendResult {
 		$provider_id = $this->settings->get_active_provider_id();
 		// Capture attribution before transport; missing legacy revisions stay unknown.
 		$revision         = $this->settings->get_diagnostic_revision();
 		$configuration_id = preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/D', $revision ) ? $revision : null;
+		if ( null !== $target ) {
+			$provider_id      = $target['provider'];
+			$configuration_id = $target['revision'];
+			$message          = new MailMessage( $message->uuid, $target['from'], $message->to, $message->subject, $message->body, $message->content_type, $message->headers, $message->attachments, $message->context, $message->attachment_names );
+		}
 
 		if ( '' === $provider_id ) {
 			$result = new SendResult( false, '', null, null, 'No mail provider is configured.', false, 'config' );
@@ -75,16 +85,29 @@ final class MailDispatcher {
 
 		$provider = $this->registry->get( $provider_id );
 		try {
-			$config = $this->settings->get_provider_config( $provider_id );
+			$config = null === $target ? $this->settings->get_provider_config( $provider_id ) : $this->settings->resolve_target( $target );
 		} catch ( \Throwable $error ) {
 			$result = new SendResult( false, $provider_id, null, null, 'Stored provider credentials are unavailable. Replace the key in Providers.', false, 'config' );
 			$this->publish( HookNames::MAIL_FAILED, $result, $message, $configuration_id );
 			return $result;
 		}
+		$recorded = false;
+		try {
+			if ( null !== $this->attempts ) {
+				$this->attempts->begin( $message->context['logical_uuid'] ?? $message->uuid, $message->uuid, $message->context['attempt_number'] ?? 1, $provider_id, $configuration_id, $message->context['origin'] ?? MailOrigin::current() );
+				$recorded = true;
+			}
+		} catch ( \Throwable $error ) {
+			$recorded = false;
+		}
+		if ( $require_evidence && ! $recorded ) {
+			throw new \RuntimeException( 'Durable submission evidence is unavailable. No submission was attempted.' );
+		}
 		// Optional tracking must be associated before submission and can never block it.
 		$association = null;
 		try {
-			$association = $this->tracker?->prepare( $message, $provider_id );
+			// Existing sources are active-revision scoped, never bind another revision.
+			$association = null === $target || $configuration_id === $revision ? $this->tracker?->prepare( $message, $provider_id ) : null;
 		} catch ( \Throwable $error ) {
 			$association = null;
 		}
@@ -92,6 +115,14 @@ final class MailDispatcher {
 			$result = $provider->send( $message, $config );
 		} catch ( \Throwable $error ) {
 			$result = new SendResult( false, $provider_id, null, null, 'Provider acceptance is unconfirmed. Check provider activity before retrying.', false, 'unknown', array(), true );
+		}
+		try {
+			if ( $recorded ) {
+				$this->attempts->finish( $message->uuid, $result );
+			}
+		} catch ( \Throwable $error ) {
+			// Never reverse observed acceptance, nor retry because an observer failed.
+			unset( $error );
 		}
 		try {
 			$this->tracker?->acknowledge( $association, $result );

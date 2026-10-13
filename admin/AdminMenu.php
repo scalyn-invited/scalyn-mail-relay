@@ -41,8 +41,14 @@ final class AdminMenu {
 	 */
 	public function register(): void {
 		add_action( 'admin_menu', array( $this, 'add_menu' ) );
+		add_action( 'admin_menu', array( AgencyBranding::class, 'apply_menu_label' ), 99 );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
+		add_action( 'admin_enqueue_scripts', array( AgencyBranding::class, 'enqueue_menu_styles' ) );
+		add_action( 'admin_notices', array( AgencyBranding::class, 'render' ) );
 		add_action( 'admin_post_scalyn_export_report', array( new ReportExportController(), 'handle' ) );
+		add_action( 'admin_post_scalyn_client_report', array( new ClientReportController(), 'handle' ) );
+		add_action( 'admin_post_scalyn_configuration', array( new ConfigurationController(), 'handle' ) );
+		add_action( 'admin_post_scalyn_recovery', array( new RecoveryController(), 'handle' ) );
 	}
 
 	/**
@@ -59,7 +65,7 @@ final class AdminMenu {
 			56
 		);
 
-		// Rename the auto-generated first sub-menu item from "Mail Relay" to "Dashboard".
+		// Keep the first submenu as Dashboard regardless of the saved brand name.
 		add_submenu_page(
 			'scalyn-mail-relay',
 			__( 'Dashboard — Scalyn Mail Relay', 'scalyn-mail-relay' ),
@@ -115,12 +121,16 @@ final class AdminMenu {
 			'scalyn-mail-relay',
 			__( 'Audit History — Scalyn Mail Relay', 'scalyn-mail-relay' ),
 			__( 'Audit History', 'scalyn-mail-relay' ),
-			Capabilities::MANAGE_SETTINGS,
+			current_user_can( Capabilities::VIEW_AUDIT ) ? Capabilities::VIEW_AUDIT : Capabilities::MANAGE_SETTINGS,
 			'scalyn-mail-relay-audit',
 			array( $this, 'render_audit' )
 		);
 		add_submenu_page( 'scalyn-mail-relay', __( 'Alerts & Recovery', 'scalyn-mail-relay' ), __( 'Alerts & Recovery', 'scalyn-mail-relay' ), Capabilities::MANAGE_SETTINGS, 'scalyn-mail-relay-alerts', array( $this, 'render_alerts' ) );
 		add_submenu_page( 'scalyn-mail-relay', __( 'Reports', 'scalyn-mail-relay' ), __( 'Reports', 'scalyn-mail-relay' ), Capabilities::EXPORT_REPORTS, 'scalyn-mail-relay-reports', array( new \Scalyn\MailRelay\Admin\Pages\ReportsPage(), 'render' ) );
+		if ( \Scalyn\MailRelay\Agency\ManagedAccess::is_client() ) {
+			add_submenu_page( 'scalyn-mail-relay', __( 'Summary Reports', 'scalyn-mail-relay' ), __( 'Summary Reports', 'scalyn-mail-relay' ), Capabilities::VIEW_CLIENT_REPORTS, 'scalyn-mail-relay-client-reports', array( new \Scalyn\MailRelay\Admin\Pages\ClientPage(), 'render' ) );
+		}
+		add_submenu_page( 'scalyn-mail-relay', __( 'Agency Settings', 'scalyn-mail-relay' ), __( 'Agency Settings', 'scalyn-mail-relay' ), Capabilities::MANAGE_AGENCY, 'scalyn-mail-relay-agency', array( new \Scalyn\MailRelay\Admin\Pages\AgencyPage( Plugin::instance()->container()->get( \Scalyn\MailRelay\Agency\AgencyRepository::class ) ), 'render' ) );
 		add_submenu_page(
 			'scalyn-mail-relay',
 			__( 'Settings — Scalyn Mail Relay', 'scalyn-mail-relay' ),
@@ -144,6 +154,22 @@ final class AdminMenu {
 		$style_path    = SCALYN_MAIL_RELAY_PATH . 'assets/css/admin.css';
 		$style_version = is_readable( $style_path ) ? (string) filemtime( $style_path ) : SCALYN_MAIL_RELAY_VERSION;
 		wp_enqueue_style( 'scalyn-mail-relay-admin', SCALYN_MAIL_RELAY_URL . 'assets/css/admin.css', array(), $style_version );
+		wp_add_inline_style( 'scalyn-mail-relay-admin', AgencyBranding::css() );
+		$help_script = SCALYN_MAIL_RELAY_PATH . 'assets/js/helper-text.js';
+		if ( str_ends_with( $hook, 'scalyn-mail-relay-providers' ) ) {
+			$catalog_script = SCALYN_MAIL_RELAY_PATH . 'assets/js/provider-catalog.js';
+			wp_enqueue_script( 'scalyn-provider-catalog', SCALYN_MAIL_RELAY_URL . 'assets/js/provider-catalog.js', array(), (string) filemtime( $catalog_script ), true );
+		}
+		wp_enqueue_script( 'scalyn-helper-text', SCALYN_MAIL_RELAY_URL . 'assets/js/helper-text.js', array(), (string) filemtime( $help_script ), true );
+		if ( preg_match( '/scalyn-mail-relay-(providers|agency|data-controls|diagnostics|alerts)$/', $hook ) ) {
+			$tabs_script = SCALYN_MAIL_RELAY_PATH . 'assets/js/provider-tabs.js';
+			wp_enqueue_script( 'scalyn-provider-tabs', SCALYN_MAIL_RELAY_URL . 'assets/js/provider-tabs.js', array(), (string) filemtime( $tabs_script ), true );
+		}
+		if ( false !== strpos( $hook, 'scalyn-mail-relay-agency' ) && ( current_user_can( Capabilities::MANAGE_AGENCY ) || current_user_can( 'manage_options' ) ) ) {
+			wp_enqueue_media();
+			$brand_script = SCALYN_MAIL_RELAY_PATH . 'assets/js/agency-branding.js';
+			wp_enqueue_script( 'scalyn-agency-branding', SCALYN_MAIL_RELAY_URL . 'assets/js/agency-branding.js', array( 'media-views' ), (string) filemtime( $brand_script ), true );
+		}
 
 		// Enqueue the admin script on every plugin screen. The script self-gates
 		// on the presence of the #scalyn-run-diagnostics button, which is rendered

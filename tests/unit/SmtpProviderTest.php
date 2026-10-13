@@ -502,7 +502,8 @@ final class SmtpProviderTest extends TestCase {
 			$result = $this->make_provider( $stub )->send( $this->make_message(), $this->valid_config() );
 			$this->assertFalse( $result->success );
 			$this->assertFalse( $result->acceptance_unconfirmed );
-			$this->assertFalse( $result->retryable );
+			$this->assertSame( in_array( $result->failure_category, array( 'connectivity', 'timeout' ), true ), $result->retryable );
+			$this->assertTrue( $result->safe_to_retry );
 			$this->assertSame( 0, $stub->send_calls );
 			$this->assertTrue( $stub->smtpClose_was_called );
 			$this->assertStringNotContainsString( 'private data', serialize( $result ) );

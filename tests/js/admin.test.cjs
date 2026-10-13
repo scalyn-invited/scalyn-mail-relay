@@ -6,6 +6,58 @@ const vm = require('node:vm');
 
 const source = readFileSync(resolve(__dirname, '../../assets/js/admin.js'), 'utf8');
 
+test('report provider is enabled and required only for specific scope without losing its selection', () => {
+  let change;
+  const scope = { value: 'all', addEventListener(name, callback) { assert.equal(name, 'change'); change = callback; } };
+  const provider = { value: 'brevo' };
+  const elements = { 'report-provider-scope': scope, 'report-provider': provider };
+  vm.runInNewContext(source, { document: { readyState: 'complete', getElementById: id => elements[id], querySelector: () => null } });
+  assert.equal(provider.disabled, true); assert.equal(provider.required, false);
+  scope.value = 'specific'; change();
+  assert.equal(provider.disabled, false); assert.equal(provider.required, true);
+  scope.value = 'unattributed'; change();
+  assert.equal(provider.disabled, true); assert.equal(provider.required, false);
+  assert.equal(provider.value, 'brevo');
+});
+
+test('audit page size automatically submits only on change and scrolls to records', () => {
+  let change, submissions = 0;
+  const form = { action: 'https://site.test/wp-admin/admin.php', requestSubmit() { submissions++; } };
+  const select = { form, addEventListener(name, handler) { assert.equal(name, 'change'); change = handler; } };
+  vm.runInNewContext(source, { URL, document: { readyState: 'complete', getElementById: id => id === 'scalyn-audit-per-page' ? select : null, querySelector: () => null } });
+  assert.equal(submissions, 0); change();
+  assert.equal(submissions, 1);
+  assert.equal(new URL(form.action).hash, '#scalyn-audit-records');
+});
+
+test('page size submits its associated filter form only on change', () => {
+  let change, submissions = 0;
+  const form = { action: 'https://site.test/wp-admin/admin.php', requestSubmit() { submissions++; } };
+  const select = { form, addEventListener(name, handler) { assert.equal(name, 'change'); change = handler; } };
+  vm.runInNewContext(source, { URL, document: { readyState: 'complete', getElementById: id => id === 'scalyn-filter-per-page' ? select : null, querySelector: () => null } });
+  assert.equal(submissions, 0);
+  change();
+  assert.equal(submissions, 1);
+  assert.equal(new URL(form.action).hash, '#scalyn-log-results-heading');
+});
+
+test('routing toggle disables rules without losing draft selections or saving', () => {
+  let change;
+  const toggle = { checked: false, addEventListener(name, callback) { assert.equal(name, 'change'); change = callback; } };
+  const rules = { disabled: false, draft: 'saved-configuration' };
+  const notice = { hidden: true };
+  const elements = { 'scalyn-routing-enabled': toggle, 'scalyn-routing-rules': rules, 'scalyn-routing-disabled': notice };
+  vm.runInNewContext(source, { document: { readyState: 'complete', getElementById: id => elements[id], querySelector: () => null } });
+  assert.equal(rules.disabled, true);
+  assert.equal(notice.hidden, false);
+  toggle.checked = true; change();
+  assert.equal(rules.disabled, false);
+  assert.equal(notice.hidden, true);
+  toggle.checked = false; change();
+  assert.equal(rules.disabled, true);
+  assert.equal(rules.draft, 'saved-configuration');
+});
+
 test('wizard health check posts with nonce and returns to step six', async () => {
   let activate, request, refreshed;
   const button = {

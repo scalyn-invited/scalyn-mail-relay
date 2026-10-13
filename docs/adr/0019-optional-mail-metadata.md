@@ -4,6 +4,17 @@ Status: Scope approved by Bernie in the UI redesign conversation; implementation
 
 ## Decision
 
+### Owner-approved default amendment — 2026-10-13
+
+Bernie requested recipient and subject capture on by default. New installations
+with no settings option now default to enabled. Existing sites retain explicit
+true/false choices; existing settings lacking this field retain the prior disabled
+policy. Administrators can disable future capture in Privacy & Retention. The
+privacy notice must disclose this default and the sensitivity of these fields.
+This supersedes the original default-off/explicit-opt-in wording below only for
+new installations. Bounded capture, schema readiness, no backfill, access,
+retention and export exclusions remain unchanged. No schema migration is needed.
+
 Align Email Logs with the UI/UX blueprint using existing operational fields and
 explicit opt-in metadata. `advanced.log_message_metadata` defaults to false.
 Only the privileged, nonce-protected Settings form exposes this policy.

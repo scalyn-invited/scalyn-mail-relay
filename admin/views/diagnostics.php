@@ -46,18 +46,24 @@ defined( 'ABSPATH' ) || exit;
 <div class="wrap scalyn-mail-relay scalyn-diagnostics">
 	<h1><?php esc_html_e( 'Diagnostics', 'scalyn-mail-relay' ); ?></h1>
 	<p class="scalyn-lead"><?php esc_html_e( 'Find configuration issues, understand their impact and review the next action.', 'scalyn-mail-relay' ); ?></p>
+	<?php
+	\Scalyn\MailRelay\Admin\Components\PageTabs::render(
+		array(
+			'configuration-checks' => __( 'Configuration Checks', 'scalyn-mail-relay' ),
+			'deliverability-score' => __( 'Deliverability Score', 'scalyn-mail-relay' ),
+			'failures-guidance'    => __( 'Failures & Guidance', 'scalyn-mail-relay' ),
+			'header-analysis'      => __( 'Header Analysis', 'scalyn-mail-relay' ),
+		)
+	);
+	?>
+	<div id="scalyn-panel-configuration-checks" class="scalyn-provider-tab-panel" data-provider-panel="configuration-checks">
 	<?php if ( current_user_can( \Scalyn\MailRelay\Core\Capabilities::MANAGE_SETTINGS ) ) : ?>
 		<p><a href="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-data-controls#scalyn-dkim-heading' ) ); ?>"><?php esc_html_e( 'Configure DKIM in Settings', 'scalyn-mail-relay' ); ?></a></p>
 	<?php endif; ?>
-	<details class="scalyn-card scalyn-disclosure"><summary><?php esc_html_e( 'Evidence freshness and coverage', 'scalyn-mail-relay' ); ?></summary>
-	<p><?php esc_html_e( 'Displayed diagnostic results:', 'scalyn-mail-relay' ); ?> <?php echo esc_html( $results_freshness ); ?></p>
-	<p><?php esc_html_e( 'Displayed health snapshot:', 'scalyn-mail-relay' ); ?> <?php echo esc_html( $score_freshness ); ?></p>
-	<p><?php esc_html_e( 'Results and the latest retained health snapshot may come from different runs. Evidence is stale after the configured cadence plus five minutes, or 24 hours plus five minutes when monitoring is disabled.', 'scalyn-mail-relay' ); ?></p>
-	</details>
 
 	<?php if ( $provider_configured ) : ?>
 		<!-- Run Diagnostics Action (Header) -->
-		<div class="scalyn-panel-heading">
+		<div class="scalyn-panel-heading scalyn-diagnostics-run-toolbar">
 			<div>
 				<?php
 				$last_run_time = null;
@@ -322,6 +328,22 @@ defined( 'ABSPATH' ) || exit;
 			</div>
 		</section>
 
+	<?php endif; ?>
+	<details class="scalyn-card scalyn-disclosure"><summary><?php esc_html_e( 'Evidence freshness and coverage', 'scalyn-mail-relay' ); ?></summary>
+	<p><?php esc_html_e( 'Displayed diagnostic results:', 'scalyn-mail-relay' ); ?> <?php echo esc_html( $results_freshness ); ?></p>
+	<p><?php esc_html_e( 'Displayed health snapshot:', 'scalyn-mail-relay' ); ?> <?php echo esc_html( $score_freshness ); ?></p>
+	<p><?php esc_html_e( 'Results and the latest retained health snapshot may come from different runs. Evidence is stale after the configured cadence plus five minutes, or 24 hours plus five minutes when monitoring is disabled.', 'scalyn-mail-relay' ); ?></p>
+	</details>
+	</div>
+	<div id="scalyn-panel-deliverability-score" class="scalyn-provider-tab-panel" data-provider-panel="deliverability-score">
+		<?php if ( $provider_configured && isset( $deliverability ) ) : ?>
+			<?php $deliverability->render(); ?>
+		<?php else : ?>
+			<p><?php esc_html_e( 'Configure a mail provider before assessing deliverability.', 'scalyn-mail-relay' ); ?></p>
+		<?php endif; ?>
+	</div>
+	<div id="scalyn-panel-failures-guidance" class="scalyn-provider-tab-panel" data-provider-panel="failures-guidance">
+	<?php if ( $provider_configured ) : ?>
 		<!-- Recent Failure Classifications -->
 		<?php if ( ! empty( $recent_failures ) ) : ?>
 			<section class="scalyn-diagnostics-section" aria-labelledby="scalyn-diagnostics-failures-heading">
@@ -364,10 +386,13 @@ defined( 'ABSPATH' ) || exit;
 		<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/recommendations.php'; ?>
 		<?php \Scalyn\MailRelay\Admin\Components\VerificationScope::render(); ?>
 	</div>
+	</div>
+	<div id="scalyn-panel-header-analysis" class="scalyn-provider-tab-panel" data-provider-panel="header-analysis">
 	<?php
 	if ( isset( $header_analysis ) ) {
 		$header_analysis->render();
 	}
 	?>
+	</div>
 	<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/diagnostics-guide.php'; ?>
 </div>

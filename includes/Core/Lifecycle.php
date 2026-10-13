@@ -31,6 +31,7 @@ final class Lifecycle {
 		RetentionService::ensure_scheduled();
 		DiagnosticSchedule::reconcile();
 		\Scalyn\MailRelay\Alerts\AlertService::ensure_scheduled();
+		\Scalyn\MailRelay\Recovery\RecoveryService::ensure_scheduled();
 		update_option( 'scalyn_mail_relay_version', SCALYN_MAIL_RELAY_VERSION, false );
 	}
 

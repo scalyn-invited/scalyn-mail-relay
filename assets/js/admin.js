@@ -324,6 +324,45 @@
 	}
 
 	function initAdmin() {
+		const reportScope = document.getElementById( 'report-provider-scope' );
+		const reportProvider = document.getElementById( 'report-provider' );
+		if ( reportScope && reportProvider ) {
+			const updateReportProvider = function() {
+				reportProvider.disabled = reportScope.value !== 'specific';
+				reportProvider.required = reportScope.value === 'specific';
+			};
+			reportScope.addEventListener( 'change', updateReportProvider );
+			updateReportProvider();
+		}
+		const auditSize = document.getElementById( 'scalyn-audit-per-page' );
+		if ( auditSize && auditSize.form && typeof auditSize.form.requestSubmit === 'function' ) {
+			auditSize.addEventListener( 'change', function() {
+				const action = new URL( auditSize.form.action );
+				action.hash = 'scalyn-audit-records';
+				auditSize.form.action = action.toString();
+				auditSize.form.requestSubmit();
+			} );
+		}
+		const pageSize = document.getElementById( 'scalyn-filter-per-page' );
+		if ( pageSize && pageSize.form && typeof pageSize.form.requestSubmit === 'function' ) {
+			pageSize.addEventListener( 'change', function() {
+				const action = new URL( pageSize.form.action );
+				action.hash = 'scalyn-log-results-heading';
+				pageSize.form.action = action.toString();
+				pageSize.form.requestSubmit();
+			} );
+		}
+		const routingEnabled = document.getElementById( 'scalyn-routing-enabled' );
+		const routingRules = document.getElementById( 'scalyn-routing-rules' );
+		const routingNotice = document.getElementById( 'scalyn-routing-disabled' );
+		if ( routingEnabled && routingRules && routingNotice ) {
+			const updateRouting = function() {
+				routingRules.disabled = ! routingEnabled.checked;
+				routingNotice.hidden = routingEnabled.checked;
+			};
+			routingEnabled.addEventListener( 'change', updateRouting );
+			updateRouting();
+		}
 		initDiagnosticsButton();
 		initTimelineDrawer();
 	}

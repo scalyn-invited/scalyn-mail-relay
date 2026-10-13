@@ -80,7 +80,7 @@ final class SettingsRepository {
 			'alert_webhook_enabled'    => false,
 			'diagnostic_schedule'      => 'disabled',
 			'log_retention_days'       => 30,
-			'log_message_metadata'     => false,
+			'log_message_metadata'     => true,
 			'delete_data_on_uninstall' => false,
 		),
 	);
@@ -93,15 +93,29 @@ final class SettingsRepository {
 	private array $data;
 
 	/**
+	 * Exact loaded option for stale-writer detection.
+	 *
+	 * @var mixed
+	 */
+	private mixed $loaded;
+
+	/**
 	 * Loads settings from the database and merges with defaults.
 	 *
 	 * @param CredentialCipher|null $cipher Optional credential service for transport use.
 	 */
 	public function __construct( private readonly ?CredentialCipher $cipher = null ) {
-		$stored     = get_option( self::OPTION_KEY, array() );
+		$stored       = get_option( self::OPTION_KEY, null );
+		$this->loaded = null === $stored ? array() : $stored;
+		$defaults     = self::DEFAULTS;
+		// New installations capture metadata by default. Existing installations
+		// without an explicit preference retain their previous off policy.
+		if ( null !== $stored ) {
+			$defaults['advanced']['log_message_metadata'] = false;
+		}
 		$this->data = is_array( $stored )
-			? array_replace_recursive( self::DEFAULTS, $stored )
-			: self::DEFAULTS;
+			? array_replace_recursive( $defaults, $stored )
+			: $defaults;
 	}
 
 	/**
@@ -141,9 +155,10 @@ final class SettingsRepository {
 	 * @return bool True on success; false if the option was not updated.
 	 */
 	public function mark_provider_verified(): bool {
+		$before                                = $this->data;
 		$this->data['provider']['verified']    = true;
 		$this->data['provider']['verified_at'] = current_time( 'c' );
-		return update_option( self::OPTION_KEY, $this->data );
+		return $this->persist_progress( $before );
 	}
 
 	/**
@@ -165,13 +180,32 @@ final class SettingsRepository {
 	 * @return bool True on success; false if the option was not updated.
 	 */
 	public function mark_test_email_accepted(): bool {
-		$now = current_time( 'c' );
+		$before = $this->data;
+		$now    = current_time( 'c' );
 
 		$this->data['provider']['verified']               = true;
 		$this->data['provider']['verified_at']            = $now;
 		$this->data['provider']['test_email_accepted_at'] = $now;
 
-		return update_option( self::OPTION_KEY, $this->data );
+		return $this->persist_progress( $before );
+	}
+
+	/**
+	 * A concurrent selection cannot overwrite the new default after a slow send.
+	 *
+	 * @param array $before Previous private state.
+	 * @return bool Whether wizard progress was saved.
+	 */
+	private function persist_progress( #[\SensitiveParameter] array $before ): bool {
+		try {
+			$saved = $this->persist( $this->data );
+		} catch ( \RuntimeException $error ) {
+			$saved = false;
+		}
+		if ( ! $saved ) {
+			$this->data = $before;
+		}
+		return $saved;
 	}
 
 	/**
@@ -181,9 +215,29 @@ final class SettingsRepository {
 	 * serialize, or expose this value.
 	 *
 	 * @return array{host:string,port:int,encryption:string,username:string,password:string,from_name:string,from_email:string}
+	 * @throws \RuntimeException When encrypted login fields are unavailable.
 	 */
 	public function get_smtp_config(): array {
-		return $this->data['smtp'] ?? self::DEFAULTS['smtp'];
+		$config = array_replace( self::DEFAULTS['smtp'], $this->data['smtp'] ?? array() );
+		if ( isset( $config['credentials_cipher'] ) ) {
+			$login = json_decode( ( $this->cipher ?? new CredentialCipher() )->decrypt( $config['credentials_cipher'], 'smtp' ), true );
+			if ( ! is_array( $login ) || ! is_string( $login['username'] ?? null ) || ! is_string( $login['password'] ?? null ) ) {
+				throw new \RuntimeException( 'Stored SMTP login is unavailable. Replace it.' );
+			}
+			$config['username'] = $login['username'];
+			$config['password'] = $login['password'];
+			unset( $config['credentials_cipher'] );
+		}
+		unset( $config['has_password'], $config['has_username'] );
+		return $config;
+	}
+
+	/** Returns a credential-free SMTP form/read-model projection. */
+	public function get_smtp_settings(): array {
+		$config                 = array_replace( self::DEFAULTS['smtp'], $this->data['smtp'] ?? array() );
+		$config['has_password'] = isset( $config['credentials_cipher'] ) ? true === ( $config['has_password'] ?? false ) : '' !== $config['password'];
+		unset( $config['password'], $config['username'], $config['credentials_cipher'] );
+		return $config;
 	}
 
 	/**
@@ -239,6 +293,7 @@ final class SettingsRepository {
 	 * @throws \InvalidArgumentException When input is invalid.
 	 */
 	public function save_sendgrid( #[\SensitiveParameter] array $input, CredentialCipher $cipher ): bool {
+		\Scalyn\MailRelay\Agency\ManagedAccess::assert_unlocked( 'providers' );
 		$action = $input['key_action'] ?? null;
 		$secret = $input['api_key'] ?? '';
 		$email  = $input['from_email'] ?? null;
@@ -278,8 +333,8 @@ final class SettingsRepository {
 			$next['provider']['verified_at']            = null;
 			$next['provider']['test_email_accepted_at'] = null;
 		}
-		$next = self::with_diagnostic_revision( $before, $next );
-		if ( ! update_option( self::OPTION_KEY, $next ) ) {
+		$next = $this->with_diagnostic_revision( $before, $next );
+		if ( ! $this->persist( $next ) ) {
 			return false;
 		}
 		$this->data = $next;
@@ -321,6 +376,7 @@ final class SettingsRepository {
 	 * @throws \InvalidArgumentException When input is invalid.
 	 */
 	public function save_postmark( #[\SensitiveParameter] array $input, CredentialCipher $cipher ): bool {
+		\Scalyn\MailRelay\Agency\ManagedAccess::assert_unlocked( 'providers' );
 		$action = $input['key_action'] ?? null;
 		$secret = $input['api_key'] ?? '';
 		$email  = $input['from_email'] ?? null;
@@ -360,8 +416,8 @@ final class SettingsRepository {
 			$next['provider']['verified_at']            = null;
 			$next['provider']['test_email_accepted_at'] = null;
 		}
-		$next = self::with_diagnostic_revision( $before, $next );
-		if ( ! update_option( self::OPTION_KEY, $next ) ) {
+		$next = $this->with_diagnostic_revision( $before, $next );
+		if ( ! $this->persist( $next ) ) {
 			return false;
 		}
 		$this->data = $next;
@@ -403,6 +459,7 @@ final class SettingsRepository {
 	 * @throws \InvalidArgumentException When input is invalid.
 	 */
 	public function save_smtp2go( #[\SensitiveParameter] array $input, CredentialCipher $cipher ): bool {
+		\Scalyn\MailRelay\Agency\ManagedAccess::assert_unlocked( 'providers' );
 		$action = $input['key_action'] ?? null;
 		$secret = $input['api_key'] ?? '';
 		$email  = $input['from_email'] ?? null;
@@ -442,8 +499,8 @@ final class SettingsRepository {
 			$next['provider']['verified_at']            = null;
 			$next['provider']['test_email_accepted_at'] = null;
 		}
-		$next = self::with_diagnostic_revision( $before, $next );
-		if ( ! update_option( self::OPTION_KEY, $next ) ) {
+		$next = $this->with_diagnostic_revision( $before, $next );
+		if ( ! $this->persist( $next ) ) {
 			return false;
 		}
 		$this->data = $next;
@@ -485,6 +542,7 @@ final class SettingsRepository {
 	 * @throws \InvalidArgumentException When input is invalid.
 	 */
 	public function save_brevo( #[\SensitiveParameter] array $input, CredentialCipher $cipher ): bool {
+		\Scalyn\MailRelay\Agency\ManagedAccess::assert_unlocked( 'providers' );
 		$action = $input['key_action'] ?? null;
 		$secret = $input['api_key'] ?? '';
 		$email  = $input['from_email'] ?? null;
@@ -524,8 +582,8 @@ final class SettingsRepository {
 			$next['provider']['verified_at']            = null;
 			$next['provider']['test_email_accepted_at'] = null;
 		}
-		$next = self::with_diagnostic_revision( $before, $next );
-		if ( ! update_option( self::OPTION_KEY, $next ) ) {
+		$next = $this->with_diagnostic_revision( $before, $next );
+		if ( ! $this->persist( $next ) ) {
 			return false;
 		}
 		$this->data = $next;
@@ -552,7 +610,7 @@ final class SettingsRepository {
 		return self::valid_retention_days( $value ) ? (int) $value : 30;
 	}
 
-	/** Returns explicit consent to retain recipient and subject metadata. */
+	/** Returns the effective policy for retaining recipient and subject metadata. */
 	public function get_log_message_metadata(): bool {
 		return true === ( $this->data['advanced']['log_message_metadata'] ?? false );
 	}
@@ -607,8 +665,18 @@ final class SettingsRepository {
 	 *
 	 * @param array<string, mixed> $new_settings Unsanitized input, typically from a form POST.
 	 * @return bool True on success; false if the option was not updated.
+	 * @throws \Throwable When validation or protected persistence fails.
 	 */
 	public function save( array $new_settings ): bool {
+		foreach ( array(
+			'provider' => 'providers',
+			'smtp'     => 'smtp',
+			'advanced' => 'critical',
+		) as $key => $group ) {
+			if ( array_key_exists( $key, $new_settings ) ) {
+				\Scalyn\MailRelay\Agency\ManagedAccess::assert_unlocked( $group );
+			}
+		}
 		$sanitized  = $this->sanitize( $new_settings );
 		$before     = $this->data;
 		$this->data = array_replace_recursive( $this->data, $sanitized );
@@ -617,8 +685,13 @@ final class SettingsRepository {
 			$this->data['provider']['verified_at']            = null;
 			$this->data['provider']['test_email_accepted_at'] = null;
 		}
-		$this->data = self::with_diagnostic_revision( $before, $this->data );
-		$saved      = update_option( self::OPTION_KEY, $this->data );
+		try {
+			$this->data = $this->with_diagnostic_revision( $before, $this->data );
+			$saved      = $this->persist( $this->data );
+		} catch ( \Throwable $error ) {
+			$this->data = $before;
+			throw $error;
+		}
 		if ( ! $saved ) {
 			$this->data = $before;
 		}
@@ -647,11 +720,178 @@ final class SettingsRepository {
 		return (string) ( $this->data['diagnostic_revision'] ?? '' );
 	}
 
+	/** Credential-free saved identities. Inactive configurations are not assessed here. */
+	public function get_configurations(): array {
+		$items = array();
+		foreach ( $this->data['configurations']['items'] ?? array() as $id => $item ) {
+			$items[] = array(
+				'id'       => $id,
+				'name'     => $item['name'],
+				'provider' => $item['provider'],
+				'revision' => $item['revision'],
+				'archived' => $item['archived'],
+				'active'   => ( $this->data['configurations']['active'] ?? '' ) === $id,
+			);
+		}
+		return $items;
+	}
+
+	/** Returns the selected stable identity, distinct from evidence revision IDs. */
+	public function get_active_configuration_id(): string {
+		return $this->data['configurations']['active'] ?? '';
+	}
+
+	/** Fresh repository snapshot with the same server cipher; no credentials exposed. */
+	public function fresh(): self {
+		wp_cache_delete( self::OPTION_KEY, 'options' );
+		wp_cache_delete( 'alloptions', 'options' );
+		return new self( $this->cipher );
+	}
+
+	/**
+	 * Credential-free current revision for routing. Legacy references cannot replay.
+	 *
+	 * @param string $id Stable configuration ID.
+	 * @return array Pinned public target.
+	 * @throws \RuntimeException For archived, legacy or unconfigured identities.
+	 */
+	public function configuration_target( string $id ): array {
+		$item     = NamedConfigurations::item( $this->data, $id );
+		$snapshot = $this->data['configurations']['revisions'][ $item['revision'] ] ?? array();
+		$config   = $snapshot['config'] ?? array();
+		if ( $item['archived'] || ! empty( $snapshot['legacy'] ) || empty( $config['from_email'] ) || ( 'smtp' === $item['provider'] ? empty( $config['host'] ) : empty( $config['key_cipher'] ) ) ) {
+			throw new \RuntimeException( 'Routing configuration is unavailable. Configure it in the wizard first.' );
+		}
+		return array(
+			'id'       => $id,
+			'revision' => $item['revision'],
+			'provider' => $item['provider'],
+			'from'     => $config['from_email'],
+		);
+	}
+
+	/**
+	 * Transport-only resolution; never expose this return value to Admin or logs.
+	 * Edits, archival and missing keys stop pinned work rather than rerouting it.
+	 *
+	 * @param array $target Pinned routing target.
+	 * @return array Private provider configuration.
+	 * @throws \RuntimeException For stale targets or unavailable credentials.
+	 */
+	public function resolve_target( array $target ): array {
+		$current = $this->configuration_target( $target['id'] ?? '' );
+		if ( $current !== $target ) {
+			throw new \RuntimeException( 'Pinned configuration changed. Review this message before sending.' );
+		}
+		$config = $this->data['configurations']['revisions'][ $target['revision'] ]['config'];
+		$cipher = $this->cipher ?? new CredentialCipher();
+		if ( 'smtp' === $target['provider'] ) {
+			$login  = json_decode( $cipher->decrypt( $config['credentials_cipher'], 'smtp' ), true, 8, JSON_THROW_ON_ERROR );
+			$config = array_merge( self::DEFAULTS['smtp'], $config, $login );
+			unset( $config['credentials_cipher'], $config['has_password'], $config['has_username'] );
+		} else {
+			$config['api_key'] = $cipher->decrypt( $config['key_cipher'], $target['provider'] );
+			unset( $config['key_cipher'] );
+		}
+		return $config;
+	}
+
+	/**
+	 * Applies an authorized catalogue operation atomically with the active slot.
+	 * Controllers must additionally verify their POST nonce.
+	 *
+	 * @param string $operation import/create/select/rename/archive.
+	 * @param string $id Existing identity or provider for create.
+	 * @param string $name Plain label for create/rename.
+	 * @return bool Persistence outcome, including no-op.
+	 * @throws \RuntimeException When unauthorized or the operation cannot be persisted.
+	 * @throws \InvalidArgumentException When input is invalid.
+	 */
+	public function configure( string $operation, string $id = '', string $name = '' ): bool {
+		if ( ! current_user_can( Capabilities::MANAGE_SETTINGS ) ) {
+			throw new \RuntimeException( 'Configuration management is not authorized.' );
+		}
+		\Scalyn\MailRelay\Agency\ManagedAccess::assert_unlocked( 'providers' );
+		$next = NamedConfigurations::import( $this->data, $this->cipher ?? new CredentialCipher() );
+		if ( 'create' === $operation ) {
+			if ( ! ( $this->cipher ?? new CredentialCipher() )->is_available() ) {
+				throw new \RuntimeException( 'Server encryption is required for new configurations.' );
+			}
+			$next = NamedConfigurations::create( $next, $id, $name );
+		} elseif ( 'select' === $operation ) {
+			$next = NamedConfigurations::select( $next, $id );
+		} elseif ( in_array( $operation, array( 'rename', 'archive' ), true ) ) {
+			$item = NamedConfigurations::item( $next, $id );
+			if ( 'archive' === $operation ) {
+				if ( $next['configurations']['active'] === $id ) {
+					throw new \InvalidArgumentException( 'Select another default before archiving this configuration.' );
+				}
+				$next['configurations']['items'][ $id ]['archived'] = true;
+			} else {
+				NamedConfigurations::name( $name );
+				$next['configurations']['items'][ $id ]['name'] = trim( $name );
+			}
+			unset( $item );
+		} elseif ( 'import' !== $operation ) {
+			throw new \InvalidArgumentException( 'Unsupported configuration operation.' );
+		}
+		if ( $next === $this->data ) {
+			return true;
+		}
+		if ( ! $this->persist( $next ) ) {
+			return false;
+		}
+		$this->data = $next;
+		try {
+			do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'configuration', $operation, 'import' === $operation || 'create' === $operation ? '' : $id ) );
+		} catch ( \Throwable $error ) {
+			// An observer cannot undo persisted state or trigger credential re-submission.
+			unset( $error );
+		}
+		return true;
+	}
+
+	/**
+	 * Serializes settings writes, including legacy requests racing an import.
+	 * A crashed writer leaves a fail-closed lock for explicit operator recovery.
+	 *
+	 * @param array $next Private candidate settings.
+	 * @return bool Whether persisted.
+	 * @throws \RuntimeException For concurrent or stale writes.
+	 */
+	private function persist( #[\SensitiveParameter] array $next ): bool {
+		if ( ! add_option( self::OPTION_KEY . '_write_lock', wp_generate_uuid4(), '', false ) ) {
+			throw new \RuntimeException( 'Settings are being updated. Reload and retry.' );
+		}
+		try {
+			// Drop only option-cache entries needed to observe a concurrent request.
+			wp_cache_delete( self::OPTION_KEY, 'options' );
+			wp_cache_delete( 'alloptions', 'options' );
+			wp_cache_delete( 'notoptions', 'options' );
+			if ( get_option( self::OPTION_KEY, array() ) !== $this->loaded ) {
+				throw new \RuntimeException( 'Settings changed in another request. Reload before saving.' );
+			}
+			$saved = $next === $this->loaded || update_option( self::OPTION_KEY, $next, false );
+			if ( $saved ) {
+				$this->loaded = $next;
+			}
+			return $saved;
+		} finally {
+			delete_option( self::OPTION_KEY . '_write_lock' );
+		}
+	}
+
 	/** Initializes upgraded installations before their first scoped run.
 	 *
 	 * @throws \RuntimeException When the revision cannot be saved.
 	 */
 	public function ensure_diagnostic_revision(): string {
+		if ( '' === $this->get_diagnostic_revision() ) {
+			// Another service may already have initialized the legacy revision.
+			$stored       = get_option( self::OPTION_KEY, array() );
+			$this->loaded = $stored;
+			$this->data   = is_array( $stored ) ? array_replace_recursive( self::DEFAULTS, $stored ) : self::DEFAULTS;
+		}
 		if ( '' === $this->get_diagnostic_revision() && ! $this->save( array() ) ) {
 			throw new \RuntimeException( 'Diagnostic configuration could not be saved.' );
 		}
@@ -663,8 +903,20 @@ final class SettingsRepository {
 	 * @param array $before Previous private settings.
 	 * @param array $next New private settings.
 	 * @return array Settings with their diagnostic revision.
+	 * @throws \RuntimeException When a named configuration edit is not authorized.
 	 */
-	private static function with_diagnostic_revision( array $before, array $next ): array {
+	private function with_diagnostic_revision( array $before, array $next ): array {
+		if ( isset( $before['configurations'] ) ) {
+			foreach ( NamedConfigurations::PROVIDERS as $provider ) {
+				if ( ( $before[ $provider ] ?? array() ) !== ( $next[ $provider ] ?? array() ) ) {
+					if ( ! current_user_can( Capabilities::MANAGE_SETTINGS ) || ( $before['provider']['active'] ?? '' ) !== $provider ) {
+						throw new \RuntimeException( 'Select the configuration before editing its settings.' );
+					}
+					\Scalyn\MailRelay\Agency\ManagedAccess::assert_unlocked( 'smtp' === $provider ? 'smtp' : 'providers' );
+				}
+			}
+			return NamedConfigurations::synchronize( $before, $next, $this->cipher ?? new CredentialCipher() );
+		}
 		$provider = (string) ( $next['provider']['active'] ?? '' );
 		if ( empty( $before['diagnostic_revision'] )
 			|| ( $before['provider']['active'] ?? '' ) !== $provider
@@ -685,6 +937,7 @@ final class SettingsRepository {
 	 * @param array<string, mixed> $input Raw input.
 	 * @return array<string, mixed> Sanitized subset.
 	 * @throws \InvalidArgumentException When retention or deletion confirmation is invalid.
+	 * @throws \RuntimeException When a saved SMTP login cannot be kept.
 	 */
 	private function sanitize( array $input ): array {
 		$output = array();
@@ -724,10 +977,30 @@ final class SettingsRepository {
 			// A blank submitted password preserves the currently stored value rather
 			// than overwriting it with an empty string. This allows the edit form to
 			// render without exposing the stored password in an HTML value attribute.
-			$submitted_password         = (string) ( $smtp['password'] ?? '' );
+			$submitted_password = (string) ( $smtp['password'] ?? '' );
+			try {
+				$stored_login = $this->get_smtp_config();
+			} catch ( \RuntimeException $error ) {
+				if ( '' === $submitted_password || '' === $output['smtp']['username'] ) {
+					throw $error;
+				}
+				// A complete replacement can recover after a server-key rotation.
+				$stored_login = self::DEFAULTS['smtp'];
+			}
 			$output['smtp']['password'] = '' !== $submitted_password
 				? $submitted_password
-				: (string) ( $this->data['smtp']['password'] ?? '' );
+				: (string) $stored_login['password'];
+			if ( '' === $output['smtp']['username'] ) {
+				$output['smtp']['username'] = $stored_login['username'];
+			}
+			// Decrypt only in memory; an edited login gets a new protected envelope.
+			if ( isset( $this->data['smtp']['credentials_cipher'] ) ) {
+				if ( count( $output['smtp'] ) === count( $stored_login ) && array() === array_diff_assoc( $output['smtp'], $stored_login ) ) {
+					$output['smtp'] = $this->data['smtp'];
+				} else {
+					$output['smtp']['credentials_cipher'] = null;
+				}
+			}
 		}
 
 		if ( isset( $input['advanced'] ) && is_array( $input['advanced'] ) ) {

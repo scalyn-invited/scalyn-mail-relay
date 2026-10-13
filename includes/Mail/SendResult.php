@@ -29,6 +29,8 @@ final class SendResult {
 	 * @param string|null $failure_category    Failure classification: 'auth', 'config', 'network', 'bounce', etc.
 	 * @param array       $metadata            Optional supplemental data. Must not contain credentials or secrets.
 	 * @param bool        $acceptance_unconfirmed True when the request may have reached the provider but no acknowledgement was observed.
+	 * @param bool        $safe_to_retry Explicit evidence that no recipient was accepted; default is false.
+	 * @param int         $retry_after_seconds Normalized provider minimum delay, never raw response data.
 	 */
 	public function __construct(
 		public readonly bool $success,
@@ -39,6 +41,8 @@ final class SendResult {
 		public readonly bool $retryable = false,
 		public readonly ?string $failure_category = null,
 		public readonly array $metadata = array(),
-		public readonly bool $acceptance_unconfirmed = false
+		public readonly bool $acceptance_unconfirmed = false,
+		public readonly bool $safe_to_retry = false,
+		public readonly int $retry_after_seconds = 0
 	) {}
 }

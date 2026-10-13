@@ -44,4 +44,12 @@ final class ProviderDeliveryEvidenceTest extends TestCase {
   $this->assertSame(['status'=>'unsupported'],$this->service('collecting',null)->current());
   $this->assertSame([],$GLOBALS['wpdb']->prepare_calls);
  }
+ public function test_deliverability_window_uses_shared_instant_and_respects_retention():void {
+  $GLOBALS['wpdb']->get_row_return=['attempts'=>1,'tracked'=>1,'observed'=>1,'hard_bounced'=>0];
+  $source=['id'=>self::ID,'configuration_id'=>self::ID];$now=strtotime('2026-10-12T00:00:00Z');
+  $result=$this->service('collecting',$source)->current(30,$now,true);
+  $this->assertSame(30,$result['days']);$this->assertSame('2026-09-12 00:00:00.000000',$result['window_start']);$this->assertSame('2026-10-12 00:00:00.000000',$result['window_end']);$this->assertSame(self::ID,$result['source_id']);
+  $GLOBALS['_test_wp_options'][SettingsRepository::OPTION_KEY]['advanced']['log_retention_days']=7;
+  $result=$this->service('collecting',$source)->current(30,$now,true);$this->assertSame(7,$result['days']);$this->assertSame('2026-10-05 00:00:00.000000',$result['window_start']);
+ }
 }

@@ -54,7 +54,7 @@ final class ProviderHealthAssessment {
 		$connection = $this->connection->current();
 		$day        = $this->logs->configuration_status_counts( $revision, $provider, 24 );
 		$week       = $this->logs->configuration_status_counts( $revision, $provider, 168 );
-		return self::evaluate( $provider, $revision, $connection, $day, $week, $this->delivery?->current() );
+		return self::evaluate( $provider, $revision, $connection, $day, $week, $this->delivery?->current(), $this->logs->configuration_failure_evidence( $revision, $provider ) );
 	}
 
 	/**
@@ -66,18 +66,29 @@ final class ProviderHealthAssessment {
 	 * @param array|null $day 24-hour accepted/failed/total counts.
 	 * @param array|null $week Seven-day accepted/failed/total counts.
 	 * @param array|null $delivery Current-source delivery counts and availability.
+	 * @param array|null $categories Current-revision 24-hour category counts and sequence.
 	 * @return array<string,mixed> Safe assessment.
 	 */
-	public static function evaluate( string $provider, string $revision, array $connection, ?array $day, ?array $week, ?array $delivery = null ): array {
-		$delivery           = self::delivery_summary( $delivery );
-		$connection_status  = in_array( $connection['status'] ?? '', array( 'passed', 'failed', 'stale' ), true ) ? $connection['status'] : 'unknown';
-		$day                = self::normalise_counts( $day );
-		$week               = self::normalise_counts( $week );
-		$rate               = $day['total'] >= 10 ? $day['failed'] / $day['total'] : null;
-		$state              = 'unknown';
-		$findings           = array();
-		$recommended_action = __( 'Run a connection check. Health remains unknown until enough current-configuration submission evidence is retained.', 'scalyn-mail-relay' );
-		if ( null !== $rate && $rate > 0.20 ) {
+	public static function evaluate( string $provider, string $revision, array $connection, ?array $day, ?array $week, ?array $delivery = null, ?array $categories = null ): array {
+		$delivery            = self::delivery_summary( $delivery );
+		$connection_status   = in_array( $connection['status'] ?? '', array( 'passed', 'failed', 'stale' ), true ) ? $connection['status'] : 'unknown';
+		$day                 = self::normalise_counts( $day );
+		$week                = self::normalise_counts( $week );
+		$rate                = $day['total'] >= 10 ? $day['failed'] / $day['total'] : null;
+		$state               = 'unknown';
+		$findings            = array();
+		$recommended_action  = __( 'Run a connection check. Health remains unknown until enough current-configuration submission evidence is retained.', 'scalyn-mail-relay' );
+		$connection_category = \Scalyn\MailRelay\Mail\TransportFailureCategory::retained( $connection['failure_category'] ?? null );
+		$category_counts     = self::category_counts( $categories );
+		if ( 'failed' === $connection_status && in_array( $connection_category, array( 'auth', 'config' ), true ) ) {
+			$state              = 'critical';
+			$findings[]         = __( 'The latest fresh connection check for this configuration failed authentication or configuration validation.', 'scalyn-mail-relay' );
+			$recommended_action = __( 'Review the current credentials and provider configuration, then verify the connection again.', 'scalyn-mail-relay' );
+		} elseif ( null !== $category_counts && $category_counts['auth_config_streak'] >= 3 ) {
+			$state              = 'critical';
+			$findings[]         = __( 'The latest three or more consecutive submissions in the last 24 hours failed authentication or configuration validation.', 'scalyn-mail-relay' );
+			$recommended_action = __( 'Correct the credentials or provider configuration before sending again.', 'scalyn-mail-relay' );
+		} elseif ( null !== $rate && $rate > 0.20 ) {
 			$state              = 'critical';
 			$recommended_action = __( 'Review recent failed submissions and the provider configuration before relying on this route.', 'scalyn-mail-relay' );
 			/* translators: 1: Failed attributed submissions. 2: Total attributed submissions. */
@@ -87,6 +98,11 @@ final class ProviderHealthAssessment {
 			$recommended_action = __( 'Review recent failed submissions and correct the underlying provider or configuration issue.', 'scalyn-mail-relay' );
 			/* translators: 1: Failed attributed submissions. 2: Total attributed submissions. */
 			$findings[] = sprintf( __( '%1$d of %2$d attributed submissions failed in the last 24 hours.', 'scalyn-mail-relay' ), $day['failed'], $day['total'] );
+		} elseif ( null !== $category_counts && ( $category_counts['provider_rejections'] > 0 || $category_counts['rate_limits'] > 0 ) ) {
+			$state = 'warning';
+			/* translators: 1: Rejections, 2: Rate-limited submissions. */
+			$findings[]         = sprintf( __( 'In the last 24 hours: %1$d provider-rejected and %2$d rate-limited submissions for this configuration.', 'scalyn-mail-relay' ), $category_counts['provider_rejections'], $category_counts['rate_limits'] );
+			$recommended_action = __( 'Review provider restrictions and sending limits. Do not retry automatically.', 'scalyn-mail-relay' );
 		} elseif ( null !== $delivery['rate'] && $delivery['rate'] > 0.05 ) {
 			$state              = 'warning';
 			$recommended_action = __( 'Review hard bounces and recipient quality in your provider account. Do not automatically resend bounced messages.', 'scalyn-mail-relay' );
@@ -101,6 +117,9 @@ final class ProviderHealthAssessment {
 		} elseif ( 'passed' === $connection_status && $week['total'] >= 10 && in_array( $delivery['status'], array( 'insufficient', 'partial', 'unavailable', 'paused' ), true ) ) {
 			$findings[]         = $delivery['explanation'];
 			$recommended_action = __( 'Review webhook collection and wait for sufficient current-configuration evidence. Missing callbacks are not delivery failures.', 'scalyn-mail-relay' );
+		} elseif ( 'passed' === $connection_status && $week['total'] >= 10 && ( null === $category_counts || $category_counts['unclassified'] > 0 ) ) {
+			$findings[]         = __( 'Recent failure-category evidence is unavailable or unclassified; it cannot establish Healthy.', 'scalyn-mail-relay' );
+			$recommended_action = __( 'Review recent failures and database readiness. Historical failures are not reclassified from response text.', 'scalyn-mail-relay' );
 		} elseif ( 'passed' === $connection_status && $week['total'] >= 10 ) {
 			$state              = 'healthy';
 			$recommended_action = __( 'Continue monitoring; this state does not confirm delivery or inbox placement.', 'scalyn-mail-relay' );
@@ -120,15 +139,32 @@ final class ProviderHealthAssessment {
 			'window_7d'          => $week,
 			'failure_rate'       => $rate,
 			'delivery'           => $delivery,
+			'failure_categories' => $category_counts,
 			'findings'           => $findings,
 			'recommended_action' => $recommended_action,
 			'limitations'        => array(
 				__( 'Only Accepted and Failed submissions attributed to the current configuration are counted.', 'scalyn-mail-relay' ),
 				__( 'Unattributed history, unconfirmed outcomes and missing evidence are excluded.', 'scalyn-mail-relay' ),
 				__( 'Bounce-rate assessment uses only current-source authenticated recipient evidence; missing callbacks are not passes or failures.', 'scalyn-mail-relay' ),
-				__( 'Category-based connection and submission failure rules remain unassessed until those categories are retained.', 'scalyn-mail-relay' ),
+				__( 'Only allowlisted observed failure categories are used; historical and ambiguous failures are never inferred as authentication failures.', 'scalyn-mail-relay' ),
 			),
 		);
+	}
+
+	/**
+	 * Validates count-only category evidence without carrying arbitrary metadata.
+	 *
+	 * @param array|null $input Repository projection.
+	 * @return array|null Safe counts or unavailable.
+	 */
+	private static function category_counts( ?array $input ): ?array {
+		$result = array();
+		foreach ( array( 'auth_config_streak', 'provider_rejections', 'rate_limits', 'unclassified' ) as $key ) {
+			if ( ! is_int( $input[ $key ] ?? null ) || $input[ $key ] < 0 || $input[ $key ] > 1000 ) {
+				return null; }
+			$result[ $key ] = $input[ $key ];
+		}
+		return $result;
 	}
 
 	/**
@@ -209,7 +245,7 @@ final class ProviderHealthAssessment {
 	 */
 	private static function unknown_reason( string $connection_status, array $week ): string {
 		if ( 'failed' === $connection_status ) {
-			return __( 'The current connection check failed. Its failure category is not retained, so this alone is not classified as a health failure.', 'scalyn-mail-relay' );
+			return __( 'The current connection check failed. Its retained category does not establish an authentication or configuration failure.', 'scalyn-mail-relay' );
 		}
 		if ( 'unknown' === $connection_status ) {
 			return __( 'No usable connection check exists for the current configuration.', 'scalyn-mail-relay' );

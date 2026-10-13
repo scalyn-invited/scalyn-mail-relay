@@ -79,7 +79,7 @@ abstract class JsonApiProvider implements ProviderInterface {
 		}
 		$rejected = $code >= 400 && $code < 500 && 408 !== $code;
 		$text     = $rejected ? 'Provider rejected the request. Check API permissions, authorized sender, account restrictions and allowance. No automatic retry was attempted.' : 'Provider acceptance is unconfirmed or partial. Inspect provider activity before retrying to avoid duplicates. No automatic retry was attempted.';
-		return new SendResult( false, $this->get_id(), null, $code ? (string) $code : null, $text, false, $rejected ? TransportFailureCategory::PROVIDER_REJECTION : TransportFailureCategory::UNKNOWN, array(), ! $rejected );
+		return new SendResult( false, $this->get_id(), null, $code ? (string) $code : null, $text, 429 === $code, TransportFailureCategory::from_http( $code ), array(), ! $rejected, 429 === $code, $response['retry_after'] ?? 0 );
 	}
 
 	/**
@@ -113,8 +113,9 @@ abstract class JsonApiProvider implements ProviderInterface {
 			$body     = is_array( $response ) ? ( $response['body'] ?? '' ) : '';
 			$data     = is_string( $body ) && strlen( $body ) <= 16384 ? json_decode( $body, true, 8 ) : null;
 			return array(
-				'code' => is_numeric( $code ) && $code >= 100 && $code <= 599 ? (int) $code : 0,
-				'data' => is_array( $data ) ? $data : array(),
+				'code'        => is_numeric( $code ) && $code >= 100 && $code <= 599 ? (int) $code : 0,
+				'retry_after' => \Scalyn\MailRelay\Mail\RetryAfter::seconds( $response ),
+				'data'        => is_array( $data ) ? $data : array(),
 			);
 		} catch ( \Throwable $error ) {
 			return array(

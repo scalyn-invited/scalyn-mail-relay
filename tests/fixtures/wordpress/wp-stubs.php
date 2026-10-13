@@ -1,5 +1,45 @@
 <?php
 
+function get_post_type(int $id): string|false { return $GLOBALS['_test_attachments'][$id]['type'] ?? false; }
+function get_post_mime_type(int $id): string|false { return $GLOBALS['_test_attachments'][$id]['mime'] ?? false; }
+function wp_get_attachment_image_url(int $id, string $size): string|false { return $GLOBALS['_test_attachments'][$id]['url'] ?? false; }
+function is_email(string $email): string|false { return filter_var($email, FILTER_VALIDATE_EMAIL); }
+function wp_add_inline_style(string $handle, string $css): bool { $GLOBALS['_test_inline_styles'][$handle][] = $css; return true; }
+function wp_enqueue_media(): void { $GLOBALS['_test_media_enqueued']=true; }
+function get_current_screen(): ?object { return $GLOBALS['_test_screen'] ?? null; }
+
+function get_current_blog_id(): int {
+	return $GLOBALS['_test_blog_id'] ?? 1;
+}
+function get_user_meta( int $user_id, string $key, bool $single = false ): mixed {
+	return $GLOBALS['_test_user_meta'][ $user_id ][ $key ] ?? ( $single ? '' : array() );
+}
+function update_user_meta( int $user_id, string $key, mixed $value ): bool {
+	if ( ! empty( $GLOBALS['_test_user_meta_write_failure'] ) ) {
+		return false;
+	}
+	$GLOBALS['_test_user_meta'][ $user_id ][ $key ] = $value;
+	return true;
+}
+function delete_metadata( string $type, int $object_id, string $key, mixed $value = '', bool $all = false ): bool {
+	foreach ( $GLOBALS['_test_user_meta'] ?? array() as $user_id => $meta ) {
+		if ( $all || $user_id === $object_id ) {
+			unset( $GLOBALS['_test_user_meta'][ $user_id ][ $key ] );
+		}
+	}
+	return true;
+}
+function get_userdata( int $user_id ): object|false {
+	return $GLOBALS['_test_site_users'][ $user_id ] ?? false;
+}
+function is_user_member_of_blog( int $user_id ): bool {
+	return isset( $GLOBALS['_test_site_users'][ $user_id ] );
+}
+function user_can( int $user_id, string $capability ): bool {
+	$user = get_userdata( $user_id );
+	return $user && ! empty( $user->allcaps[ $capability ] );
+}
+
 if ( ! function_exists( 'esc_textarea' ) ) {
 	function esc_textarea( $text ) {
 		return htmlspecialchars( (string) $text, ENT_QUOTES, 'UTF-8' );
@@ -8,6 +48,7 @@ if ( ! function_exists( 'esc_textarea' ) ) {
 
 if ( ! function_exists( 'wp_verify_nonce' ) ) {
 	function wp_verify_nonce( $nonce, $action = -1 ) {
+		if ('scalyn_client_report' === $action) return 'valid-client-nonce' === $nonce ? 1 : false;
 		if ( in_array( $action, array( 'scalyn_postmark_webhook', 'scalyn_smtp2go_webhook', 'scalyn_brevo_webhook' ), true ) ) {
 			return 'valid' === $nonce && ( $GLOBALS['_test_wp_nonce_valid'] ?? false ) ? 1 : false;
 		}
@@ -25,6 +66,11 @@ if ( ! function_exists( 'is_wp_error' ) ) {
 function submit_button(string $text='Save Changes'):void {echo '<p><button type="submit">'.esc_html($text).'</button></p>';}
 function checked(mixed $checked, mixed $current=true, bool $display=true):string {
 	$value=(string)$checked===(string)$current ? ' checked="checked"' : '';
+	if($display) echo $value;
+	return $value;
+}
+function disabled(mixed $disabled, mixed $current=true, bool $display=true):string {
+	$value=(string)$disabled===(string)$current ? ' disabled="disabled"' : '';
 	if($display) echo $value;
 	return $value;
 }
@@ -123,6 +169,17 @@ if ( ! function_exists( 'get_option' ) ) {
 	 */
 	function get_option( string $option, $default = false ) {
 		return $GLOBALS['_test_wp_options'][ $option ] ?? $default;
+	}
+}
+
+if ( ! function_exists( 'add_option' ) ) {
+	/** Atomic create-only option shim. */
+	function add_option( string $option, $value, string $deprecated = '', $autoload = null ): bool {
+		if ( array_key_exists( $option, $GLOBALS['_test_wp_options'] ?? array() ) || ! empty( $GLOBALS['_test_wp_option_write_failures'][ $option ] ) ) {
+			return false;
+		}
+		$GLOBALS['_test_wp_options'][ $option ] = $value;
+		return true;
 	}
 }
 
@@ -234,6 +291,12 @@ if ( ! function_exists( 'do_action' ) ) {
 		foreach ( $GLOBALS['_test_wp_added_actions'][ $hook_name ] ?? array() as $entry ) {
 			( $entry['callback'] )( ...array_slice( $args, 0, $entry['accepted_args'] ) );
 		}
+	}
+}
+
+if ( ! function_exists( 'sanitize_key' ) ) {
+	function sanitize_key( string $key ): string {
+		return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( $key ) );
 	}
 }
 

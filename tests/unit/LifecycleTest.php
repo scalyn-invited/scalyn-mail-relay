@@ -83,7 +83,7 @@ final class LifecycleTest extends TestCase {
 		Lifecycle::activate();
 
 		$this->assertSame(
-			array( 'scalyn_mail_relay_cleanup_logs', 'scalyn_mail_relay_send_alerts' ),
+			array( 'scalyn_mail_relay_cleanup_logs', 'scalyn_mail_relay_send_alerts', 'scalyn_mail_relay_recovery_tick' ),
 			array_keys( $GLOBALS['_test_wp_cron'] )
 		);
 	}
@@ -97,7 +97,7 @@ final class LifecycleTest extends TestCase {
 
 		Lifecycle::activate();
 
-		$this->assertSame( array( 'scalyn_mail_relay_cleanup_logs', 'scalyn_mail_relay_send_alerts' ), array_keys( $GLOBALS['_test_wp_cron'] ) );
+		$this->assertSame( array( 'scalyn_mail_relay_cleanup_logs', 'scalyn_mail_relay_send_alerts', 'scalyn_mail_relay_recovery_tick' ), array_keys( $GLOBALS['_test_wp_cron'] ) );
 		$this->assertGreaterThan( time(), $GLOBALS['_test_wp_cron']['scalyn_mail_relay_cleanup_logs'] );
 	}
 
@@ -110,6 +110,7 @@ final class LifecycleTest extends TestCase {
 				'scalyn_mail_relay_run_daily_diagnostics',
 				'scalyn_mail_relay_generate_health_snapshot',
 				'scalyn_mail_relay_send_alerts',
+				'scalyn_mail_relay_recovery_tick',
 			),
 			$GLOBALS['_test_wp_cleared_hooks'],
 			'Deactivation must clear every hook name the plugin has ever scheduled.'

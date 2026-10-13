@@ -37,6 +37,7 @@ final class DataControlsPage {
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.ValidatedSanitizedInput.MissingUnslash -- Server request method only.
 		if ( 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? '' ) && ! $is_dkim_form ) {
 			check_admin_referer( 'scalyn_retention_settings' );
+			\Scalyn\MailRelay\Agency\ManagedAccess::protect_form( 'critical' );
 			$days      = isset( $_POST['retention_days'] ) && is_string( $_POST['retention_days'] ) ? sanitize_text_field( wp_unslash( $_POST['retention_days'] ) ) : '';
 			$delete    = isset( $_POST['delete_on_uninstall'] ) && '1' === $_POST['delete_on_uninstall'];
 			$confirmed = isset( $_POST['confirm_delete'] ) && '1' === $_POST['confirm_delete'];

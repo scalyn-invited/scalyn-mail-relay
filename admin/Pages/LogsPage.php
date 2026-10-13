@@ -36,7 +36,8 @@ final class LogsPage {
 	 * Must not exceed MailLogRepository::MAX_PAGE_SIZE. Kept small so that
 	 * the admin list remains readable on typical screens.
 	 */
-	private const PER_PAGE = 25;
+	private const PER_PAGE   = 25;
+	private const PAGE_SIZES = array( 10, 25, 50, 100 );
 
 	/**
 	 * Creates a new LogsPage with the required repository dependencies.
@@ -86,7 +87,7 @@ final class LogsPage {
 		$filters      = array();
 		$filter_error = false;
 		try {
-			foreach ( array( 'start', 'end', 'provider', 'source', 'recipient', 'search' ) as $key ) {
+			foreach ( array( 'start', 'end', 'provider', 'source', 'recipient', 'subject', 'message_id', 'search' ) as $key ) {
 				// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Reject malformed read-only filter input before sanitizing.
 				if ( isset( $_GET[ $key ] ) && ! is_string( $_GET[ $key ] ) ) {
 					throw new \InvalidArgumentException( 'Invalid log filter.' );
@@ -100,8 +101,11 @@ final class LogsPage {
 			$filter_error = true;
 		}
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended
-		$paged  = isset( $_GET['paged'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['paged'] ) ) : '1';
-		$status = isset( $_GET['status'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['status'] ) ) : '';
+		$raw_per_page = isset( $_GET['per_page'] ) && is_string( $_GET['per_page'] ) ? sanitize_text_field( wp_unslash( $_GET['per_page'] ) ) : '';
+		$per_page     = in_array( $raw_per_page, array_map( 'strval', self::PAGE_SIZES ), true ) ? (int) $raw_per_page : self::PER_PAGE;
+		$page_sizes   = self::PAGE_SIZES;
+		$paged        = isset( $_GET['paged'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['paged'] ) ) : '1';
+		$status       = isset( $_GET['status'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['status'] ) ) : '';
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		// Validate status filter against whitelist.
@@ -110,7 +114,7 @@ final class LogsPage {
 		}
 
 		$page   = max( 1, absint( $paged ) );
-		$offset = ( $page - 1 ) * self::PER_PAGE;
+		$offset = ( $page - 1 ) * $per_page;
 
 		// Fetch one extra row to determine if there's a next page. Apply the status
 		// in the repository so filtering and pagination describe the full result set.
@@ -119,20 +123,20 @@ final class LogsPage {
 			$rows = array();
 		} elseif ( $filters ) {
 			try {
-				$rows = $this->log_repo->search( $filters, $status, self::PER_PAGE + 1, $offset );
+				$rows = $this->log_repo->search( $filters, $status, $per_page + 1, $offset );
 			} catch ( \Throwable $error ) {
 				$rows         = array();
 				$filter_error = true;
 			}
 		} else {
 			$rows = $status
-				? $this->log_repo->find_recent_by_status( $status, self::PER_PAGE + 1, $offset )
-				: $this->log_repo->find_recent( self::PER_PAGE + 1, $offset );
+				? $this->log_repo->find_recent_by_status( $status, $per_page + 1, $offset )
+				: $this->log_repo->find_recent( $per_page + 1, $offset );
 		}
-		$has_next_page = count( $rows ) > self::PER_PAGE;
+		$has_next_page = count( $rows ) > $per_page;
 
 		// Trim to page size.
-		$rows = array_slice( $rows, 0, self::PER_PAGE, true );
+		$rows = array_slice( $rows, 0, $per_page, true );
 
 		require SCALYN_MAIL_RELAY_PATH . 'admin/views/logs.php';
 	}

@@ -110,7 +110,7 @@ namespace {
 			$p=new StubPostmarkProvider(); $p->email=['response'=>['code'=>$code],'body'=>$body];
 			$r=$p->send($this->message(),$this->config());
 			$this->assertFalse($r->success); $this->assertSame($uncertain,$r->acceptance_unconfirmed);
-			$this->assertFalse($r->retryable); $this->assertNull($r->provider_message_id);
+			$this->assertSame(429 === $code,$r->retryable); $this->assertSame(429 === $code,$r->safe_to_retry); $this->assertNull($r->provider_message_id);
 			$this->assertCount(2,$p->calls); $this->assertStringNotContainsString('private',serialize($r));
 		}
 

@@ -15,10 +15,18 @@ $wizard_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 <div class="wrap scalyn-mail-relay scalyn-providers">
 	<h1><?php esc_html_e( 'Providers', 'scalyn-mail-relay' ); ?></h1>
 	<p class="scalyn-lead"><?php esc_html_e( 'Manage how your site sends email. Configure a provider, verify its connection, and send a test.', 'scalyn-mail-relay' ); ?></p>
+	<nav class="scalyn-provider-tabs" id="scalyn-provider-tabs" aria-label="<?php esc_attr_e( 'Providers sections', 'scalyn-mail-relay' ); ?>">
+		<a id="scalyn-tab-providers" href="#providers" data-provider-tab="providers"><?php esc_html_e( 'Providers', 'scalyn-mail-relay' ); ?></a>
+		<?php if ( $can_configure ) : ?>
+			<a id="scalyn-tab-email-routing" href="#email-routing" data-provider-tab="email-routing"><?php esc_html_e( 'Email Routing', 'scalyn-mail-relay' ); ?></a>
+			<a id="scalyn-tab-saved-configurations" href="#saved-configurations" data-provider-tab="saved-configurations"><?php esc_html_e( 'Saved Configurations', 'scalyn-mail-relay' ); ?></a>
+		<?php endif; ?>
+	</nav>
+	<div id="scalyn-panel-providers" class="scalyn-provider-tab-panel" data-provider-panel="providers">
 	<section class="scalyn-card scalyn-provider-overview" aria-labelledby="scalyn-active-route">
 		<div><h2 id="scalyn-active-route"><?php esc_html_e( 'Active sending route', 'scalyn-mail-relay' ); ?></h2>
 		<p class="scalyn-provider-overview__name"><?php echo esc_html( $active_label ); ?></p>
-		<p><?php esc_html_e( 'Only the selected provider handles site email. Saved settings on another provider do not enable automatic failover.', 'scalyn-mail-relay' ); ?></p></div>
+		<p><?php esc_html_e( 'This is the site default. Explicit source routes can override it when routing is enabled. Saved settings on another provider do not enable automatic failover; recovery requires separate opt-in.', 'scalyn-mail-relay' ); ?></p></div>
 		<?php if ( $can_configure ) : ?>
 			<a class="button button-primary" href="<?php echo esc_url( add_query_arg( 'step', 2, $wizard_url ) ); ?>"><?php esc_html_e( 'Change sending provider', 'scalyn-mail-relay' ); ?></a>
 		<?php endif; ?>
@@ -36,9 +44,32 @@ $wizard_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 			</a><?php endif; ?>
 		</div>
 	<?php else : ?>
+		<div class="scalyn-provider-catalog" hidden>
+			<h2><?php esc_html_e( 'Available providers', 'scalyn-mail-relay' ); ?></h2>
+			<div class="scalyn-provider-tiles">
+				<?php foreach ( $providers as $index => $p ) : ?>
+					<button type="button" class="scalyn-provider-tile" data-active="<?php echo $p['is_active'] ? 'true' : 'false'; ?>" data-provider-index="<?php echo esc_attr( $index ); ?>" data-configured="<?php echo $p['configured'] ? 'configured' : 'unconfigured'; ?>" data-search="<?php echo esc_attr( $p['label'] . ' ' . $p['id'] ); ?>" aria-haspopup="dialog" aria-controls="scalyn-provider-details">
+						<?php if ( in_array( $p['id'], array( 'smtp', 'sendgrid', 'postmark', 'smtp2go', 'brevo' ), true ) ) : ?>
+							<img class="scalyn-provider-logo" src="<?php echo esc_url( SCALYN_MAIL_RELAY_URL . 'assets/images/providers/' . $p['id'] . '.svg' ); ?>" alt="" width="150" height="44" />
+						<?php else : ?>
+							<span class="dashicons dashicons-email-alt" aria-hidden="true"></span>
+						<?php endif; ?>
+						<span class="scalyn-provider-tile__name"><?php echo esc_html( $p['label'] ); ?></span>
+						<span class="scalyn-badge scalyn-badge--<?php echo $p['configured'] ? 'connected' : 'disconnected'; ?>"><?php echo esc_html( $p['configured'] ? __( 'Settings saved', 'scalyn-mail-relay' ) : __( 'Not configured', 'scalyn-mail-relay' ) ); ?></span>
+						<?php if ( $p['is_active'] ) : ?>
+							<span class="scalyn-badge scalyn-badge--connected"><?php esc_html_e( 'Active', 'scalyn-mail-relay' ); ?></span>
+						<?php endif; ?>
+						<span class="scalyn-provider-tile__arrow" aria-hidden="true">&rsaquo;</span>
+					</button>
+				<?php endforeach; ?>
+			</div>
+		</div>
 		<div class="scalyn-grid scalyn-provider-grid">
 					<?php foreach ( $providers as $p ) : ?>
 						<section class="scalyn-card scalyn-provider-card">
+							<?php if ( in_array( $p['id'], array( 'smtp', 'sendgrid', 'postmark', 'smtp2go', 'brevo' ), true ) ) : ?>
+								<img class="scalyn-provider-logo" src="<?php echo esc_url( SCALYN_MAIL_RELAY_URL . 'assets/images/providers/' . $p['id'] . '.svg' ); ?>" alt="" width="150" height="44" />
+							<?php endif; ?>
 							<div class="scalyn-panel-heading">
 								<h2><?php echo esc_html( $p['label'] ); ?></h2>
 								<?php if ( $p['is_active'] ) : ?>
@@ -104,12 +135,10 @@ $wizard_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 									?>
 									<span class="scalyn-badge scalyn-badge--<?php echo esc_attr( $state ); ?>"><?php echo esc_html( $label ); ?></span>
 									<?php
-									if ( ! empty( $health['findings'][0] ) ) {
-										echo ' ' . esc_html( $health['findings'][0] );
-									}
-									if ( ! empty( $health['recommended_action'] ) ) {
-										echo ' ' . esc_html( $health['recommended_action'] );
-									}
+									\Scalyn\MailRelay\Admin\Components\HelpText::render(
+										__( 'About provider health', 'scalyn-mail-relay' ),
+										trim( ( $health['findings'][0] ?? '' ) . ' ' . ( $health['recommended_action'] ?? '' ) )
+									);
 								}
 								?>
 								</dd>
@@ -168,12 +197,26 @@ $wizard_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 						</section>
 					<?php endforeach; ?>
 		</div>
+		<dialog id="scalyn-provider-details" class="scalyn-provider-drawer" aria-labelledby="scalyn-provider-details-title">
+			<div class="scalyn-provider-drawer__heading"><h2 id="scalyn-provider-details-title"><?php esc_html_e( 'Provider details', 'scalyn-mail-relay' ); ?></h2><button type="button" class="button" data-provider-close><?php esc_html_e( 'Close', 'scalyn-mail-relay' ); ?></button></div>
+			<div data-provider-detail-content></div>
+			<p class="scalyn-finding__action"><?php esc_html_e( 'Viewing details does not change the sending provider.', 'scalyn-mail-relay' ); ?></p>
+		</dialog>
 	<?php endif; ?>
 	<details class="scalyn-provider-evidence scalyn-disclosure"><summary><?php esc_html_e( 'What these statuses mean', 'scalyn-mail-relay' ); ?></summary>
-		<p><?php esc_html_e( 'Connection status and provider health use only evidence for the selected provider’s current configuration. Unknown and stale evidence are never treated as healthy. Saved settings are not proof of authorization or delivery. Provider acceptance never guarantees delivery or inbox placement. SendGrid sandbox verification does not prove real-send permission. Postmark verification checks token access and Live server type, not sender authorization or sending allowance.', 'scalyn-mail-relay' ); ?></p>
+		<p class="scalyn-finding__action"><?php esc_html_e( 'Connection status and provider health use only evidence for the selected provider’s current configuration. Unknown and stale evidence are never treated as healthy. Saved settings are not proof of authorization or delivery. Provider acceptance never guarantees delivery or inbox placement. SendGrid sandbox verification does not prove real-send permission. Postmark verification checks token access and Live server type, not sender authorization or sending allowance.', 'scalyn-mail-relay' ); ?></p>
 	</details>
 		<aside class="scalyn-card" aria-labelledby="scalyn-provider-help"><h2 id="scalyn-provider-help"><?php esc_html_e( 'Before you switch providers', 'scalyn-mail-relay' ); ?></h2>
 			<ol><li><?php esc_html_e( 'Prepare the provider credentials and an authorized sender.', 'scalyn-mail-relay' ); ?></li><li><?php esc_html_e( 'Use the wizard to select and configure the sending route. Selection takes effect immediately.', 'scalyn-mail-relay' ); ?></li><li><?php esc_html_e( 'Verify the connection, send a test to an inbox you control, and check receipt.', 'scalyn-mail-relay' ); ?></li></ol>
 			<p><?php esc_html_e( 'Provider settings are managed in the Setup Wizard. Select the provider in step 2 before configuring it in step 3. Changing settings for the active provider affects site email.', 'scalyn-mail-relay' ); ?></p>
 		</aside>
+	</div>
+	<?php if ( $can_configure ) : ?>
+		<div id="scalyn-panel-email-routing" class="scalyn-provider-tab-panel" data-provider-panel="email-routing">
+			<?php \Scalyn\MailRelay\Admin\Components\RoutingForm::render(); ?>
+		</div>
+		<div id="scalyn-panel-saved-configurations" class="scalyn-provider-tab-panel" data-provider-panel="saved-configurations">
+			<?php ( new \Scalyn\MailRelay\Admin\Components\ConfigurationList( $settings ) )->render(); ?>
+		</div>
+	<?php endif; ?>
 </div>

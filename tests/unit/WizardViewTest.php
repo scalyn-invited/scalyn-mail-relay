@@ -20,6 +20,7 @@ final class WizardViewTest extends TestCase {
 		$conn_result = $result;
 		$email_result = $result;
 		$prior_options = $GLOBALS['_test_wp_options'] ?? array();
+		$settings = new \Scalyn\MailRelay\Core\SettingsRepository();
 		if (in_array($provider,['smtp2go','brevo'],true)) {
 			$GLOBALS['_test_wp_options']=[];
 			$settings=new \Scalyn\MailRelay\Core\SettingsRepository();

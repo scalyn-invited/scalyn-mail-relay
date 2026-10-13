@@ -13,7 +13,7 @@ use Scalyn\MailRelay\Core\HookNames;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Intercepts wp_mail only when SendGrid or Postmark is active. SMTP behavior is unchanged.
+ * Intercepts API mail, or SMTP only when routing/recovery is explicitly enabled.
  * Unsupported mail shapes fail closed instead of silently falling back to PHP mail.
  */
 final class WordPressMailBridge {
@@ -21,12 +21,14 @@ final class WordPressMailBridge {
 	/**
 	 * Connects the bridge to provider settings and the shared dispatcher.
 	 *
-	 * @param SettingsRepository $settings Provider selection and public sender.
-	 * @param MailDispatcher     $dispatcher Shared mail orchestrator.
+	 * @param SettingsRepository                              $settings Provider selection and public sender.
+	 * @param MailDispatcher                                  $dispatcher Shared mail orchestrator.
+	 * @param \Scalyn\MailRelay\Recovery\RecoveryService|null $recovery Explicit opt-in durable queue.
 	 */
 	public function __construct(
 		private readonly SettingsRepository $settings,
-		private readonly MailDispatcher $dispatcher
+		private readonly MailDispatcher $dispatcher,
+		private readonly ?\Scalyn\MailRelay\Recovery\RecoveryService $recovery = null
 	) {}
 
 	/** Registers the WordPress short-circuit at its normal priority. */
@@ -39,10 +41,10 @@ final class WordPressMailBridge {
 	 *
 	 * @param mixed $pre  Prior pre_wp_mail result.
 	 * @param mixed $atts Filtered WordPress mail arguments.
-	 * @return mixed Null for core mail, otherwise the provider acknowledgement boolean.
+	 * @return mixed Null for core mail; otherwise acknowledgement or opted-in durable ownership.
 	 */
 	public function maybe_send( mixed $pre, mixed $atts ): mixed {
-		if ( null !== $pre || ! in_array( $this->settings->get_active_provider_id(), array( 'sendgrid', 'postmark', 'smtp2go', 'brevo' ), true ) ) {
+		if ( null !== $pre || ( ! $this->recovery?->enabled() && true !== ( new RoutingRepository() )->policy()['enabled'] && ! in_array( $this->settings->get_active_provider_id(), array( 'sendgrid', 'postmark', 'smtp2go', 'brevo' ), true ) ) ) {
 			return $pre;
 		}
 		$uuid = wp_generate_uuid4();
@@ -71,7 +73,11 @@ final class WordPressMailBridge {
 			return false;
 		}
 		try {
-			return $this->dispatcher->dispatch( $message )->success;
+			if ( $this->recovery?->enabled() ) {
+				return $this->recovery->own( $message );
+			}
+			$target = ( new RoutingRepository() )->plan( $this->settings, MailOrigin::current() )[0] ?? null;
+			return $this->dispatcher->dispatch( $message, $target )->success;
 		} catch ( \Throwable $error ) {
 			// Do not fabricate a preparation failure after dispatch may have started.
 			return false;
@@ -111,6 +117,7 @@ final class WordPressMailBridge {
 			throw new \InvalidArgumentException( 'Unsupported mail headers.' );
 		}
 		$config = match ( $this->settings->get_active_provider_id() ) {
+			'smtp' => $this->settings->get_smtp_settings(),
 			'postmark' => $this->settings->get_postmark_settings(),
 			'smtp2go' => $this->settings->get_smtp2go_settings(),
 			'brevo' => $this->settings->get_brevo_settings(),
@@ -175,6 +182,11 @@ final class WordPressMailBridge {
 				throw new \InvalidArgumentException( 'Unsupported attachment path.' );
 			}
 		}
+		$origin  = MailOrigin::current();
+		$context = 'unknown/default' === $origin ? array(
+			'source_type' => 'wordpress',
+			'source_name' => 'wp_mail',
+		) : array_combine( array( 'source_type', 'source_name' ), explode( '/', $origin ) );
 		return new MailMessage(
 			uuid: $uuid,
 			from: $from_email,
@@ -184,10 +196,7 @@ final class WordPressMailBridge {
 			content_type: strtolower( $parts[1] ),
 			headers: $forwarded,
 			attachments: $attachments,
-			context: array(
-				'source_type' => 'wordpress',
-				'source_name' => 'wp_mail',
-			)
+			context: $context
 		);
 	}
 

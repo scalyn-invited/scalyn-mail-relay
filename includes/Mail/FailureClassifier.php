@@ -212,6 +212,11 @@ final class FailureClassifier {
 				__( 'The mail server rejected the message. This may indicate a misconfiguration, an invalid recipient, or the server\'s relay policy. Check the mail provider\'s logs or contact support.', 'scalyn-mail-relay' ),
 				$evidence
 			),
+			TransportFailureCategory::RATE_LIMIT => new RemediationSuggestion(
+				TransportFailureCategory::RATE_LIMIT,
+				__( 'The provider rate limit was reached. Review sending limits and provider activity before a manual retry.', 'scalyn-mail-relay' ),
+				$evidence
+			),
 			TransportFailureCategory::CONFIG => new RemediationSuggestion(
 				TransportFailureCategory::CONFIG,
 				__( 'Configuration error before sending. Verify the selected provider setup in the Setup Wizard and run diagnostics to check for other issues.', 'scalyn-mail-relay' ),
