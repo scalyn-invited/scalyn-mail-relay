@@ -31,12 +31,15 @@ final class DeliverabilityRepositoryTest extends TestCase {
   $this->assertSame(['verdicts'=>['spf'=>'pass','dkim'=>'fail','dmarc'=>'unknown'],'alignment'=>['spf'=>'strict','dkim'=>'unknown']],$payload);$this->assertStringNotContainsString('secret',$insert['payload']);$this->assertStringNotContainsString('private',$insert['payload']);
  }
  public function test_history_query_is_revision_provider_window_scoped_with_future_exclusion():void {
+  $previousTimezone=date_default_timezone_get();date_default_timezone_set('UTC');
+  try {
   $GLOBALS['wpdb']->get_results_return=[['status'=>'accepted','row_count'=>'20'],['status'=>'failed','row_count'=>'1']];$repo=new DeliverabilityRepository();
   $this->assertSame(['accepted'=>20,'failed'=>1],$repo->submissions(self::REV,'smtp',30,1791763200));$call=end($GLOBALS['wpdb']->prepare_calls);
   foreach(['configuration_id=%s','provider=%s','created_at >= %s','created_at <= %s',"status IN ('accepted','failed')"] as $guard){$this->assertStringContainsString($guard,$call['query']);}
-  $this->assertSame(['wp_scalyn_mail_logs',self::REV,'smtp','2026-09-12 02:00:00','2026-10-12 02:00:00'],$call['args']);
+  $this->assertSame(['wp_scalyn_mail_logs',self::REV,'smtp','2026-09-12 00:00:00','2026-10-12 00:00:00'],$call['args']);
   $GLOBALS['wpdb']->get_results_return=[];$this->assertSame(['accepted'=>0,'failed'=>0],$repo->submissions(self::REV,'smtp',7,time()));
   $GLOBALS['wpdb']->last_error='secret SQL';$this->assertNull($repo->submissions(self::REV,'smtp',7,time()));
+  } finally {date_default_timezone_set($previousTimezone);}
  }
  public function test_scope_schema_and_failed_insert_never_yield_a_number():void {
   $repo=new DeliverabilityRepository();$this->assertNull($repo->latest('bad','smtp'));$this->assertNull($repo->submissions(self::REV,'smtp',31,time()));$this->assertSame([],$GLOBALS['wpdb']->prepare_calls);
