@@ -20,6 +20,7 @@ class DeliverySchemaWpdbStub extends WpdbStub {
 	}
 	public function get_var(string $query): mixed {
 		$call=end($this->prepare_calls);
+		if (str_contains($query,'SELECT ENGINE') && in_array($call['args'][0] ?? '', [$this->prefix.'scalyn_ai_sessions',$this->prefix.'scalyn_ai_usage'],true)) { return $this->engine; }
 		if (str_contains($query,'SELECT ENGINE') && ($call['args'][0] ?? '') === $this->prefix.'scalyn_recovery_queue') { return $this->engine; }
 		if (str_contains($query,'SELECT ENGINE') && ($call['args'][0] ?? '') === $this->prefix.'scalyn_submission_attempts') { return $this->engine; }
 		if (($call['args'][0] ?? '') === $this->prefix.'scalyn_deliverability_evidence') { return $this->engine; }
@@ -28,6 +29,8 @@ class DeliverySchemaWpdbStub extends WpdbStub {
 	}
 	public function get_col(string $query): array {
 		$call=end($this->prepare_calls);
+		if (($call['args'][0] ?? '') === $this->prefix.'scalyn_ai_sessions') { return ['uuid','owner','payload','claim','claim_until','expires_at','updated_at']; }
+		if (($call['args'][0] ?? '') === $this->prefix.'scalyn_ai_usage') { return ['scope','used','expires_at']; }
 		if (($call['args'][0] ?? '') === $this->prefix.'scalyn_recovery_queue') { return ['logical_uuid','payload','state','attempt_count','claim_token','claimed_at','next_at','expires_at','created_at','updated_at','reason']; }
 		if (($call['args'][0] ?? '') === $this->prefix.'scalyn_submission_attempts') { return ['attempt_uuid','logical_uuid','configuration_id','provider','origin','attempt_number','status','failure_category','safe_to_retry','created_at','finished_at']; }
 		if (($call['args'][0] ?? '') === $this->prefix.'scalyn_deliverability_evidence') { return $this->missingDeliverability ? [] : ['id','computation_uuid','configuration_id','provider','diagnostic_uuid','kind','weights_version','payload','created_at']; }
@@ -37,6 +40,12 @@ class DeliverySchemaWpdbStub extends WpdbStub {
 	}
 	public function get_results(string $query,string $output=OBJECT): array {
 		$call=end($this->prepare_calls);
+		if (in_array($call['args'][0] ?? '', [$this->prefix.'scalyn_ai_sessions',$this->prefix.'scalyn_ai_usage'],true)) {
+			$session=($call['args'][0] ?? '') === $this->prefix.'scalyn_ai_sessions';
+			$indexes=$session ? ['PRIMARY'=>[0,['uuid']],'owner_updated'=>[1,['owner','updated_at','uuid']],'expiry'=>[1,['expires_at','uuid']]] : ['PRIMARY'=>[0,['scope']],'expiry'=>[1,['expires_at','scope']]];
+			$index=$indexes[$call['args'][1]];
+			return array_map(fn($col,$n)=>['Column_name'=>$col,'Seq_in_index'=>$n+1,'Non_unique'=>$index[0],'Sub_part'=>null],$index[1],array_keys($index[1]));
+		}
 		if (($call['args'][0] ?? '') === $this->prefix.'scalyn_recovery_queue') {
 			$indexes=['PRIMARY'=>[0,['logical_uuid']],'due_work'=>[1,['state','next_at','logical_uuid']],'expiry'=>[1,['expires_at','logical_uuid']],'created_at'=>[1,['created_at','logical_uuid']]];
 			$index=$indexes[$call['args'][1]];

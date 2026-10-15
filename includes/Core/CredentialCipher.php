@@ -75,7 +75,7 @@ final class CredentialCipher {
 	 */
 	public function decrypt( #[\SensitiveParameter] string $envelope, string $provider = 'sendgrid' ): string {
 		$key     = $this->key();
-		$maximum = 'recovery-payload' === $provider ? 12000000 : ( 'smtp' === $provider ? 8192 : 1024 );
+		$maximum = 'recovery-payload' === $provider ? 12000000 : ( 'ai-session' === $provider ? 1500000 : ( 'smtp' === $provider ? 8192 : 1024 ) );
 		if ( ! str_starts_with( $envelope, 'v1:' ) || strlen( $envelope ) > $maximum ) {
 			throw new \RuntimeException( 'Stored credential is unavailable. Replace or remove it.' );
 		}
@@ -99,6 +99,9 @@ final class CredentialCipher {
 	 * @throws \InvalidArgumentException When the context is unsupported.
 	 */
 	private function context( string $provider ): string {
+		if ( in_array( $provider, array( 'ai-openai', 'ai-gemini', 'ai-claude', 'ai-session' ), true ) ) {
+			return 'scalyn:ai:' . $provider . ':v1';
+		}
 		if ( 'recovery-payload' === $provider ) {
 			return 'scalyn:recovery:payload:v1';
 		}

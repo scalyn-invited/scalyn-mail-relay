@@ -16,6 +16,8 @@ use Scalyn\MailRelay\Core\Capabilities;
 final class UninstallTest extends TestCase {
 
 	private const OWNED_TABLES = array(
+		'wp_scalyn_ai_sessions',
+		'wp_scalyn_ai_usage',
 		'wp_scalyn_connection_evidence',
 		'wp_scalyn_delivery_events',
 		'wp_scalyn_delivery_recipients',

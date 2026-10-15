@@ -40,14 +40,14 @@ final class MailConfigurationTest extends TestCase {
 		$GLOBALS['wpdb']=new DeliverySchemaWpdbStub();
 		Migrator::migrate();
 		$this->assertSame(SCALYN_MAIL_RELAY_DB_VERSION,get_option('scalyn_mail_relay_db_version'));
-		$this->assertCount(7,$GLOBALS['_test_dbdelta_queries']);
+		$this->assertCount(9,$GLOBALS['_test_dbdelta_queries']);
 		$sql=$GLOBALS['_test_dbdelta_queries'][0];
 		$this->assertStringContainsString('configuration_id char(36) NULL',$sql);
 		$this->assertStringContainsString('configuration_created (configuration_id,created_at,id)',$sql);
 		$this->assertStringNotContainsString('UPDATE',$sql);
 		$this->assertStringNotContainsString('DROP',$sql);
 		Migrator::migrate();
-		$this->assertCount(7,$GLOBALS['_test_dbdelta_queries']);
+		$this->assertCount(9,$GLOBALS['_test_dbdelta_queries']);
 	}
 	public function test_incomplete_migration_does_not_advance_version_and_can_retry(): void {
 		foreach(['missingMailRevision','brokenMailIndex'] as $property) {

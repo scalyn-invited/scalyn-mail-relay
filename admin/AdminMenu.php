@@ -127,6 +127,10 @@ final class AdminMenu {
 		);
 		add_submenu_page( 'scalyn-mail-relay', __( 'Alerts & Recovery', 'scalyn-mail-relay' ), __( 'Alerts & Recovery', 'scalyn-mail-relay' ), Capabilities::MANAGE_SETTINGS, 'scalyn-mail-relay-alerts', array( $this, 'render_alerts' ) );
 		add_submenu_page( 'scalyn-mail-relay', __( 'Reports', 'scalyn-mail-relay' ), __( 'Reports', 'scalyn-mail-relay' ), Capabilities::EXPORT_REPORTS, 'scalyn-mail-relay-reports', array( new \Scalyn\MailRelay\Admin\Pages\ReportsPage(), 'render' ) );
+		if ( current_user_can( 'manage_options' ) ) {
+			$ai_container = Plugin::instance()->container();
+			add_submenu_page( 'scalyn-mail-relay', __( 'AI Assistant', 'scalyn-mail-relay' ), __( 'AI Assistant', 'scalyn-mail-relay' ), 'manage_options', 'scalyn-mail-relay-ai', array( new \Scalyn\MailRelay\Admin\Pages\AiPage( $ai_container->get( \Scalyn\MailRelay\AI\AiSettings::class ), $ai_container->get( \Scalyn\MailRelay\AI\AiAdapters::class ) ), 'render' ) );
+		}
 		if ( \Scalyn\MailRelay\Agency\ManagedAccess::is_client() ) {
 			add_submenu_page( 'scalyn-mail-relay', __( 'Summary Reports', 'scalyn-mail-relay' ), __( 'Summary Reports', 'scalyn-mail-relay' ), Capabilities::VIEW_CLIENT_REPORTS, 'scalyn-mail-relay-client-reports', array( new \Scalyn\MailRelay\Admin\Pages\ClientPage(), 'render' ) );
 		}
@@ -161,9 +165,15 @@ final class AdminMenu {
 			wp_enqueue_script( 'scalyn-provider-catalog', SCALYN_MAIL_RELAY_URL . 'assets/js/provider-catalog.js', array(), (string) filemtime( $catalog_script ), true );
 		}
 		wp_enqueue_script( 'scalyn-helper-text', SCALYN_MAIL_RELAY_URL . 'assets/js/helper-text.js', array(), (string) filemtime( $help_script ), true );
-		if ( preg_match( '/scalyn-mail-relay-(providers|agency|data-controls|diagnostics|alerts)$/', $hook ) ) {
+		if ( preg_match( '/scalyn-mail-relay-(providers|agency|data-controls|diagnostics|alerts|ai)$/', $hook ) ) {
 			$tabs_script = SCALYN_MAIL_RELAY_PATH . 'assets/js/provider-tabs.js';
 			wp_enqueue_script( 'scalyn-provider-tabs', SCALYN_MAIL_RELAY_URL . 'assets/js/provider-tabs.js', array(), (string) filemtime( $tabs_script ), true );
+		}
+		if ( str_ends_with( $hook, 'scalyn-mail-relay-ai' ) && current_user_can( 'manage_options' ) ) {
+			$ai_script = SCALYN_MAIL_RELAY_PATH . 'assets/js/ai-assistant.js';
+			wp_enqueue_script( 'scalyn-ai-assistant', SCALYN_MAIL_RELAY_URL . 'assets/js/ai-assistant.js', array(), (string) filemtime( $ai_script ), true );
+			$ai_settings_script = SCALYN_MAIL_RELAY_PATH . 'assets/js/ai-settings.js';
+			wp_enqueue_script( 'scalyn-ai-settings', SCALYN_MAIL_RELAY_URL . 'assets/js/ai-settings.js', array(), (string) filemtime( $ai_settings_script ), true );
 		}
 		if ( false !== strpos( $hook, 'scalyn-mail-relay-agency' ) && ( current_user_can( Capabilities::MANAGE_AGENCY ) || current_user_can( 'manage_options' ) ) ) {
 			wp_enqueue_media();
