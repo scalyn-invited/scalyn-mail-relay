@@ -36,7 +36,8 @@ final class AiEvidence {
 				'routing'     => 'Explicit routing selects named configurations for supported mail sources. Recovery is separate and opt-in.',
 				'diagnostics' => 'Checks inspect configuration and DNS, not authentication on a received message. AI cannot repair configuration.',
 				'evidence'    => 'Webhook evidence may confirm recipient-server acceptance or bounce; missing callbacks are not failures.',
-				'scope'       => 'Only this plugin and its mail diagnostics/configuration/remediation are supported.',
+				'scope'       => 'Technical email setup, authentication, delivery, security and troubleshooting are supported. Email drafting is not supported.',
+				'setup'       => 'Use Setup Wizard to choose a provider and enter credentials privately; authorize the sender/domain with the provider, publish its required DNS records, then verify connection. A separately requested test email is different from diagnostics. Review Email Health, Diagnostics and Email Logs for recorded evidence.',
 			),
 			'configuration' => array(
 				'revision' => $revision,
@@ -63,6 +64,7 @@ final class AiEvidence {
 					'status'                => $status,
 					'recorded_at_site_time' => $timestamp,
 					'freshness'             => $this->freshness( $timestamp ),
+					'guidance'              => self::guidance( $name, $status ),
 				);
 			}
 			$sources['diagnostics']['available'] = ! empty( $sources['diagnostics']['checks'] );
@@ -142,19 +144,47 @@ final class AiEvidence {
 	/** Builds observed facts deterministically instead of trusting model assertions.
 	 *
 	 * @param array $snapshot Current allowlisted projection.
+	 * @param array $references Relevant verified source keys.
 	 */
-	public static function observations( array $snapshot ): string {
+	public static function observations( array $snapshot, array $references = array( 'configuration', 'diagnostics', 'health', 'activity' ) ): string {
 		$sources = $snapshot['sources'];
-		$lines   = array( 'Current provider: ' . $sources['configuration']['provider'] . '. Revision: ' . $snapshot['revision'] . '.', 'Evidence captured (UTC): ' . $snapshot['captured_at_utc'] . '.' );
-		if ( ! $sources['diagnostics']['available'] ) {
+		$lines   = array();
+		if ( in_array( 'configuration', $references, true ) ) {
+			$lines[] = 'Current provider: ' . $sources['configuration']['provider'] . '. Revision: ' . $snapshot['revision'] . '.';
+		}
+		if ( in_array( 'diagnostics', $references, true ) && ! $sources['diagnostics']['available'] ) {
 			$lines[] = 'No current recorded diagnostic findings are available.';
 		}
 		foreach ( $sources['diagnostics']['checks'] as $check ) {
+			if ( ! in_array( 'diagnostics', $references, true ) ) {
+				continue;
+			}
 			$lines[] = $check['name'] . ': ' . $check['status'] . ' (' . $check['freshness'] . '; recorded site time: ' . ( $check['recorded_at_site_time'] ?? 'unknown' ) . ').';
 		}
-		$lines[] = $sources['health']['available'] ? 'Recorded configuration score: ' . $sources['health']['configuration_score'] . '/100 (' . $sources['health']['freshness'] . ').' : 'Configuration score unavailable.';
-		$lines[] = $sources['activity']['available'] ? 'Retained site-wide submissions in seven days: Accepted ' . $sources['activity']['accepted'] . ', Failed ' . $sources['activity']['failed'] . '.' : 'Retained activity unavailable.';
+		if ( in_array( 'health', $references, true ) ) {
+			$lines[] = $sources['health']['available'] ? 'Recorded configuration score: ' . $sources['health']['configuration_score'] . '/100 (' . $sources['health']['freshness'] . ').' : 'Configuration score unavailable.';
+		}
+		if ( in_array( 'activity', $references, true ) ) {
+			$lines[] = $sources['activity']['available'] ? 'Retained site-wide submissions in seven days: Accepted ' . $sources['activity']['accepted'] . ', Failed ' . $sources['activity']['failed'] . '.' : 'Retained activity unavailable.';
+		}
 		$lines[] = 'Configuration checks and provider acceptance do not verify authentication on an actual message or inbox delivery.';
 		return implode( "\n", $lines );
+	}
+
+	/** Fixed guides explain possible remediation without exposing raw findings.
+	 *
+	 * @param string $name Allowlisted check.
+	 * @param string $status Recorded normalized status.
+	 */
+	private static function guidance( string $name, string $status ): string {
+		$guides = array(
+			'spf_record'   => 'Compare the single SPF TXT record with the sending provider requirements. Avoid duplicate SPF records and check lookup limits; actual outbound-IP authorization is not verified here.',
+			'dkim_record'  => 'Confirm provider-side DKIM signing and the configured selector, then compare the published public key with provider instructions. DNS presence does not verify message signatures.',
+			'dmarc_policy' => 'Review the DMARC TXT policy and confirm actual SPF or DKIM alignment using receiver authentication results before tightening enforcement.',
+			'mx_record'    => 'Check the receiving mail host MX instructions. MX describes inbound routing and does not by itself authorize outbound sending.',
+			'smtp_tls'     => 'Compare SMTP host, port and encryption mode with provider instructions. Investigate certificate or connection issues without disabling certificate verification.',
+			'reverse_dns'  => 'Ask the sending-IP owner to check PTR and forward DNS consistency; this may not apply to a hosted API provider.',
+		);
+		return ( 'pass' === $status ? 'Recorded configuration check passed; this alone is not a reason to change settings. ' : 'Status alone does not identify the exact cause. Inspect the finding on Diagnostics; refresh unknown or stale evidence before changing settings. ' ) . ( $guides[ $name ] ?? '' );
 	}
 }

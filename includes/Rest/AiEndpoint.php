@@ -93,8 +93,9 @@ final class AiEndpoint {
 					}
 					$claim = $this->repository->claim( $uuid );
 					try {
-						$session          = $this->repository->read( $uuid );
-						$session['title'] = $title;
+						$session                       = $this->repository->read( $uuid );
+						$session['title']              = $title;
+						$session['auto_title_pending'] = false;
 						$this->repository->save( $uuid, $claim, $session, false );
 					} finally {
 						$this->repository->release( $uuid, $claim );
@@ -131,12 +132,14 @@ final class AiEndpoint {
 				200
 			);
 		} catch ( \Throwable $error ) {
-			$status = in_array( $error->getCode(), array( 403, 404, 409, 429 ), true ) ? $error->getCode() : 400;
+			$status = in_array( $error->getCode(), array( 403, 404, 409, 429, 502 ), true ) ? $error->getCode() : 400;
 			// Never expose SQL, transport bodies or unexpected exception messages.
 			$response = new \WP_REST_Response(
 				array(
-					'success' => false,
-					'message' => 'AI operation unavailable. Check settings, limits, conversation ownership or current configuration; refresh before trying again.',
+					'success'    => false,
+					'error_code' => $error instanceof \Scalyn\MailRelay\AI\AiFailure && isset( \Scalyn\MailRelay\AI\AiFailure::MESSAGES[ $error->reason ] ) ? $error->reason : 'ai_unavailable',
+					'provider'   => $error instanceof \Scalyn\MailRelay\AI\AiFailure && isset( \Scalyn\MailRelay\AI\AiCatalog::PROVIDERS[ $error->provider ] ) ? $error->provider : null,
+					'message'    => $error instanceof \Scalyn\MailRelay\AI\AiFailure ? $error->getMessage() : 'AI operation unavailable. Check settings, limits, conversation ownership or current configuration; refresh before trying again.',
 				),
 				$status
 			);

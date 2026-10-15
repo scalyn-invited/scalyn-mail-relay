@@ -16,7 +16,7 @@ final class AiRedaction {
 	 * @param string $text Untrusted text.
 	 */
 	public static function has_secret( string $text ): bool {
-		return 1 === preg_match( '/sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]+|-----BEGIN [A-Z ]*PRIVATE KEY|(?:password|api[_ -]?key|token|authorization)\s*[:=]\s*\S{4,}/i', $text );
+		return 1 === preg_match( '/sk-[A-Za-z0-9_-]{16,}|AIza[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]+|-----BEGIN [A-Z ]*PRIVATE KEY|(?:password|api[_ -]?key|token|authorization)\s*[:=]\s*\S{4,}/i', $text );
 	}
 
 	/** Validates text before local persistence or transmission.

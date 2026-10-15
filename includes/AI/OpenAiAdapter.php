@@ -38,25 +38,13 @@ final class OpenAiAdapter implements AiAdapterInterface {
 	 * @param array  $evidence Allowlisted evidence package.
 	 * @throws \InvalidArgumentException For unsupported models.
 	 * @throws \RuntimeException For invalid or unsafe responses.
+	 * @throws AiFailure For safely classified API failures or incomplete replies.
 	 */
 	public function answer( string $model, array $history, array $evidence ): array {
 		if ( ! in_array( $model, AiSettings::MODELS, true ) ) {
 			throw new \InvalidArgumentException( 'Select a supported model.' );
 		}
-		$properties = array(
-			'in_scope'            => array( 'type' => 'boolean' ),
-			'observed'            => array( 'type' => 'string' ),
-			'possible_causes'     => array( 'type' => 'string' ),
-			'next_steps'          => array( 'type' => 'string' ),
-			'references'          => array(
-				'type'  => 'array',
-				'items' => array(
-					'type' => 'string',
-					'enum' => array( 'help', 'configuration', 'diagnostics', 'health', 'activity' ),
-				),
-			),
-			'suggest_diagnostics' => array( 'type' => 'boolean' ),
-		);
+		$properties = AiAnswer::schema()['properties'];
 		$payload    = array(
 			'model'             => $model,
 			'store'             => false,
@@ -85,11 +73,20 @@ final class OpenAiAdapter implements AiAdapterInterface {
 				),
 			),
 		);
+		// Reasoning shares the existing 1,200-token budget; never silently raise it.
+		if ( in_array( $model, array( 'gpt-5-mini', 'gpt-5' ), true ) ) {
+			$payload['reasoning']         = array( 'effort' => 'minimal' );
+			$payload['text']['verbosity'] = 'low';
+		}
+		$payload['instructions'] = AiAnswer::INSTRUCTIONS;
 		if ( strlen( wp_json_encode( $payload ) ) > 65000 ) {
 			throw new \RuntimeException( 'Conversation context is too large. Start a new chat.' );
 		}
 		$data = $this->request( 'responses', $payload );
 		if ( 'completed' !== ( $data['status'] ?? '' ) ) {
+			if ( 'incomplete' === ( $data['status'] ?? '' ) && 'max_output_tokens' === ( $data['incomplete_details']['reason'] ?? '' ) ) {
+				throw new AiFailure( 'ai_incomplete' );
+			}
 			throw new \RuntimeException( 'AI did not complete an answer. No result was accepted.' );
 		}
 		$text = '';
@@ -103,24 +100,7 @@ final class OpenAiAdapter implements AiAdapterInterface {
 				}
 			}
 		}
-		$answer = json_decode( $text, true );
-		if ( ! is_array( $answer ) || array_diff( array_keys( $answer ), array_keys( $properties ) ) || count( $answer ) !== count( $properties ) || ! is_bool( $answer['in_scope'] ?? null ) || ! is_bool( $answer['suggest_diagnostics'] ?? null ) || ! is_array( $answer['references'] ?? null ) || array_diff( $answer['references'], array_keys( $evidence['sources'] ) ) ) {
-			throw new \RuntimeException( 'AI returned an unsupported answer format.' );
-		}
-		foreach ( array( 'observed', 'possible_causes', 'next_steps' ) as $section ) {
-			if ( ! is_string( $answer[ $section ] ) || strlen( $answer[ $section ] ) > 8000 || AiRedaction::has_secret( $answer[ $section ] ) || preg_match( '/https?:\/\/|<[^>]+>/', $answer[ $section ] ) ) {
-				throw new \RuntimeException( 'AI returned unsafe or oversized content.' );
-			}
-			$answer[ $section ] = preg_replace( '/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i', '[address removed]', $answer[ $section ] );
-		}
-		return $answer['in_scope'] ? $answer : array(
-			'in_scope'            => false,
-			'observed'            => 'I can only help with this plugin, its diagnostics and email configuration.',
-			'possible_causes'     => '',
-			'next_steps'          => '',
-			'references'          => array( 'help' ),
-			'suggest_diagnostics' => false,
-		);
+		return AiAnswer::parse( $text, $evidence );
 	}
 
 	/** Makes one bounded official-origin request, without automatic retry.
@@ -128,6 +108,7 @@ final class OpenAiAdapter implements AiAdapterInterface {
 	 * @param string     $path Fixed resource name.
 	 * @param array|null $payload Optional JSON body.
 	 * @throws \RuntimeException For failed remote requests.
+	 * @throws AiFailure For safely classified remote errors.
 	 */
 	private function request( string $path, ?array $payload ): array {
 		$response = wp_remote_request(
@@ -144,8 +125,23 @@ final class OpenAiAdapter implements AiAdapterInterface {
 				'body'                => null === $payload ? null : wp_json_encode( $payload ),
 			)
 		);
-		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
-			throw new \RuntimeException( 'OpenAI request failed. Check the key, selected model, account limits and connection. No automatic retry was made.' );
+		if ( is_wp_error( $response ) ) {
+			throw new AiFailure( 'ai_network' );
+		}
+		$status = wp_remote_retrieve_response_code( $response );
+		if ( 200 !== $status ) {
+			// Inspect only fixed code/type identifiers; never return provider messages or bodies.
+			$failure = json_decode( wp_remote_retrieve_body( $response ), true );
+			$codes   = array( $failure['error']['code'] ?? null, $failure['error']['type'] ?? null );
+			$reason  = match ( true ) {
+				429 === $status && in_array( 'insufficient_quota', $codes, true ) => 'ai_quota',
+				429 === $status => 'ai_rate',
+				in_array( $status, array( 401, 403 ), true ) => 'ai_key',
+				404 === $status || in_array( 'model_not_found', $codes, true ) => 'ai_model',
+				default => 'ai_remote',
+			};
+			// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Fixed local match identifier, never provider prose; AiFailure maps authored messages.
+			throw new AiFailure( $reason );
 		}
 		$data = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( ! is_array( $data ) ) {

@@ -1,5 +1,5 @@
 <?php
-/** Encrypted opt-in AI configuration.
+/** Encrypted, independently consented AI profiles.
  *
  * @package ScalynMailRelay
  */
@@ -7,165 +7,182 @@
 namespace Scalyn\MailRelay\AI;
 
 use Scalyn\MailRelay\Core\CredentialCipher;
-
 defined( 'ABSPATH' ) || exit;
-
-/** Credential-free summaries and explicit key replacement/removal. */
+/** Versioned option repository; reads never mutate legacy settings. */
 final class AiSettings {
-
 	public const OPTION = 'scalyn_mail_relay_ai';
 	public const MODELS = array( 'gpt-4.1-mini', 'gpt-4.1', 'gpt-5-mini', 'gpt-5' );
-
-	/** Creates settings with existing server-key protection.
+	/** Creates the encrypted repository.
 	 *
-	 * @param CredentialCipher $cipher Secret protection.
+	 * @param CredentialCipher $cipher Server-key protection.
 	 */
 	public function __construct( private CredentialCipher $cipher ) {}
-
-	/** Returns internal configuration; never used as an admin read model. */
+	/** Normalizes legacy OpenAI settings without writing or re-encrypting. */
 	private function stored(): array {
 		$value = get_option( self::OPTION, array() );
-		return is_array( $value ) ? $value : array();
+		$data  = is_array( $value ) ? $value : array();
+		if ( 2 !== ( $data['version'] ?? null ) ) {
+			$data = array(
+				'version'  => 2,
+				'revision' => $data['revision'] ?? '',
+				'enabled'  => ! empty( $data['enabled'] ),
+				'mcp'      => ! empty( $data['mcp'] ),
+				'provider' => 'openai',
+				'profiles' => array( 'openai' => array_intersect_key( $data, array_flip( array( 'key', 'model', 'models', 'consent' ) ) ) ),
+			);
+		}
+		return $data;
 	}
-
-	/** Returns only fixed fields; no envelope or key is disclosed. */
+	/** Returns only safe fields for all profiles, never encrypted credentials. */
 	public function summary(): array {
 		AiAccess::require_admin();
-		$data = $this->stored();
-		return array(
-			'revision'   => is_string( $data['revision'] ?? null ) ? $data['revision'] : '',
-			'enabled'    => ! empty( $data['enabled'] ),
-			'consent'    => ! empty( $data['consent'] ),
-			'mcp'        => ! empty( $data['mcp'] ),
-			'model'      => in_array( $data['model'] ?? '', self::MODELS, true ) ? $data['model'] : '',
-			'has_key'    => ! empty( $data['key'] ),
-			'encryption' => $this->cipher->is_available(),
-			'models'     => array_values( array_intersect( self::MODELS, $data['models'] ?? array() ) ),
+		$data     = $this->stored();
+		$profiles = array();
+		foreach ( AiCatalog::PROVIDERS as $provider => $label ) {
+			$profile               = $data['profiles'][ $provider ] ?? array();
+			$model                 = is_string( $profile['model'] ?? null ) && isset( AiCatalog::MODELS[ $provider ][ $profile['model'] ] ) ? $profile['model'] : '';
+			$models                = array_values( array_intersect( array_keys( AiCatalog::MODELS[ $provider ] ), is_array( $profile['models'] ?? null ) ? $profile['models'] : array() ) );
+			$profiles[ $provider ] = array(
+				'model'    => $model,
+				'models'   => $models,
+				'has_key'  => ! empty( $profile['key'] ),
+				'consent'  => ! empty( $profile['consent'] ),
+				'verified' => '' !== $model && in_array( $model, $models, true ),
+			);
+		}
+		$provider = isset( AiCatalog::PROVIDERS[ $data['provider'] ?? '' ] ) ? $data['provider'] : 'openai';
+		$active   = $profiles[ $provider ];
+		return array_merge(
+			$active,
+			array(
+				'revision'   => (string) ( $data['revision'] ?? '' ),
+				'provider'   => $provider,
+				'profiles'   => $profiles,
+				'enabled'    => ! empty( $data['enabled'] ) && $active['verified'] && $active['has_key'] && $active['consent'] && $this->cipher->is_available(),
+				'mcp'        => ! empty( $data['mcp'] ),
+				'encryption' => $this->cipher->is_available(),
+			)
 		);
 	}
-
-	/** Credentials are available only to the server-side adapter.
+	/** Decrypts only the named adapter's credential.
 	 *
-	 * @throws \RuntimeException When no key is stored.
+	 * @param string $provider Exact provider ID.
+	 * @throws \RuntimeException For missing credentials.
+	 * @throws \InvalidArgumentException For unknown providers.
 	 */
-	public function credential(): string {
+	public function credential( string $provider = 'openai' ): string {
 		AiAccess::require_admin();
+		if ( ! isset( AiCatalog::PROVIDERS[ $provider ] ) ) {
+			throw new \InvalidArgumentException( 'Unsupported AI provider.' );}
 		$data = $this->stored();
-		if ( empty( $data['key'] ) ) {
-			throw new \RuntimeException( 'Save an OpenAI API key first.' );
-		}
-		return $this->cipher->decrypt( $data['key'], 'ai-openai' );
+		$key  = $data['profiles'][ $provider ]['key'] ?? '';
+		if ( ! is_string( $key ) || '' === $key ) {
+			throw new \RuntimeException( 'Save this provider API key first.' );}
+		return $this->cipher->decrypt( $key, 'ai-' . $provider );
 	}
-
-	/** Stores an explicit administrator decision.
+	/** Saves one profile and independent MCP opt-in.
 	 *
-	 * @param array $input Validated by this repository, never trusted form data.
-	 * @throws \InvalidArgumentException For invalid opt-in or credentials.
-	 * @throws \RuntimeException For changed settings or unavailable writes.
+	 * @param array $input Protected form values.
+	 * @throws \InvalidArgumentException For invalid setup.
 	 */
 	public function save( array $input ): void {
 		AiAccess::require_admin();
-		$token = $this->lock();
-		try {
+		$token = $this->lock();try {
 			$data = $this->stored();
-			if ( isset( $input['revision'] ) && ( ! is_string( $input['revision'] ) || ! hash_equals( (string) ( $data['revision'] ?? '' ), $input['revision'] ) ) ) {
-				throw new \RuntimeException( 'AI settings changed. Reload before saving.' );
+			$this->revision( $data, $input['revision'] ?? null );
+			$model = $input['model'] ?? '';
+			$key   = $input['key'] ?? '';
+			if ( ! is_string( $model ) || ! is_string( $key ) || strlen( $key ) > 512 ) {
+				throw new \InvalidArgumentException( 'Invalid AI settings.' );}
+			$provider = '' !== $model ? AiCatalog::provider( $model ) : ( $data['provider'] ?? 'openai' );
+			$profile  = $data['profiles'][ $provider ] ?? array();
+			$replaced = '' !== $key || ! empty( $input['remove_key'] );
+			if ( '' !== $key && ! empty( $input['remove_key'] ) ) {
+				throw new \InvalidArgumentException( 'Enter a new key or remove the saved key, not both.' );
 			}
-			$key = $input['key'] ?? '';
-			if ( ! is_string( $key ) || strlen( $key ) > 512 || ! is_string( $input['model'] ?? '' ) ) {
-				throw new \InvalidArgumentException( 'Invalid AI settings.' );
+			if ( 'claude' === $provider && '' !== $key && ( str_contains( $key, '...' ) || str_contains( $key, '…' ) ) ) {
+				throw new \InvalidArgumentException( 'The Claude key appears shortened. Use the full secret copied when the key was created.' );
 			}
 			if ( '' !== $key ) {
-				if ( ! preg_match( '/^sk-[A-Za-z0-9_-]{16,509}$/D', $key ) ) {
-					throw new \InvalidArgumentException( 'Enter a valid OpenAI API key.' );
-				}
-				$data['key']      = $this->cipher->encrypt( $key, 'ai-openai' );
-				$data['models']   = array();
-				$input['model']   = '';
-				$input['enabled'] = false;
+				$valid = match ( $provider ) {
+					'openai'=>preg_match( '/^sk-[A-Za-z0-9_-]{16,509}$/D', $key ), 'gemini'=>preg_match( '/^AIza[A-Za-z0-9_-]{20,508}$/D', $key ), 'claude'=>preg_match( '/^sk-ant-[A-Za-z0-9_-]{16,505}$/D', $key )};
+				if ( ! $valid ) {
+					throw new \InvalidArgumentException( 'Enter a valid key for the selected provider.' );}
+				$profile['key'] = $this->cipher->encrypt( $key, 'ai-' . $provider );
 			}
 			if ( ! empty( $input['remove_key'] ) ) {
-				unset( $data['key'] );
-				$data['models']   = array();
-				$input['model']   = '';
-				$input['enabled'] = false;
-			}
-			$model = $input['model'] ?? '';
-			if ( '' !== $model && ! in_array( $model, array_intersect( self::MODELS, $data['models'] ?? array() ), true ) ) {
-				throw new \InvalidArgumentException( 'Refresh models and select an available supported model.' );
-			}
-			$data['model']   = $model;
-			$data['consent'] = ! empty( $input['consent'] );
-			$data['mcp']     = ! empty( $input['mcp'] );
-			$data['enabled'] = ! empty( $input['enabled'] );
-			if ( $data['enabled'] && ( ! $data['consent'] || empty( $data['key'] ) || '' === $model || ! $this->cipher->is_available() ) ) {
-				throw new \InvalidArgumentException( 'AI needs encryption, a key, a selected available model and data-sharing consent.' );
-			}
+				unset( $profile['key'] );
+			}if ( $replaced ) {
+				$profile['models'] = array();}
+			$profile['model']   = $model;
+			$profile['consent'] = ! empty( $input['consent'] );
+			$enabled            = ! empty( $input['enabled'] ) && ! $replaced;
+			if ( $enabled && ( ! $profile['consent'] || empty( $profile['key'] ) || ! in_array( $model, $profile['models'] ?? array(), true ) || ! $this->cipher->is_available() ) ) {
+				throw new \InvalidArgumentException( 'Verify this provider key, selected model and consent before enabling chat.' );}
+			$data['profiles'][ $provider ] = $profile;
+			$data['provider']              = $provider;
+			$data['enabled']               = $enabled;
+			$data['mcp']                   = ! empty( $input['mcp'] );
 			$this->persist( $data );
 			AiAudit::record( 'ai_settings', 'saved' );
 		} finally {
-			$this->unlock( $token );
-		}
+			$this->unlock( $token );}
 	}
-
-	/** Records account-visible supported choices without selecting one.
+	/** Records account-visible models for one unchanged profile.
 	 *
-	 * @param array       $models Account-visible model identifiers.
-	 * @param string|null $revision Revision captured before the network request.
-	 * @throws \RuntimeException For changed credentials or busy settings.
+	 * @param array       $models Exact account-visible IDs.
+	 * @param string|null $revision Revision before network access.
+	 * @param string      $provider Key's provider.
+	 * @throws \InvalidArgumentException For unknown providers.
 	 */
-	public function record_models( array $models, ?string $revision = null ): void {
+	public function record_models( array $models, ?string $revision = null, string $provider = 'openai' ): void {
 		AiAccess::require_admin();
-		$token = $this->lock();
-		try {
+		if ( ! isset( AiCatalog::MODELS[ $provider ] ) ) {
+			throw new \InvalidArgumentException( 'Unsupported AI provider.' );}
+		$token = $this->lock();try {
 			$data = $this->stored();
-			if ( null !== $revision && ! hash_equals( (string) ( $data['revision'] ?? '' ), $revision ) ) {
-				throw new \RuntimeException( 'AI settings changed. Refresh models again.' );
-			}
-			$data['models'] = array_values( array_intersect( self::MODELS, $models ) );
-			if ( ! in_array( $data['model'] ?? '', $data['models'], true ) ) {
-				$data['enabled'] = false;
-				$data['model']   = '';
-			}
+			$this->revision( $data, $revision );
+			$data['profiles'][ $provider ]['models'] = array_values( array_intersect( array_keys( AiCatalog::MODELS[ $provider ] ), $models ) );
+			if ( ( $data['provider'] ?? 'openai' ) === $provider && ! in_array( $data['profiles'][ $provider ]['model'] ?? '', $data['profiles'][ $provider ]['models'], true ) ) {
+				$data['enabled'] = false;}
 			$this->persist( $data );
 			AiAudit::record( 'ai_settings', 'models_refreshed' );
 		} finally {
-			$this->unlock( $token );
-		}
+			$this->unlock( $token );}
 	}
-
-	/** Verifies a settings write without disclosing stored values.
+	/** Checks the option revision.
 	 *
-	 * @param array $data Protected configuration.
-	 * @throws \RuntimeException When persistence fails.
+	 * @param array $data Stored option.
+	 * @param mixed $revision Expected token.
+	 * @throws \RuntimeException For stale or malformed tokens.
+	 */
+	private function revision( array $data, mixed $revision ): void {
+		if ( null !== $revision && ( ! is_string( $revision ) || ! hash_equals( (string) ( $data['revision'] ?? '' ), $revision ) ) ) {
+			throw new \RuntimeException( 'AI settings changed. Reload before saving.' );}}
+	/** Persists and verifies a versioned option.
+	 *
+	 * @param array $data Encrypted profiles.
+	 * @throws \RuntimeException For failed writes.
 	 */
 	private function persist( array $data ): void {
 		$data['revision'] = wp_generate_uuid4();
 		update_option( self::OPTION, $data, false );
 		if ( get_option( self::OPTION ) !== $data ) {
-			throw new \RuntimeException( 'AI settings could not be saved.' );
-		}
-	}
-
-	/** Serializes short settings writes; never holds a lock over a remote request.
+			throw new \RuntimeException( 'AI settings could not be saved.' );}}
+	/** Serializes short writes, never network requests.
 	 *
 	 * @throws \RuntimeException For busy settings.
 	 */
 	private function lock(): string {
 		$token = wp_generate_uuid4();
 		if ( ! add_option( self::OPTION . '_write_lock', $token, '', false ) ) {
-			throw new \RuntimeException( 'AI settings are busy. Try again after the current save.' );
-		}
-		return $token;
-	}
-
-	/** Releases only this operation's option lock.
+			throw new \RuntimeException( 'AI settings are busy.' );
+		}return $token;}
+	/** Releases only its own claim.
 	 *
-	 * @param string $token Write claim.
+	 * @param string $token Claim.
 	 */
 	private function unlock( string $token ): void {
 		if ( get_option( self::OPTION . '_write_lock' ) === $token ) {
-			delete_option( self::OPTION . '_write_lock' );
-		}
-	}
+			delete_option( self::OPTION . '_write_lock' );}}
 }

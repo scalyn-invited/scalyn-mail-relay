@@ -55,8 +55,9 @@ final class AiRepository {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Repository-owned encrypted insert.
 		$payload = $this->encode(
 			array(
-				'title'    => 'New chat',
-				'messages' => array(),
+				'title'              => 'New chat',
+				'auto_title_pending' => true,
+				'messages'           => array(),
 			)
 		);
 		$result  = $this->quiet(
@@ -93,11 +94,16 @@ final class AiRepository {
 			throw new \RuntimeException( 'Conversation list is unavailable.' );
 		}
 		return array_map(
-			fn( $row ) => array(
-				'uuid'       => $row['uuid'],
-				'title'      => $this->decode( $row['payload'] )['title'],
-				'updated_at' => $row['updated_at'],
-			),
+			function ( $row ) {
+				$session  = $this->decode( $row['payload'] );
+				$provider = $session['provider'] ?? ( empty( $session['messages'] ) ? '' : 'openai' );
+				return array(
+					'uuid'       => $row['uuid'],
+					'title'      => $session['title'],
+					'provider'   => isset( AiCatalog::PROVIDERS[ $provider ] ) ? $provider : '',
+					'updated_at' => $row['updated_at'],
+				);
+			},
 			$rows
 		);
 	}

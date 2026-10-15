@@ -99,7 +99,7 @@ final class CredentialCipher {
 	 * @throws \InvalidArgumentException When the context is unsupported.
 	 */
 	private function context( string $provider ): string {
-		if ( in_array( $provider, array( 'ai-openai', 'ai-session' ), true ) ) {
+		if ( in_array( $provider, array( 'ai-openai', 'ai-gemini', 'ai-claude', 'ai-session' ), true ) ) {
 			return 'scalyn:ai:' . $provider . ':v1';
 		}
 		if ( 'recovery-payload' === $provider ) {

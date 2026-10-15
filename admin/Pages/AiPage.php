@@ -8,7 +8,8 @@ namespace Scalyn\MailRelay\Admin\Pages;
 
 use Scalyn\MailRelay\AI\AiAccess;
 use Scalyn\MailRelay\AI\AiSettings;
-use Scalyn\MailRelay\AI\OpenAiAdapter;
+use Scalyn\MailRelay\AI\AiAdapters;
+use Scalyn\MailRelay\AI\AiCatalog;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -16,10 +17,10 @@ defined( 'ABSPATH' ) || exit;
 final class AiPage {
 	/** Creates the page.
 	 *
-	 * @param AiSettings    $settings Safe configuration repository.
-	 * @param OpenAiAdapter $adapter Model listing only after explicit administrator request.
+	 * @param AiSettings $settings Safe configuration repository.
+	 * @param AiAdapters $adapter Model listing only after explicit administrator request.
 	 */
-	public function __construct( private AiSettings $settings, private OpenAiAdapter $adapter ) {}
+	public function __construct( private AiSettings $settings, private AiAdapters $adapter ) {}
 
 	/** Renders the protected interface.
 	 *
@@ -43,16 +44,23 @@ final class AiPage {
 				}
 				// phpcs:ignore WordPress.Security.NonceVerification, WordPress.Security.ValidatedSanitizedInput -- Nonce checked above; strict action allowlist and repository validation below.
 				$action = isset( $_POST['ai_action'] ) && is_string( $_POST['ai_action'] ) ? wp_unslash( $_POST['ai_action'] ) : '';
+				// phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- Exact catalogue validation below; nonce checked above.
+				$model    = isset( $_POST['model'] ) && is_string( $_POST['model'] ) ? wp_unslash( $_POST['model'] ) : '';
+				$provider = '' !== $model ? AiCatalog::provider( $model ) : $this->settings->summary()['provider'];
 				if ( 'models' === $action ) {
-					$this->settings->record_models( $this->adapter->models(), $revision );
+					$this->settings->record_models( $this->adapter->for_provider( $provider )->models(), $revision, $provider );
 					$notice = __( 'Account-visible supported models refreshed. Select a model explicitly. This tests key access, not a generated answer.', 'scalyn-mail-relay' );
 				} elseif ( 'save' === $action ) {
-					$input = array( 'revision' => $revision );
-					foreach ( array( 'key', 'model' ) as $field ) {
+					$input = array(
+						'revision' => $revision,
+						'model'    => $model,
+					);
+					foreach ( array( 'key', 'consent', 'remove_key' ) as $field ) {
 						// phpcs:ignore WordPress.Security.NonceVerification, WordPress.Security.ValidatedSanitizedInput -- Secret is never echoed; repository validates type and exact syntax.
-						$input[ $field ] = isset( $_POST[ $field ] ) && is_string( $_POST[ $field ] ) ? wp_unslash( $_POST[ $field ] ) : '';
+						$value           = $_POST[ $field . '_' . $provider ] ?? '';
+						$input[ $field ] = 'key' === $field ? ( is_string( $value ) ? wp_unslash( $value ) : '' ) : '1' === $value;
 					}
-					foreach ( array( 'enabled', 'consent', 'mcp', 'remove_key' ) as $field ) {
+					foreach ( array( 'enabled', 'mcp' ) as $field ) {
 						// phpcs:ignore WordPress.Security.NonceVerification, WordPress.Security.ValidatedSanitizedInput -- Strict literal checkbox value, nonce checked above.
 						$input[ $field ] = isset( $_POST[ $field ] ) && '1' === $_POST[ $field ];
 					}
@@ -62,8 +70,19 @@ final class AiPage {
 					throw new \InvalidArgumentException();
 				}
 			} catch ( \Throwable $exception ) {
-				$error  = true;
-				$notice = __( 'AI settings could not be saved or verified. Check encryption, key, model selection and consent. No rejected values are displayed.', 'scalyn-mail-relay' );
+				$error        = true;
+				$known_errors = array(
+					'Enter a valid key for the selected provider.',
+					'The Claude key appears shortened. Use the full secret copied when the key was created.',
+					'Enter a new key or remove the saved key, not both.',
+					'Verify this provider key, selected model and consent before enabling chat.',
+					'AI settings changed. Reload this page.',
+					'AI settings changed. Reload before saving.',
+					'AI settings are busy.',
+					'AI settings could not be saved.',
+					'Unsupported AI provider.',
+				);
+				$notice       = $exception instanceof \Scalyn\MailRelay\AI\AiFailure || in_array( $exception->getMessage(), $known_errors, true ) ? $exception->getMessage() : __( 'AI settings could not be saved or verified. Check encryption, key, model selection and consent. No rejected values are displayed.', 'scalyn-mail-relay' );
 			}
 		}
 		$config = $this->settings->summary();

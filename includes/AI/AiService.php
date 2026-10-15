@@ -27,6 +27,7 @@ final class AiService {
 	 * @param string $uuid Private session.
 	 * @param string $text User question.
 	 * @throws \RuntimeException For disabled AI, unavailable context or exhausted history.
+	 * @throws AiFailure When a new chat is required to change vendors.
 	 */
 	public function send( string $uuid, string $text ): array {
 		AiAccess::require_admin();
@@ -38,13 +39,17 @@ final class AiService {
 		$token = $this->repository->claim( $uuid );
 		try {
 			$session = $this->repository->read( $uuid );
+			if ( ! empty( $session['messages'] ) && ( $session['provider'] ?? 'openai' ) !== $config['provider'] ) {
+				throw new AiFailure( 'ai_new_chat' );
+			}
 			if ( count( $session['messages'] ) > 98 ) {
 				throw new \RuntimeException( 'Conversation limit reached. Start a new chat.' );
 			}
-			$snapshot = $this->evidence->snapshot();
-			$history  = array();
+			$snapshot  = $this->evidence->snapshot();
+			$history   = array();
+			$truncated = count( $session['messages'] ) > 10;
 			foreach ( array_slice( $session['messages'], -10 ) as $message ) {
-				if ( false === ( $message['in_scope'] ?? true ) || ( 'assistant' === $message['role'] && false === ( $message['answer']['in_scope'] ?? true ) ) ) {
+				if ( ( 'user' === $message['role'] && false === ( $message['in_scope'] ?? true ) && ! AiScope::allows( $message['text'], array() ) ) || ( 'assistant' === $message['role'] && false === ( $message['answer']['in_scope'] ?? true ) ) ) {
 					continue;
 				}
 				$content = 'user' === $message['role'] ? $message['text'] : wp_json_encode( $message['answer'] );
@@ -53,14 +58,16 @@ final class AiService {
 						'role'    => $message['role'],
 						'content' => $content,
 					);
+				} else {
+					$truncated = true;
 				}
 			}
 			$history_size = strlen( wp_json_encode( $history ) );
 			while ( $history_size > 30000 ) {
+				$truncated = true;
 				array_shift( $history );
 				$history_size = strlen( wp_json_encode( $history ) );
 			}
-			$truncated = count( $history ) < count( $session['messages'] );
 			$history[] = array(
 				'role'    => 'user',
 				'content' => $text,
@@ -78,9 +85,16 @@ final class AiService {
 				$answer = AiScope::decline();
 			}
 			if ( $answer['in_scope'] ) {
-				$answer['observed']   = AiEvidence::observations( $snapshot );
-				$answer['references'] = array_values( array_unique( array_merge( $answer['references'], array( 'configuration', 'diagnostics', 'health', 'activity' ) ) ) );
+				$references           = ! empty( $answer['references'] ) ? $answer['references'] : array( 'configuration', 'diagnostics', 'health' );
+				$references           = array_values( array_unique( array_merge( array( 'configuration' ), $references ) ) );
+				$answer['observed']   = AiEvidence::observations( $snapshot, $references );
+				$answer['references'] = array_values( array_unique( $references ) );
 			}
+			if ( true === ( $session['auto_title_pending'] ?? false ) && empty( $session['messages'] ) ) {
+				$session['title']              = self::title_from_question( $text );
+				$session['auto_title_pending'] = false;
+			}
+			$session['provider']   = $config['provider'];
 			$session['messages'][] = array(
 				'role'     => 'user',
 				'in_scope' => $answer['in_scope'],
@@ -89,6 +103,8 @@ final class AiService {
 			);
 			$session['messages'][] = array(
 				'role'              => 'assistant',
+				'provider'          => $config['provider'],
+				'model'             => $config['model'],
 				'answer'            => $answer,
 				'at'                => gmdate( 'c' ),
 				'revision'          => $snapshot['revision'],
@@ -100,5 +116,25 @@ final class AiService {
 		} finally {
 			$this->repository->release( $uuid, $token );
 		}
+	}
+
+	/** Makes a bounded local title from the first saved, already-redacted question.
+	 *
+	 * @param string $question Validated question.
+	 */
+	private static function title_from_question( string $question ): string {
+		$words = preg_split( '/\s+/u', trim( $question ) );
+		$title = '';
+		foreach ( array_slice( $words, 0, 10 ) as $word ) {
+			$candidate = '' === $title ? $word : $title . ' ' . $word;
+			if ( mb_strlen( $candidate, 'UTF-8' ) > 60 ) {
+				break;
+			}
+			$title = $candidate;
+		}
+		if ( '' === $title ) {
+			$title = mb_substr( $question, 0, 60, 'UTF-8' );
+		}
+		return $title;
 	}
 }
