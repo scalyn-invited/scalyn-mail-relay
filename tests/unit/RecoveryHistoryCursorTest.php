@@ -7,15 +7,18 @@ use Scalyn\MailRelay\Database\RecoveryQueueRepository;
 final class RecoveryCursorWpdb extends WpdbStub {
 	public array $rows = array();
 	public array $reads = array();
+	public string $last_error = '';
 
-	public function get_results( string $query, string $output = OBJECT ): array {
+	public function query( string $query ): int|false {
 		$this->reads[] = $query;
 		$args = end( $this->prepare_calls )['args'];
 		$before = $args[1];
 		$uuid = str_contains( $query, 'logical_uuid<%s' ) ? $args[3] : null;
 		$rows = array_filter( $this->rows, static fn( $row ) => $row['created_at'] < $before || ( null !== $uuid && $row['created_at'] === $before && $row['logical_uuid'] < $uuid ) );
 		usort( $rows, static fn( $left, $right ) => strcmp( $right['created_at'], $left['created_at'] ) ?: strcmp( $right['logical_uuid'], $left['logical_uuid'] ) );
-		return array_slice( $rows, 0, 50 );
+		$this->last_error = '';
+		$this->last_result = array_map( static fn( $row ) => (object) $row, array_slice( $rows, 0, 50 ) );
+		return count( $this->last_result );
 	}
 }
 
