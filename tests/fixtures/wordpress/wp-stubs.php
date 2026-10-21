@@ -129,7 +129,7 @@ if ( ! defined( 'SCALYN_MAIL_RELAY_REST_NAMESPACE' ) ) {
 }
 
 if ( ! defined( 'SCALYN_MAIL_RELAY_VERSION' ) ) {
-	define( 'SCALYN_MAIL_RELAY_VERSION', '0.1.0' );
+	define( 'SCALYN_MAIL_RELAY_VERSION', '0.1.1-qa.1' );
 }
 
 if ( ! defined( 'SCALYN_MAIL_RELAY_URL' ) ) {
