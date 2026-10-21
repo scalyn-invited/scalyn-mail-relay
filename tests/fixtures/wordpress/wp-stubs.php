@@ -969,7 +969,7 @@ class WpdbStub {
 	/** Recorded raw query() calls, in call order. */
 	public array $queries = array();
 
-	/** Optional FIFO results for query(); empty means simulated success (1). */
+	/** Optional FIFO results for query(); empty defaults to SELECT row count or other-statement success (1). */
 	public array $query_returns = array();
 
 	/** Values returned by get_col(). */
@@ -986,6 +986,9 @@ class WpdbStub {
 
 	/** Rows returned by get_results(). Empty array = no rows. */
 	public array $get_results_return = array();
+
+	/** Object rows populated by successful SELECT query() calls, as in wpdb. */
+	public array $last_result = array();
 
 	/**
 	 * When true, insert() throws a RuntimeException to simulate a DB-layer exception.
@@ -1014,15 +1017,23 @@ class WpdbStub {
 	 * @return string The unmodified query template.
 	 */
 	/**
-	 * Records a raw query and reports success. Used by uninstall.php's
-	 * DROP TABLE statements.
+	 * Records a raw query. SELECT exposes configured rows through last_result;
+	 * other statements retain the default one-row success. FIFO overrides win.
 	 *
 	 * @param string $query The SQL statement.
 	 * @return int|false Simulated rows affected or failure.
 	 */
 	public function query( string $query ): int|false {
 		$this->queries[] = $query;
-		return array() !== $this->query_returns ? array_shift( $this->query_returns ) : 1;
+		$result = array() !== $this->query_returns ? array_shift( $this->query_returns ) : null;
+		if ( false === $result ) {
+			return false;
+		}
+		if ( preg_match( '/^\s*SELECT\b/i', $query ) ) {
+			$this->last_result = array_map( static fn( array $row ): object => (object) $row, $this->get_results_return );
+			return $result ?? count( $this->last_result );
+		}
+		return $result ?? 1;
 	}
 
 	public function prepare( string $query, mixed ...$args ): string {

@@ -150,12 +150,22 @@ class RecoveryQueueRepository {
 	 */
 	public function summaries( string $before = '9999-12-31 23:59:59' ): array {
 		global $wpdb;
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Bounded public read; encrypted payload and sender plan explicitly excluded.
-		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT logical_uuid,state,attempt_count,next_at,expires_at,created_at,reason FROM %i WHERE created_at<%s ORDER BY created_at DESC,logical_uuid DESC LIMIT 50', $wpdb->prefix . 'scalyn_recovery_queue', $before ), ARRAY_A );
-		if ( ! is_array( $rows ) ) {
+		$previous = $wpdb->suppress_errors( true );
+		try {
+			// get_results() discards query()'s false return, including failures before last_error is set.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Bounded metadata-only read; no payload or sender plan.
+			$result = $wpdb->query( $wpdb->prepare( 'SELECT logical_uuid,state,attempt_count,next_at,expires_at,created_at,reason FROM %i WHERE created_at<%s ORDER BY created_at DESC,logical_uuid DESC LIMIT 50', $wpdb->prefix . 'scalyn_recovery_queue', $before ) );
+			if ( false === $result || ! empty( $wpdb->last_error ) || ! is_array( $wpdb->last_result ) ) {
+				throw new \RuntimeException( 'Recovery history is unavailable.' );
+			}
+			// Match wpdb::get_results( ..., ARRAY_A ) without issuing a second query.
+			return array_map( 'get_object_vars', $wpdb->last_result );
+		} catch ( \Throwable $error ) {
+			// Never expose driver details, SQL, or a private previous exception.
 			throw new \RuntimeException( 'Recovery history is unavailable.' );
+		} finally {
+			$wpdb->suppress_errors( $previous );
 		}
-		return $rows;
 	}
 
 	/**
