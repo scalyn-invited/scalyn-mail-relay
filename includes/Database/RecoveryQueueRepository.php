@@ -145,16 +145,30 @@ class RecoveryQueueRepository {
 	/**
 	 * Credential/content-free read model, at most 50 recent rows.
 	 *
-	 * @param string $before Optional UTC timestamp cursor.
+	 * @param string      $before Optional UTC timestamp cursor.
+	 * @param string|null $before_uuid Last row UUID for stable same-second pagination; null keeps legacy time-only semantics.
+	 * @throws \InvalidArgumentException When either cursor component is malformed.
 	 * @throws \RuntimeException When history is unavailable.
 	 */
-	public function summaries( string $before = '9999-12-31 23:59:59' ): array {
+	public function summaries( string $before = '9999-12-31 23:59:59', ?string $before_uuid = null ): array {
 		global $wpdb;
+		if ( ! preg_match( '/^[1-9][0-9]{3}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$/D', $before ) || ( null !== $before_uuid && ! SubmissionAttemptRepository::uuid( $before_uuid ) ) ) {
+			throw new \InvalidArgumentException( 'Recovery history cursor is invalid.' );
+		}
+		$date = \DateTimeImmutable::createFromFormat( '!Y-m-d H:i:s', $before, new \DateTimeZone( 'UTC' ) );
+		if ( false === $date || $date->format( 'Y-m-d H:i:s' ) !== $before ) {
+			throw new \InvalidArgumentException( 'Recovery history cursor is invalid.' );
+		}
 		$previous = $wpdb->suppress_errors( true );
 		try {
 			// get_results() discards query()'s false return, including failures before last_error is set.
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Bounded metadata-only read; no payload or sender plan.
-			$result = $wpdb->query( $wpdb->prepare( 'SELECT logical_uuid,state,attempt_count,next_at,expires_at,created_at,reason FROM %i WHERE created_at<%s ORDER BY created_at DESC,logical_uuid DESC LIMIT 50', $wpdb->prefix . 'scalyn_recovery_queue', $before ) );
+			if ( null === $before_uuid ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Bounded metadata-only legacy timestamp read.
+				$result = $wpdb->query( $wpdb->prepare( 'SELECT logical_uuid,state,attempt_count,next_at,expires_at,created_at,reason FROM %i WHERE created_at<%s ORDER BY created_at DESC,logical_uuid DESC LIMIT 50', $wpdb->prefix . 'scalyn_recovery_queue', $before ) );
+			} else {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Bounded composite keyset read; no payload or sender plan.
+				$result = $wpdb->query( $wpdb->prepare( 'SELECT logical_uuid,state,attempt_count,next_at,expires_at,created_at,reason FROM %i WHERE (created_at<%s OR (created_at=%s AND logical_uuid<%s)) ORDER BY created_at DESC,logical_uuid DESC LIMIT 50', $wpdb->prefix . 'scalyn_recovery_queue', $before, $before, $before_uuid ) );
+			}
 			if ( false === $result || ! empty( $wpdb->last_error ) || ! is_array( $wpdb->last_result ) ) {
 				throw new \RuntimeException( 'Recovery history is unavailable.' );
 			}
