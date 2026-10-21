@@ -62,6 +62,7 @@ class RecoveryQueueRepository {
 	 *
 	 * @param int $now UTC Unix time.
 	 * @return array|null Private row with encrypted payload and claim token.
+	 * @throws \RuntimeException When the candidate read fails; never means no due work.
 	 */
 	public function claim( int $now ): ?array {
 		global $wpdb;
@@ -69,6 +70,9 @@ class RecoveryQueueRepository {
 		$at    = gmdate( 'Y-m-d H:i:s', $now );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Indexed bounded candidate read; ownership established by CAS below.
 		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE state=%s AND next_at<=%s AND expires_at>%s AND attempt_count<3 ORDER BY next_at,logical_uuid LIMIT 1', $table, 'pending', $at, $at ), ARRAY_A );
+		if ( ! empty( $wpdb->last_error ) ) {
+			throw new \RuntimeException( 'Recovery queue read is unavailable.' );
+		}
 		if ( ! is_array( $row ) ) {
 			return null;
 		}

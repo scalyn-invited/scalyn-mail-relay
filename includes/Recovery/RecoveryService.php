@@ -146,6 +146,8 @@ final class RecoveryService {
 				$this->audit( 'stopped', $row['logical_uuid'] );
 			}
 		} catch ( \Throwable $error ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Fixed operational text only; no SQL, exceptions or private queue content.
+			error_log( 'Scalyn Mail Relay: recovery worker could not complete. Check recovery storage and review retained work.' );
 			if ( null !== $row ) {
 				try {
 					$this->queue->finish( $row, 'review', 'storage_unavailable', time() );
