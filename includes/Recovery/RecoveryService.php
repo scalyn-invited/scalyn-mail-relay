@@ -73,15 +73,16 @@ final class RecoveryService {
 	 * No synchronous fallback after an ownership failure or duplicate claim.
 	 *
 	 * @param MailMessage $message Prepared private message.
+	 * @param array|null  $plan Trusted ordered targets already pinned by the bridge.
 	 * @return bool Whether durable ownership was established.
 	 */
-	public function own( MailMessage $message ): bool {
+	public function own( MailMessage $message, ?array $plan = null ): bool {
 		if ( ! $this->enabled() ) {
 			return false;
 		}
 		try {
 			$origin = MailOrigin::current();
-			$plan   = ( new RoutingRepository() )->plan( $this->settings, $origin );
+			$plan ??= ( new RoutingRepository() )->plan( $this->settings, $origin );
 			if ( array() === $plan ) {
 				$plan = array( $this->settings->configuration_target( $this->settings->get_active_configuration_id() ) );
 			}

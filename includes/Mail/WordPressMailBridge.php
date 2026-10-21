@@ -49,7 +49,12 @@ final class WordPressMailBridge {
 		}
 		$uuid = wp_generate_uuid4();
 		try {
-			$message = $this->prepare( $atts, $uuid );
+			$plan = ( new RoutingRepository() )->plan( $this->settings, MailOrigin::current() );
+			if ( array() === $plan && $this->recovery?->enabled() ) {
+				$plan = array( $this->settings->configuration_target( $this->settings->get_active_configuration_id() ) );
+			}
+			$target  = $plan[0] ?? null;
+			$message = $this->prepare( $atts, $uuid, $target );
 		} catch ( \Throwable $error ) {
 			// Do not copy even partially parsed customer content into the failure event.
 			$message = new MailMessage(
@@ -74,9 +79,8 @@ final class WordPressMailBridge {
 		}
 		try {
 			if ( $this->recovery?->enabled() ) {
-				return $this->recovery->own( $message );
+				return $this->recovery->own( $message, $plan );
 			}
-			$target = ( new RoutingRepository() )->plan( $this->settings, MailOrigin::current() )[0] ?? null;
 			return $this->dispatcher->dispatch( $message, $target )->success;
 		} catch ( \Throwable $error ) {
 			// Do not fabricate a preparation failure after dispatch may have started.
@@ -88,12 +92,13 @@ final class WordPressMailBridge {
 	 * Maps the common wp_mail shape without dropping unsupported headers or embeds.
 	 * The selected adapter performs the final address, size and attachment checks.
 	 *
-	 * @param mixed  $atts WordPress arguments after the wp_mail filter.
-	 * @param string $uuid Correlation allocated before preparation.
+	 * @param mixed      $atts WordPress arguments after the wp_mail filter.
+	 * @param string     $uuid Correlation allocated before preparation.
+	 * @param array|null $target Trusted pinned route, resolved before header validation.
 	 * @return MailMessage Prepared message.
 	 * @throws \InvalidArgumentException When a structure cannot be mapped safely.
 	 */
-	private function prepare( mixed $atts, string $uuid ): MailMessage {
+	private function prepare( mixed $atts, string $uuid, ?array $target ): MailMessage {
 		if ( ! is_array( $atts ) || ! is_string( $atts['subject'] ?? null ) || ! is_string( $atts['message'] ?? null ) ) {
 			throw new \InvalidArgumentException( 'Unsupported WordPress mail arguments.' );
 		}
@@ -123,7 +128,7 @@ final class WordPressMailBridge {
 			'brevo' => $this->settings->get_brevo_settings(),
 			default => $this->settings->get_sendgrid_settings(),
 		};
-		$from_email   = $config['from_email'];
+		$from_email   = $target['from'] ?? $config['from_email'];
 		$content_type = apply_filters( 'wp_mail_content_type', 'text/plain' );
 		$forwarded    = array();
 		$from_seen    = false;

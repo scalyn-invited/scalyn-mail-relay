@@ -65,6 +65,124 @@ final class WordPressMailBridgeTest extends TestCase {
 		);
 	}
 
+	private function routed_sender(): string {
+		$GLOBALS['_test_current_user_can'] = array( \Scalyn\MailRelay\Core\Capabilities::MANAGE_SETTINGS => true, 'manage_options' => true );
+		$this->settings->save( array( 'provider' => array( 'active' => 'sendgrid' ) ) );
+		$this->settings->configure( 'import' );
+		$default = $this->settings->get_active_configuration_id();
+		$this->settings->configure( 'create', 'sendgrid', 'Routed sender' );
+		$items = $this->settings->get_configurations();
+		$route = $items[1]['id'];
+		$this->settings->configure( 'select', $route );
+		$this->settings->save_sendgrid(
+			array( 'key_action' => 'replace', 'api_key' => self::KEY, 'from_email' => 'route@example.com', 'from_name' => 'Route' ),
+			new CredentialCipher( base64_encode( str_repeat( 'q', 32 ) ) )
+		);
+		$this->settings->configure( 'select', $default );
+		( new \Scalyn\MailRelay\Mail\RoutingRepository() )->save( true, array( 'unknown/default' => array( $route ) ), '', $this->settings );
+		return $route;
+	}
+
+	protected function tearDown(): void {
+		$GLOBALS['_test_current_user_can'] = array();
+		$GLOBALS['_test_wp_filters'] = array();
+	}
+
+	public function test_route_sender_is_validated_and_preserved_in_provider_payload(): void {
+		$this->routed_sender();
+		$this->assertTrue( $this->bridge->maybe_send( null, $this->atts( array( 'headers' => array( 'From: Route <route@example.com>' ) ) ) ) );
+		$this->assertCount( 1, $this->provider->requests );
+		$payload = json_decode( $this->provider->requests[0]['body'], true );
+		$this->assertSame( 'route@example.com', $payload['from']['email'] );
+		$this->assertSame( 'Route', $payload['from']['name'] );
+		$this->assertSame( 'sender@example.com', $this->settings->get_sendgrid_settings()['from_email'] );
+	}
+
+	public function test_default_sender_is_not_silently_replaced_by_route_sender(): void {
+		$this->routed_sender();
+		$failures = array();
+		$GLOBALS['_test_wp_actions'][HookNames::MAIL_FAILED] = static function( $result, $message ) use ( &$failures ): void {
+			$failures[] = array( $result, $message );
+		};
+		$this->assertFalse( $this->bridge->maybe_send( null, $this->atts( array( 'headers' => array( 'From: sender@example.com' ) ) ) ) );
+		$this->assertSame( array(), $this->provider->requests );
+		$this->assertCount( 1, $failures );
+		$this->assertSame( 'config', $failures[0][0]->failure_category );
+		$this->assertSame( '', $failures[0][1]->from );
+		$this->assertSame( array(), $failures[0][1]->to );
+		foreach ( array( 'sender@example.com', 'Subject', 'Body', self::KEY ) as $private ) {
+			$this->assertStringNotContainsString( $private, serialize( $failures ) );
+		}
+	}
+
+	public function test_no_from_header_uses_route_sender(): void {
+		$this->routed_sender();
+		$this->assertTrue( $this->bridge->maybe_send( null, $this->atts() ) );
+		$payload = json_decode( $this->provider->requests[0]['body'], true );
+		$this->assertSame( 'route@example.com', $payload['from']['email'] );
+	}
+
+	public function test_smtp_default_does_not_override_api_route_sender(): void {
+		$this->routed_sender();
+		$this->settings->configure( 'create', 'smtp', 'SMTP default' );
+		$items = $this->settings->get_configurations();
+		$this->settings->configure( 'select', $items[2]['id'] );
+		$this->settings->save( array( 'smtp' => array( 'host' => 'smtp.example.test', 'from_email' => 'smtp@example.com' ) ) );
+		$this->assertTrue( $this->bridge->maybe_send( null, $this->atts( array( 'headers' => array( 'From: route@example.com' ) ) ) ) );
+		$this->assertCount( 1, $this->provider->requests );
+		$payload = json_decode( $this->provider->requests[0]['body'], true );
+		$this->assertSame( 'route@example.com', $payload['from']['email'] );
+		$this->assertSame( 'smtp', $this->settings->get_active_provider_id() );
+	}
+
+	public function test_archived_route_fails_closed_without_default_fallback(): void {
+		$route = $this->routed_sender();
+		$this->settings->configure( 'archive', $route );
+		$this->assertFalse( $this->bridge->maybe_send( null, $this->atts() ) );
+		$this->assertSame( array(), $this->provider->requests );
+	}
+
+	public function test_synchronous_send_keeps_route_pinned_before_content_type_filters(): void {
+		$this->routed_sender();
+		add_filter( 'wp_mail_content_type', function( $type ) {
+			$routes = new \Scalyn\MailRelay\Mail\RoutingRepository();
+			$routes->save( true, array(), $routes->policy()['token'], $this->settings );
+			return $type;
+		} );
+		$this->assertTrue( $this->bridge->maybe_send( null, $this->atts( array( 'headers' => array( 'From: route@example.com' ) ) ) ) );
+		$this->assertCount( 1, $this->provider->requests );
+		$payload = json_decode( $this->provider->requests[0]['body'], true );
+		$this->assertSame( 'route@example.com', $payload['from']['email'] );
+	}
+
+	public function test_recovery_keeps_the_route_validated_before_content_type_filters(): void {
+		$route = $this->routed_sender();
+		$payloads = new \Scalyn\MailRelay\Recovery\RecoveryPayload( new CredentialCipher( base64_encode( str_repeat( 'q', 32 ) ) ) );
+		$queue = new class extends \Scalyn\MailRelay\Database\RecoveryQueueRepository {
+			public array $owned = array();
+			public function enqueue( string $logical, string $payload, int $now ): void {
+				$this->owned = array( 'logical' => $logical, 'payload' => $payload );
+			}
+		};
+		$GLOBALS['_test_wp_options'][\Scalyn\MailRelay\Recovery\RecoveryPolicyRepository::OPTION] = array( 'enabled' => true );
+		$registry = new ProviderRegistry();
+		$registry->register( $this->provider );
+		$dispatcher = new MailDispatcher( $registry, $this->settings );
+		$recovery = new \Scalyn\MailRelay\Recovery\RecoveryService( $queue, new \Scalyn\MailRelay\Recovery\RecoveryPolicyRepository(), $payloads, $dispatcher, $this->settings );
+		$bridge = new WordPressMailBridge( $this->settings, $dispatcher, $recovery );
+		add_filter( 'wp_mail_content_type', function( $type ) {
+			$routes = new \Scalyn\MailRelay\Mail\RoutingRepository();
+			$routes->save( true, array(), $routes->policy()['token'], $this->settings );
+			return $type;
+		} );
+		$this->assertTrue( $bridge->maybe_send( null, $this->atts( array( 'headers' => array( 'From: route@example.com' ) ) ) ) );
+		$this->assertSame( array(), $this->provider->requests );
+		$data = $payloads->open( $queue->owned['payload'], $queue->owned['logical'] );
+		$this->assertSame( $route, $data['plan'][0]['id'] );
+		$this->assertSame( 'route@example.com', $data['from'] );
+		$this->assertSame( $data['from'], $data['plan'][0]['from'] );
+	}
+
 	public function test_only_selected_sendgrid_short_circuits_wordpress_mail(): void {
 		$this->assertNull( $this->bridge->maybe_send( null, $this->atts() ) );
 		$this->settings->save( array( 'provider' => array( 'active' => 'sendgrid' ) ) );
