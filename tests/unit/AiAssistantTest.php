@@ -483,7 +483,7 @@ namespace {
    $GLOBALS['_test_wp_options']['scalyn_mail_relay_db_version']='0.13.0';$GLOBALS['_test_dbdelta_queries']=[];
    try{\Scalyn\MailRelay\Database\Migrator::migrate();$this->fail();}catch(RuntimeException $e){}
    $this->assertSame('0.13.0',get_option('scalyn_mail_relay_db_version'));$GLOBALS['wpdb']->missingAi=false;
-   \Scalyn\MailRelay\Database\Migrator::migrate();$this->assertSame('0.14.0',get_option('scalyn_mail_relay_db_version'));
+   \Scalyn\MailRelay\Database\Migrator::migrate();$this->assertSame(SCALYN_MAIL_RELAY_DB_VERSION,get_option('scalyn_mail_relay_db_version'));
    $before=count($GLOBALS['_test_dbdelta_queries']);\Scalyn\MailRelay\Database\Migrator::migrate();$this->assertCount($before,$GLOBALS['_test_dbdelta_queries']);
   }
   public function test_lost_claim_fence_blocks_inference_before_dispatch():void {

@@ -59,7 +59,7 @@ final class LifecycleTest extends TestCase {
 
 		Lifecycle::activate();
 
-		$this->assertSame( '0.1.1-qa.1', $GLOBALS['_test_wp_options']['scalyn_mail_relay_version'] );
+		$this->assertSame( '0.1.1-qa.2', $GLOBALS['_test_wp_options']['scalyn_mail_relay_version'] );
 	}
 
 	// -------------------------------------------------------------------------
