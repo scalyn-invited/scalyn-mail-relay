@@ -45,6 +45,18 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Bounded diagnostic retention that deletes complete diagnostic-run groups and
   independently expires health snapshots without inventing absent correlation.
 
+### 0.1.1-qa.2 local QA candidate (not released)
+
+- SMR-QA-03–07: route-aware WordPress sender validation, explicit recovery read
+  failures, composite recovery-history pagination and stronger AI credential-prose
+  screening. These source changes still need affected live-flow acceptance.
+- Add schema gate 0.15.0: convert the exact legacy MyISAM alert table to InnoDB
+  with verification before advancing the stored version; create fresh alerts on
+  InnoDB. The upgrade can rebuild/lock the table and requires a backup, database
+  privileges, maintenance window and staging recipient safeguard.
+- The tested ZIP is a local QA artifact, not a production release. GitHub CI and
+  local database checks do not establish staging acceptance or inbox delivery.
+
 ## [0.1.0] - 2026-09-04
 
 First MVP release: configure a mail provider, send through it, see what happened,

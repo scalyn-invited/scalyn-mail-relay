@@ -1,6 +1,7 @@
 # ADR 0041: Repair legacy alert storage engine
 
-Status: Local implementation; Bernie's schema/release review pending.
+Status: Implemented in draft PR #77; local migration tests passed. Jay's
+integration/release decision and controlled staging acceptance remain pending.
 
 ## Context
 
@@ -29,7 +30,8 @@ repository guards, enable a channel/recovery, change cron, or send anything.
 
 ## Operations and rollback
 
-Bernie must review before deployment. Back up structure/data first. ALTER may
+Jay must approve the migration and staging safeguards before installation. Back
+up structure/data first. ALTER may
 rebuild and lock a large table, requires ALTER permission, InnoDB support and
 free disk space, and implicitly commits. Schedule an appropriate maintenance
 window. Failure retains the old schema version but cannot roll back completed
@@ -47,4 +49,4 @@ isolated socket-only MariaDB with session default MyISAM. It covers installed
 0.14.0 upgrade, row/index preservation, fresh creation, both alert-table engines,
 versioning, no-op exclusion, missing-table failure and retry. It is not a full
 WordPress installation, scheduler/notification test, MySQL compatibility matrix
-or staging retest. Local QA builds are not owner-approved releases.
+or staging retest. Local QA builds are not production releases.

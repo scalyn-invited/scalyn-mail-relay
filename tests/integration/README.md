@@ -48,3 +48,27 @@ unrelated table preservation, local no-op exclusion completion, idempotence,
 missing-table failure without advancement and retry. Fresh additionally verifies
 explicit InnoDB before the new repair runs and executes the full migration chain.
 No mail, provider call, cron tick, channel enablement or recovery is invoked.
+
+## Recovery-history cursor (SMR-QA-07)
+
+The separate opt-in runner checks the current `RecoveryQueueRepository::summaries()`
+against WordPress 6.5 `wpdb` and real MariaDB SQL, rather than the in-memory unit
+stub. Use only a disposable, socket-only local server as above:
+
+```
+php -n -d extension=/path/to/mysqli.so \
+  tests/integration/recovery-history-real-db.php /path/to/wp-fixture \
+  /path/to/disposable/mysql.sock
+```
+
+The optional third argument selects a trusted local repository PHP file for a
+regression comparison; the fourth selects an unprivileged local database user
+(default: `$USER`). This runner authenticates without a password; it does not
+access a WordPress site. It checks `@@skip_networking=1` and the actual socket,
+creates a random `scalyn_qa07_history_<random>` schema, inserts 61 synthetic
+metadata rows with a non-secret payload, asserts 50/11 equal-timestamp pages
+without skips/duplicates, payload exclusion and legacy timestamp-only exclusion,
+then drops only that schema and reads back its
+absence. Fatal process termination can prevent cleanup; never point this runner
+at a customer or staging database. It does not exercise the installed UI, mail,
+providers, or live recovery.

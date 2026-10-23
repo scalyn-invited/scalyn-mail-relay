@@ -1,6 +1,8 @@
 # SMR-QA-07: recovery history composite cursor candidate
 
-Status: local source candidate; pending independent QA and Bernie's contract/integration review. No UI pagination is added.
+Status: included in draft integration PR #77; unit and isolated real-database
+cursor regressions passed. Live installed-site behavior remains unverified. No UI
+pagination is added.
 
 ## Calling contract
 
@@ -24,6 +26,18 @@ Cursors and rows contain only metadata already returned by this repository: no p
 
 ## Validation boundary
 
-The regression fixture evaluates the prepared comparison predicate in memory and asserts the exact keyset SQL shape, bound arguments, metadata projection, ordering and 50-row cap. It is NOT an actual MySQL/WordPress execution test. Test equal-timestamp pages on a disposable WordPress/database environment before runtime acceptance.
+The unit regression fixture evaluates the prepared comparison predicate in memory
+and asserts the exact keyset SQL shape, bound arguments, metadata projection,
+ordering and 50-row cap. The opt-in
+`tests/integration/recovery-history-real-db.php` test uses WordPress 6.5 `wpdb`
+against socket-only MariaDB 12.3.3: 61 persisted synthetic rows split into
+50/11 pages without skips or duplicates, synthetic payload excluded from history,
+legacy timestamp-exclusive behavior, and exact disposable-schema cleanup/readback.
+It failed against the older `origin/develop` reader at the expected equal-
+timestamp boundary. This is not a full WordPress installation, SQL-failure or
+invalid-cursor real-DB test, MySQL version matrix or live staging retest.
 
-QA-06's SQL-error distinction is a separate uncommitted branch under independent review; it is intentionally not bundled into this patch. Bernie must decide integration and review combined behavior before merge. No migrations, provider operations or deployment are part of this change.
+QA-06's SQL-error distinction is included in the same integration candidate.
+The recovery-history cursor change itself adds no migration, provider operation
+or deployment. Jay decides integration; do not infer live acceptance from unit
+coverage of the SQL shape.
