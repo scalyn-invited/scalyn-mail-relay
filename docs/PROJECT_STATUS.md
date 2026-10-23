@@ -15,8 +15,11 @@ reach real customer mail. Jay is the installer. Before an upgrade or any mail-
 affecting retest, establish the recipient safeguard, maintenance window, backup,
 database capacity/ALTER privileges, verification and rollback plan. The exact
 candidate ZIP and its checksum are recorded in
-[alert-engine QA](qa/alert-engine-repair.md). Historic status updates below
-preserve their original dates and context; they are not current approval gates.
+[alert-engine QA](qa/alert-engine-repair.md). Follow the
+[staging preflight](qa/staging-acceptance-preflight.md) before Jay uploads it.
+
+Historic status updates below preserve their original dates and context; they
+are not current approval gates.
 
 ## Historical provider update — 2026-10-06
 

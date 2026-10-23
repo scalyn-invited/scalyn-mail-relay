@@ -67,6 +67,8 @@ QA may clean up this dedicated leftover through an approved local DB workflow.
 ## Owner review, deployment and rollback
 
 Jay must decide the migration and staging safety plan before installation.
+See the [staging acceptance preflight](staging-acceptance-preflight.md) for the
+operator's concrete go/no-go, safeguards and read-only evidence sequence.
 Back up structure/data first; assess table size, ALTER permission, InnoDB support,
 free disk space and maintenance window. ALTER can lock/rebuild and implicitly
 commits. Failed version persistence does not undo completed engine conversion;
