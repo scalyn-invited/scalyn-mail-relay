@@ -22,9 +22,16 @@ ProviderInterface remains unchanged; SettingsRepository privately resolves trans
 configuration. SMTP uses the common bridge only when explicit routing is enabled;
 disabled routing preserves existing WordPress SMTP behavior.
 
-API bridge sender validation still checks the configured default authorized sender;
-after selecting a trusted route the dispatcher uses that route's authorized sender.
-This prevents user-supplied From headers from choosing or spoofing a route.
+API bridge sender validation originally checked the configured default authorized
+sender before selecting the route. Proposed SMR-QA-03 correction (pending Bernie's
+review): resolve the trusted route before preparing mail and validate any supplied
+From against its first target's authorized sender, or the configured default when
+no route applies. Missing From uses that same sender; a mismatched From fails
+closed rather than being silently replaced. Headers never select a route. Pass
+the same pinned ordered plan into recovery ownership so preparation filters cannot
+reroute already-validated mail. Direct RecoveryService callers may omit the plan
+and retain existing route resolution. Ordered recovery failover continues to use
+its explicitly configured alternate senders after proven nonacceptance.
 
 Existing webhook collectors are default-revision scoped. Non-default routed sends
 do not bind to the default source, even for the same provider. Absence of that

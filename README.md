@@ -22,14 +22,16 @@ freshness/status is displayed on Dashboard and Diagnostics. Backend execution st
 records UTC start/finish times and fixed failure stages, separately for scheduled
 runs. Complete diagnostic runs and their
 computed health snapshots now publish atomically (requires InnoDB tables).
-Alerts, API providers, and agency management remain roadmap work. See
-[Project Status](docs/PROJECT_STATUS.md) and the
-[Milestone 1 evidence](docs/qa/2026-09-21-milestone-1-completion.md).
-The local baseline is verified, not release-certified. Provider acceptance is
+The `0.1.1-qa.2` candidate also includes alerting/recovery, API providers,
+reporting, AI and agency screens; their availability in source does not establish
+end-to-end acceptance on the staging site. See [Project Status](docs/PROJECT_STATUS.md)
+and the [alert-engine QA record](docs/qa/alert-engine-repair.md). This is a QA
+candidate, not a production release: staging migration, scheduled evaluation,
+recipient safety and affected live flows remain open. Provider acceptance is
 not confirmed inbox delivery, and a high health score does not prove full
 authentication coverage or deliverability.
 
-## Known limitations in 0.1.0
+## Historical 0.1.0 limitations
 
 Recorded with rationale in
 [ADR-0002](docs/adr/0002-mvp-release-hardening-accepted-risks.md).
@@ -82,13 +84,14 @@ its verification steps.
 
 Never commit directly to `main` or `develop`.
 
-## Module ownership
+## Current project governance
 
-Bernie is the sole project owner and developer across Core, Mail, Providers,
-Database, Logging, Diagnostics, REST, Admin, assets, and future modules. Former
-team members have no continuing assignments or required review responsibilities.
-Module boundaries remain architectural boundaries; cross-module work is allowed
-within a focused task. See `AGENTS.md` for current engineering guidance.
+Jay directs current integration and release decisions for this repository through
+the `scalyn-invited` owner account; Bernie is no longer in the project review
+path. Older milestone records preserve their historical ownership context, not
+current approval requirements. Module boundaries remain architectural boundaries;
+cross-module work is allowed within a focused task. See `AGENTS.md` for current
+engineering guidance.
 
 ## First vertical slice
 1. Configure provider.

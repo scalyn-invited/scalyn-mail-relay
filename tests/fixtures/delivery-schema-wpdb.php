@@ -24,7 +24,7 @@ class DeliverySchemaWpdbStub extends WpdbStub {
 		if (str_contains($query,'SELECT ENGINE') && ($call['args'][0] ?? '') === $this->prefix.'scalyn_recovery_queue') { return $this->engine; }
 		if (str_contains($query,'SELECT ENGINE') && ($call['args'][0] ?? '') === $this->prefix.'scalyn_submission_attempts') { return $this->engine; }
 		if (($call['args'][0] ?? '') === $this->prefix.'scalyn_deliverability_evidence') { return $this->engine; }
-		if (str_contains($query,'SELECT ENGINE') && in_array(substr($call['args'][0] ?? '',strlen($this->prefix)), ['scalyn_diagnostics','scalyn_health_scores','scalyn_mail_logs','scalyn_mail_timeline'],true)) { return 'InnoDB'; }
+		if (str_contains($query,'SELECT ENGINE') && in_array(substr($call['args'][0] ?? '',strlen($this->prefix)), ['scalyn_alerts','scalyn_diagnostics','scalyn_health_scores','scalyn_mail_logs','scalyn_mail_timeline'],true)) { return 'InnoDB'; }
 		return $this->definition() ? $this->engine : parent::get_var($query);
 	}
 	public function get_col(string $query): array {

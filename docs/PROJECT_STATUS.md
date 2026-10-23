@@ -1,5 +1,28 @@
 # Project Status
 
+## Current QA candidate — 2026-10-23
+
+Jay directs current integration and release decisions; Bernie is not in the
+current approval path. Draft [PR #77](https://github.com/scalyn-invited/scalyn-mail-relay/pull/77)
+integrates the local `0.1.1-qa.2` candidate, including SMR-QA-03–07 and the
+versioned alert-table InnoDB repair (schema `0.15.0`). Local automated checks and
+PHP 8.2/8.3 CI passed; isolated MariaDB upgrade/fresh-install and recovery-
+history cursor checks passed.
+This is a QA candidate, **not a production release or live acceptance**.
+
+Staging was last observed on `0.1.1-qa.1` with a MyISAM alert table and can
+reach real customer mail. Jay is the installer. Before an upgrade or any mail-
+affecting retest, establish the recipient safeguard, maintenance window, backup,
+database capacity/ALTER privileges, verification and rollback plan. The exact
+candidate ZIP and its checksum are recorded in
+[alert-engine QA](qa/alert-engine-repair.md). Follow the
+[staging preflight](qa/staging-acceptance-preflight.md) before Jay uploads it.
+
+Historic status updates below preserve their original dates and context; they
+are not current approval gates.
+
+## Historical provider update — 2026-10-06
+
 Current owner update (2026-10-06): Bernie confirms SMTP2GO and Brevo sending QA
 is complete. Live webhook delivery/bounce/retry testing remains in the backlog.
 SendGrid remains deferred. Earlier pending sending-QA notes below are historical;

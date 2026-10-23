@@ -3,7 +3,7 @@
  * Plugin Name: Scalyn Mail Relay
  * Plugin URI: https://github.com/scalyn-invited/scalyn-mail-relay
  * Description: WordPress email delivery, diagnostics, monitoring and remediation platform.
- * Version: 0.1.0
+ * Version: 0.1.1-qa.2
  * Requires at least: 6.5
  * Requires PHP: 8.2
  * Update URI: https://github.com/scalyn-invited/scalyn-mail-relay
@@ -16,8 +16,8 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'SCALYN_MAIL_RELAY_VERSION', '0.1.0' );
-define( 'SCALYN_MAIL_RELAY_DB_VERSION', '0.14.0' );
+define( 'SCALYN_MAIL_RELAY_VERSION', '0.1.1-qa.2' );
+define( 'SCALYN_MAIL_RELAY_DB_VERSION', '0.15.0' );
 define( 'SCALYN_MAIL_RELAY_FILE', __FILE__ );
 define( 'SCALYN_MAIL_RELAY_PATH', plugin_dir_path( __FILE__ ) );
 define( 'SCALYN_MAIL_RELAY_URL', plugin_dir_url( __FILE__ ) );

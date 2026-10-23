@@ -73,15 +73,16 @@ final class RecoveryService {
 	 * No synchronous fallback after an ownership failure or duplicate claim.
 	 *
 	 * @param MailMessage $message Prepared private message.
+	 * @param array|null  $plan Trusted ordered targets already pinned by the bridge.
 	 * @return bool Whether durable ownership was established.
 	 */
-	public function own( MailMessage $message ): bool {
+	public function own( MailMessage $message, ?array $plan = null ): bool {
 		if ( ! $this->enabled() ) {
 			return false;
 		}
 		try {
 			$origin = MailOrigin::current();
-			$plan   = ( new RoutingRepository() )->plan( $this->settings, $origin );
+			$plan ??= ( new RoutingRepository() )->plan( $this->settings, $origin );
 			if ( array() === $plan ) {
 				$plan = array( $this->settings->configuration_target( $this->settings->get_active_configuration_id() ) );
 			}
@@ -145,6 +146,8 @@ final class RecoveryService {
 				$this->audit( 'stopped', $row['logical_uuid'] );
 			}
 		} catch ( \Throwable $error ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Fixed operational text only; no SQL, exceptions or private queue content.
+			error_log( 'Scalyn Mail Relay: recovery worker could not complete. Check recovery storage and review retained work.' );
 			if ( null !== $row ) {
 				try {
 					$this->queue->finish( $row, 'review', 'storage_unavailable', time() );
