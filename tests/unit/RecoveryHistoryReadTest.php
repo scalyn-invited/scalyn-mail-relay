@@ -12,10 +12,16 @@ final class RecoveryHistoryWpdb extends WpdbStub {
 	public string $mode = 'empty';
 	public bool $show_errors = true;
 	public int $history_reads = 0;
+	public bool $only_attempt_failure = false;
 
 	public function query( string $query ): int|false {
 		++$this->history_reads;
 		$this->queries[] = $query;
+		if ( $this->only_attempt_failure && ! str_starts_with( $query, 'SELECT attempt_uuid' ) ) {
+			$this->last_error = '';
+			$this->last_result = array();
+			return 0;
+		}
 		if ( 'early' === $this->mode ) {
 			return false; // No flush, no last_error, possibly stale last_result.
 		}
@@ -127,6 +133,24 @@ final class RecoveryHistoryReadTest extends TestCase {
 		$this->db->mode = $mode;
 		$html = $this->panel();
 		$this->assertSame( 1, $this->db->history_reads );
+		$this->assertStringContainsString( 'Recovery storage is unavailable', $html );
+		$this->assertStringNotContainsString( 'No retained recovery work.', $html );
+		$this->assertStringNotContainsString( 'PRIVATE', $html );
+		$this->assertStringNotContainsString( 'SELECT ', $html );
+		$this->assertFalse( $this->db->errors_suppressed );
+	}
+
+	/** @dataProvider panel_failures */
+	public function test_selected_attempt_history_failure_is_unavailable_not_empty( string $mode ): void {
+		$this->db->only_attempt_failure = true;
+		$this->db->mode = $mode;
+		$_GET['recovery_message'] = '11111111-1111-4111-8111-111111111111';
+		try {
+			$html = $this->panel();
+		} finally {
+			$_GET = array();
+		}
+		$this->assertSame( 2, $this->db->history_reads );
 		$this->assertStringContainsString( 'Recovery storage is unavailable', $html );
 		$this->assertStringNotContainsString( 'No retained recovery work.', $html );
 		$this->assertStringNotContainsString( 'PRIVATE', $html );

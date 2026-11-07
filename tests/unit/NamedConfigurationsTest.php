@@ -58,14 +58,14 @@ final class NamedConfigurationsTest extends TestCase {
 		$this->assertTrue($settings->configure('import'));
 		$this->assertSame($before,get_option(SettingsRepository::OPTION_KEY));
 	}
-	public function test_missing_key_import_preserves_legacy_sending_without_copying_plaintext(): void {
+	public function test_missing_key_import_is_rejected_without_mutating_legacy_sending(): void {
 		$this->legacy();
 		$settings=new SettingsRepository(new CredentialCipher('invalid'));
-		$settings->configure('import');
+		$before=get_option(SettingsRepository::OPTION_KEY);
+		try { $settings->configure('import'); $this->fail('A new import must not retain unprotected credentials.'); }
+		catch(RuntimeException $error) { $this->assertSame($before,get_option(SettingsRepository::OPTION_KEY)); }
 		$this->assertSame('private_password',$settings->get_smtp_config()['password']);
-		$catalog=get_option(SettingsRepository::OPTION_KEY)['configurations'];
-		$this->assertStringNotContainsString('private_password',wp_json_encode($catalog));
-		$this->assertTrue($catalog['revisions'][self::REVISION]['legacy']);
+		$this->assertSame([],$settings->get_configurations());
 		$this->expectException(RuntimeException::class);
 		$settings->configure('create','smtp','New');
 	}
@@ -190,8 +190,10 @@ final class NamedConfigurationsTest extends TestCase {
 		$this->assertSame($before,get_option(SettingsRepository::OPTION_KEY));
 	}
 	public function test_legacy_selector_edit_does_not_require_a_key_or_duplicate_plaintext(): void {
-		$this->legacy(); $settings=new SettingsRepository(new CredentialCipher('invalid'));
-		$settings->configure('import');
+		$this->legacy();
+		// Seed the exact legacy-reference shape that pre-QA4 imports could persist.
+		$GLOBALS['_test_wp_options'][SettingsRepository::OPTION_KEY]=NamedConfigurations::import(get_option(SettingsRepository::OPTION_KEY),new CredentialCipher('invalid'));
+		$settings=new SettingsRepository(new CredentialCipher('invalid'));
 		$settings->save(['advanced'=>['dkim_selector'=>'updated']]);
 		$this->assertNotSame(self::REVISION,$settings->get_diagnostic_revision());
 		$this->assertSame('private_password',$settings->get_smtp_config()['password']);

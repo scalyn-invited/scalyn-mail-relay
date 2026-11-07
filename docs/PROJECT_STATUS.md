@@ -1,6 +1,72 @@
 # Project Status
 
-## Current QA candidate — 2026-10-23
+## Release preflight — 2026-11-07
+
+QA5 active-version and corrected Dashboard acceptance are closed from Jay's
+screenshots. Current source still matches the verified QA5 package. A fresh
+production-lock Composer audit passed with no reported advisories or abandoned
+packages. Read-only GitHub access now works: draft PR #77 is still at the QA2
+commit and its successful checks do not cover uncommitted QA5 work. No commit,
+push, merge or deployment was performed. See the finite
+[release-preflight gates and integration inventory](qa/release-preflight-2026-11-07.md).
+
+## QA5 package — 2026-11-07
+
+Jay authorized packaging the reviewed Dashboard authentication-progress repair.
+The verified `0.1.1-qa.5` ZIP retains schema `0.15.0` and QA4 runtime fixes;
+[artifact identity, packaged tests and replacement guidance](qa/dashboard-progress-qa5.md)
+record its exact scope. Packaged-source strict suites passed on PHP 8.2/8.3/8.5.
+No agent live installation, new mail, remote Git integration or production release
+is claimed. Jay subsequently supplied visible QA5-active and corrected Dashboard
+acceptance evidence; this is not remote installed-file checksum verification.
+
+## Core-purpose follow-up — 2026-11-07
+
+Jay completed the dedicated-site SMTP wizard and supplied inbox, Email Logs,
+timeline and Dashboard evidence for an ordinary WordPress password-reset email.
+This closes that successful installed-site flow, not full release certification
+or exact installed-file identity. A local follow-up corrects the Dashboard's
+misleading authentication progress: a health snapshot no longer substitutes for
+three passing scoped SPF/DKIM/DMARC record checks. See
+[scope and verification](qa/core-purpose-2026-11-07.md). The QA4 ZIP and live site
+are unchanged by this patch; production integration/packaging remains separate.
+
+## Current local QA4 candidate — 2026-11-05
+
+Jay authorized the install-and-use SMTP, automatic protected first-save storage
+and strict-deprecation fixes. Version 0.1.1-qa.4 keeps schema 0.15.0. Selected
+SMTP now handles ordinary wp_mail without advanced routing/recovery. Authorized
+credential writes can initialize a separate private key; GET/send/workers cannot.
+Legacy reads remain compatible; new saves/imports are encrypted or rejected.
+All five PHP 8.5 reflection deprecations were removed. The strict suite passes
+on PHP 8.2.35, 8.3.36 and 8.5.12. QA4 package identity, final review and installed
+acceptance are recorded in [the QA4 record](qa/smtp-and-credential-protection-qa4.md).
+Final local results: 2,168 tests / 8,833 assertions on each runtime, independent
+review passed, and 168/168 exact-package installed checks passed. This closes
+the scoped local implementation/QA gates, not integration or production approval.
+Older acceptance/status sections below remain historical evidence, not current
+production approval. Staging, provider traffic and remote Git state are unchanged.
+
+
+## Readiness audit — 2026-11-01
+
+The local candidate is being evaluated against explicit acceptance gates in
+[the current readiness record](qa/release-readiness-2026-11-01.md). This is not a
+release approval. User-supplied October 31 staging SQL screenshots supersede the
+older staging state below: schema `0.15.0`, both alert tables InnoDB, and a
+`completed` evaluation timestamp that subsequently advanced. The engine-mismatch
+repair is verified narrowly; the latest observed evaluation was still overdue.
+Jay chose to retain native WordPress scheduling without adding cPanel cron.
+Custom SMTP is a transport option, not an alternative scheduler. Installed
+version `0.1.1-qa.2` is user-reported, not a remote artifact checksum.
+
+Local recovery read fixes and native-WP cron guidance are now implemented after
+Jay's authorization; [implementation evidence](qa/recovery-read-safety.md) records
+regressions, full checks and remaining gates. A verified `0.1.1-qa.3` QA ZIP is
+now available in that record; source changes remain uncommitted. No staging QA3
+installation or production approval is claimed.
+
+## Prior QA candidate record — 2026-10-23
 
 Jay directs current integration and release decisions; Bernie is not in the
 current approval path. Draft [PR #77](https://github.com/scalyn-invited/scalyn-mail-relay/pull/77)

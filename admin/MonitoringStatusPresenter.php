@@ -86,7 +86,7 @@ final class MonitoringStatusPresenter {
 			$schedule = ! $next || $actual !== $cadence
 				? __( 'Schedule missing or mismatched. Save the cadence in Settings and check WP-Cron.', 'scalyn-mail-relay' )
 				: ( $next < $now - 300
-					? __( 'Scheduled monitoring is overdue. Check the server cron trigger and WordPress cron lock.', 'scalyn-mail-relay' )
+					? __( 'Scheduled monitoring is overdue. WordPress normally runs WP-Cron when the site receives traffic. Check site traffic, WP-Cron configuration and locks, and host restrictions. If WP-Cron is disabled, verify the configured external cron trigger.', 'scalyn-mail-relay' )
 					: __( 'An event is scheduled; this does not prove it will execute on time.', 'scalyn-mail-relay' ) );
 		}
 		$success   = $state['last_scheduled_success'] ?? null;

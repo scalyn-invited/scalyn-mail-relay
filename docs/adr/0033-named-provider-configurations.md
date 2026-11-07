@@ -1,5 +1,14 @@
 # ADR 0033: Named configurations and immutable sending revisions
 
+> QA4 amendment (Jay-approved): [ADR 0042](0042-install-and-use-smtp-and-local-credential-key.md)
+> adds automatic separately stored local keys for authorized credential writes.
+> A manually configured external key is no longer mandatory on supported hosts.
+> The no-new-plaintext guarantee remains: fresh/legacy explicit SMTP saves and
+> imports encrypt or fail unchanged. Existing legacy read/selector compatibility
+> remains; missing keys are never silently replaced. Historical decisions below
+> describe the original external-key design, not a fresh plaintext exception.
+
+
 Owner: Bernie. Milestone 9, ticket 3.
 Status: implements the approved ticket scope; architecture/owner acceptance pending.
 

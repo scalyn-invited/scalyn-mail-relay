@@ -1,8 +1,21 @@
 # Local QA candidate: alert engine repair
 
-Status: plugin 0.1.1-qa.2 / schema 0.15.0 candidate in draft PR #77. Jay's
-integration/release decision and separately authorized staging retest remain
-outstanding. No release approval.
+Status: plugin 0.1.1-qa.2 / schema 0.15.0 candidate, historically recorded in
+draft PR #77; current remote PR/CI state is not reconfirmed. Narrow staging
+engine-repair verification is recorded below. Jay's integration/release decision
+and broader installed-site acceptance remain outstanding. No release approval.
+
+## Staging evidence update — 2026-11-01 audit
+
+Jay supplied October 31 read-only SQL screenshots confirming schema `0.15.0`,
+both alert tables InnoDB, and completed evaluations with a later advancing
+completion timestamp. This closes the narrow observed engine mismatch, not the
+full candidate acceptance. Evaluation freshness remained overdue; Jay chose to
+keep native WordPress scheduling without cPanel changes. The installed plugin
+version `0.1.1-qa.2` is user-reported, not remote ZIP checksum evidence.
+See the [current readiness record](release-readiness-2026-11-01.md) for exact
+image references, timestamps, current check results and outstanding gates.
+Earlier staging-retest statements below describe the original candidate handoff.
 
 ## Scope
 

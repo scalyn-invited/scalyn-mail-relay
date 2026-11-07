@@ -49,6 +49,31 @@ missing-table failure without advancement and retry. Fresh additionally verifies
 explicit InnoDB before the new repair runs and executes the full migration chain.
 No mail, provider call, cron tick, channel enablement or recovery is invoked.
 
+## Recovery read failure boundary (offline real wpdb)
+
+`recovery-read-wpdb.php` uses the same unmodified WordPress 6.5 `class-wpdb.php`
+fixture and hash listed above. It needs no database, mysqli extension, credentials,
+mail/provider transport or installed WordPress site:
+
+```sh
+php -n tests/integration/recovery-read-wpdb.php /path/to/wp-fixture
+```
+
+Optional `PLUGIN_ROOT` as the second argument selects a trusted local source tree
+for a baseline comparison. Only the repository's test helper functions are loaded;
+no WordPress/site bootstrap runs. Preparation and driver outcomes are explicit
+shims. Native `wpdb::query()`'s not-ready early false return, the native legacy
+readers' discarded returns, and native suppression/error logging/display behavior
+are exercised. SQL is never executed. The runner checks 32 combinations of claim
+versus submission history, early/SQL/thrown/empty result, prior suppression state
+and display-error state. Failed reads must throw a fixed unchained exception,
+produce no SQL/driver output or log, preserve the caller's error policy and do
+no claim writes. Successful empty reads preserve null/empty-array contracts.
+
+This complements unit cases for successful row reads, compare-and-set claim races,
+worker no-send behavior and unavailable UI; it is **not** a real-database test,
+actual MySQL-driver failure, installed-site or supported-version matrix test.
+
 ## Recovery-history cursor (SMR-QA-07)
 
 The separate opt-in runner checks the current `RecoveryQueueRepository::summaries()`

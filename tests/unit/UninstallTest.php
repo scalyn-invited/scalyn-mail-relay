@@ -138,6 +138,16 @@ final class UninstallTest extends TestCase {
 		$this->assertSame('keep me',$GLOBALS['_test_wp_options']['unrelated_plugin_option']);
 	}
 
+	public function test_local_key_marker_follows_data_policy_without_touching_separate_key_artifacts(): void {
+		$marker=['version'=>1,'blog_id'=>1,'fingerprint'=>str_repeat('a',64)];
+		$GLOBALS['_test_wp_options']['scalyn_mail_relay_local_key_state']=$marker;
+		$this->run_uninstall(false);
+		$this->assertSame($marker,$GLOBALS['_test_wp_options']['scalyn_mail_relay_local_key_state']);
+		$this->run_uninstall(true);
+		$this->assertArrayNotHasKey('scalyn_mail_relay_local_key_state',$GLOBALS['_test_wp_options']);
+		$this->assertSame('keep me',$GLOBALS['_test_wp_options']['unrelated_plugin_option']);
+	}
+
 	// -------------------------------------------------------------------------
 	// Retain mode — the default
 	// -------------------------------------------------------------------------

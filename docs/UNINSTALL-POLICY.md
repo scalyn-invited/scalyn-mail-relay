@@ -36,6 +36,24 @@ Unrelated plugin data and capabilities remain. Permanent deletion is recoverable
 only from a backup. Deactivation never deletes operational data, even when the
 uninstall policy is enabled.
 
+## Separate credential-key artifact (QA4)
+
+The automatic key directory `wp-content/scalyn-mail-relay-private/` is outside
+the plugin directory. It is retained on deactivation, replacement and both
+uninstall modes. Explicit data deletion removes the current site's nonsecret
+`scalyn_mail_relay_local_key_state` database marker, not the key file. This
+intentional exception preserves access to retained encrypted backups. A reinstall
+can use the retained valid private key; it never overwrites it. Do not remove it
+until encrypted records and backups no longer need it. Keep encrypted backups of
+the database and key, and restrict access: possession of both defeats the
+protection against a database-only disclosure. Managed external keys/constants
+also remain the operator's responsibility. See ADR 0042.
+
+The historical table/option examples above are not the complete current schema.
+The authoritative bounded owned-data list is in `uninstall.php`, including
+recovery, submission, connection/delivery and AI tables, their settings and
+owned locks. Unrelated site data is not selected for deletion.
+
 ## Retention versus uninstall
 
 Hourly retention removes expired operational history while the plugin is active;

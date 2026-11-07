@@ -23,7 +23,7 @@ class RecoveryQueueRepository {
 	 */
 	public function enqueue( string $logical, #[\SensitiveParameter] string $payload, int $now ): void {
 		global $wpdb;
-		if ( ! SubmissionAttemptRepository::uuid( $logical ) || ! str_starts_with( $payload, 'v1:' ) || strlen( $payload ) > 12000000 || ! add_option( self::LOCK, true, '', false ) ) {
+		if ( ! SubmissionAttemptRepository::uuid( $logical ) || ! in_array( substr( $payload, 0, 3 ), array( 'v1:', 'v2:' ), true ) || strlen( $payload ) > 12000000 || ! add_option( self::LOCK, true, '', false ) ) {
 			throw new \RuntimeException( 'Recovery ownership is unavailable.' );
 		}
 		try {
@@ -66,15 +66,25 @@ class RecoveryQueueRepository {
 	 */
 	public function claim( int $now ): ?array {
 		global $wpdb;
-		$table = $wpdb->prefix . 'scalyn_recovery_queue';
-		$at    = gmdate( 'Y-m-d H:i:s', $now );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Indexed bounded candidate read; ownership established by CAS below.
-		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE state=%s AND next_at<=%s AND expires_at>%s AND attempt_count<3 ORDER BY next_at,logical_uuid LIMIT 1', $table, 'pending', $at, $at ), ARRAY_A );
-		if ( ! empty( $wpdb->last_error ) ) {
+		$table    = $wpdb->prefix . 'scalyn_recovery_queue';
+		$at       = gmdate( 'Y-m-d H:i:s', $now );
+		$previous = $wpdb->suppress_errors( true );
+		try {
+			// get_row() discards query(false), including failures before last_error is initialized.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Indexed bounded candidate read; ownership established by CAS below.
+			$result = $wpdb->query( $wpdb->prepare( 'SELECT * FROM %i WHERE state=%s AND next_at<=%s AND expires_at>%s AND attempt_count<3 ORDER BY next_at,logical_uuid LIMIT 1', $table, 'pending', $at, $at ) );
+			if ( false === $result || ! empty( $wpdb->last_error ) || ! is_array( $wpdb->last_result ) ) {
+				throw new \RuntimeException( 'Recovery queue read is unavailable.' );
+			}
+			if ( array() === $wpdb->last_result ) {
+				return null;
+			}
+			$row = get_object_vars( $wpdb->last_result[0] );
+		} catch ( \Throwable $error ) {
+			// Do not expose SQL, driver details or a private previous exception.
 			throw new \RuntimeException( 'Recovery queue read is unavailable.' );
-		}
-		if ( ! is_array( $row ) ) {
-			return null;
+		} finally {
+			$wpdb->suppress_errors( $previous );
 		}
 		$token = wp_generate_uuid4();
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Atomic ownership; racing workers cannot both win.

@@ -9,7 +9,9 @@ use Scalyn\MailRelay\Database\DiagnosticRepository;
 use Scalyn\MailRelay\Database\HealthScoreRepository;
 
 final class DiagnosticScopeTest extends TestCase {
+	private CredentialCipher $cipher;
 	protected function setUp(): void {
+		$this->cipher = new CredentialCipher( base64_encode( str_repeat( 'x', 32 ) ) );
 		$GLOBALS['_test_wp_options'] = [];
 		$GLOBALS['_test_wp_option_write_failures'] = [];
 		$GLOBALS['_test_wp_actions'] = [];
@@ -18,7 +20,7 @@ final class DiagnosticScopeTest extends TestCase {
 	}
 
 	public function test_switching_back_never_revives_the_old_revision(): void {
-		$s = new SettingsRepository();
+		$s = new SettingsRepository( $this->cipher );
 		$s->save(['provider'=>['active'=>'smtp']]);
 		$first = $s->get_diagnostic_revision();
 		$s->save(['provider'=>['active'=>'postmark']]);
@@ -29,7 +31,7 @@ final class DiagnosticScopeTest extends TestCase {
 	}
 
 	public function test_smtp_and_selector_changes_rotate_but_policy_and_verification_do_not(): void {
-		$s = new SettingsRepository();
+		$s = new SettingsRepository( $this->cipher );
 		$s->save(['provider'=>['active'=>'smtp']]);
 		$previous = $s->get_diagnostic_revision();
 		foreach (['host'=>'smtp.test.example','port'=>465,'encryption'=>'ssl','username'=>'synthetic-user','password'=>'synthetic-password','from_email'=>'new@example.org'] as $key=>$value) {
@@ -48,9 +50,9 @@ final class DiagnosticScopeTest extends TestCase {
 	}
 
 	public function test_each_api_credential_and_sender_change_rotates_only_when_active(): void {
-		$cipher = new CredentialCipher(base64_encode(str_repeat('s',32)));
+		$cipher = $this->cipher;
 		foreach (['postmark','sendgrid'] as $provider) {
-			$s = new SettingsRepository();
+			$s = new SettingsRepository( $this->cipher );
 			$s->save(['provider'=>['active'=>$provider]]);
 			$method='save_'.$provider;
 			$input=['key_action'=>'replace','api_key'=>'synthetic-test-token-0123456789','from_email'=>'sender@example.org','from_name'=>'Sender'];
@@ -74,7 +76,7 @@ final class DiagnosticScopeTest extends TestCase {
 	}
 
 	public function test_failed_save_preserves_revision_and_initialization_failure_is_explicit(): void {
-		$s = new SettingsRepository();
+		$s = new SettingsRepository( $this->cipher );
 		$GLOBALS['_test_wp_option_write_failures'][SettingsRepository::OPTION_KEY]=true;
 		$this->assertFalse($s->save(['provider'=>['active'=>'postmark']]));
 		$this->assertSame('',$s->get_diagnostic_revision());
@@ -90,14 +92,14 @@ final class DiagnosticScopeTest extends TestCase {
 				$provider=>['from_email'=>'current@new.example','key_cipher'=>'private-cipher'],
 				'advanced'=>['dkim_selector'=>'selector1'],
 			];
-			$context=(new DiagnosticContextBuilder())->build(new SettingsRepository(),'site.example');
+			$context=(new DiagnosticContextBuilder())->build(new SettingsRepository( $this->cipher ),'site.example');
 			$this->assertSame('new.example',$context->domain);
 			$this->assertSame(['dkim_selector'=>'selector1'],$context->settings);
 		}
 	}
 
 	private function settings(): SettingsRepository {
-		$s=new SettingsRepository();
+		$s=new SettingsRepository( $this->cipher );
 		$s->save(['provider'=>['active'=>'smtp'],'smtp'=>['from_email'=>'sender@example.org']]);
 		return $s;
 	}

@@ -55,6 +55,14 @@ final class WizardViewTest extends TestCase {
 		return (string) ob_get_clean();
 	}
 
+	public function test_smtp_configuration_explains_automatic_storage_and_backup_dependency(): void {
+		$html=$this->render_view(3,'smtp');
+		$this->assertStringContainsString('Saving SMTP login fields uses protected storage', $html);
+		$this->assertStringContainsString('Back up WordPress files and database together', $html);
+		$this->assertStringContainsString('restores need the matching key', $html);
+		$this->assertStringContainsString('No manual server-key or cPanel setup is required on supported hosts', $html);
+	}
+
 	public function test_all_steps_have_accessible_progress_and_contextual_help(): void {
 		for ( $step = 1; $step <= 7; ++$step ) {
 			$output = $this->render_view( $step );

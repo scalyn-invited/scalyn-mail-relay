@@ -55,12 +55,13 @@ final class AiSettings {
 		return array_merge(
 			$active,
 			array(
-				'revision'   => (string) ( $data['revision'] ?? '' ),
-				'provider'   => $provider,
-				'profiles'   => $profiles,
-				'enabled'    => ! empty( $data['enabled'] ) && $active['verified'] && $active['has_key'] && $active['consent'] && $this->cipher->is_available(),
-				'mcp'        => ! empty( $data['mcp'] ),
-				'encryption' => $this->cipher->is_available(),
+				'revision'         => (string) ( $data['revision'] ?? '' ),
+				'provider'         => $provider,
+				'profiles'         => $profiles,
+				'enabled'          => ! empty( $data['enabled'] ) && $active['verified'] && $active['has_key'] && $active['consent'] && $this->cipher->is_available(),
+				'mcp'              => ! empty( $data['mcp'] ),
+				'encryption'       => $this->cipher->is_available(),
+				'encryption_setup' => $this->cipher->can_initialize(),
 			)
 		);
 	}
@@ -108,6 +109,7 @@ final class AiSettings {
 					'openai'=>preg_match( '/^sk-[A-Za-z0-9_-]{16,509}$/D', $key ), 'gemini'=>preg_match( '/^AIza[A-Za-z0-9_-]{20,508}$/D', $key ), 'claude'=>preg_match( '/^sk-ant-[A-Za-z0-9_-]{16,505}$/D', $key )};
 				if ( ! $valid ) {
 					throw new \InvalidArgumentException( 'Enter a valid key for the selected provider.' );}
+				$this->cipher->initialize_for_write();
 				$profile['key'] = $this->cipher->encrypt( $key, 'ai-' . $provider );
 			}
 			if ( ! empty( $input['remove_key'] ) ) {

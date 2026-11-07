@@ -49,7 +49,7 @@ final class AuditTest extends TestCase {
 		$this->assertSame(array('version'=>2,'source'=>'application','outcome'=>'accepted','changed_fields'=>array()), json_decode($row['metadata'],true));
 	}
 	public function test_settings_emit_changes_without_values_and_skip_noops(): void {
-		$repo = new SettingsRepository();
+		$repo = new SettingsRepository(new \Scalyn\MailRelay\Core\CredentialCipher(base64_encode(str_repeat('a',32))));
 		$repo->save(array('smtp'=>array('password'=>'private-password','username'=>'private-user','host'=>'private-host')));
 		$this->assertCount(1,$this->db->inserts);
 		$this->assertStringNotContainsString('private-',json_encode($this->db->inserts));

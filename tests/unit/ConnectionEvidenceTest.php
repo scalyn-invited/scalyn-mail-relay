@@ -4,6 +4,7 @@ use PHPUnit\Framework\TestCase;
 use Scalyn\MailRelay\Core\Capabilities;
 use Scalyn\MailRelay\Core\ConnectionVerification;
 use Scalyn\MailRelay\Core\SettingsRepository;
+use Scalyn\MailRelay\Core\CredentialCipher;
 use Scalyn\MailRelay\Core\ProviderRegistry;
 use Scalyn\MailRelay\Database\ConnectionEvidenceRepository;
 use Scalyn\MailRelay\Database\Migrator;
@@ -16,9 +17,11 @@ use Scalyn\MailRelay\Mail\SendResult;
 require_once dirname(__DIR__) . '/fixtures/delivery-schema-wpdb.php';
 
 final class ConnectionEvidenceTest extends TestCase {
+	private CredentialCipher $cipher;
 	private const REV='11111111-1111-4111-8111-111111111111';
 	private const TIME='2026-10-05 00:00:00.000000';
 	protected function setUp(): void {
+		$this->cipher = new CredentialCipher( base64_encode( str_repeat( 'x', 32 ) ) );
 		$GLOBALS['_test_wp_options']=['scalyn_mail_relay_db_version'=>'0.9.0',SettingsRepository::OPTION_KEY=>['provider'=>['active'=>'smtp'],'diagnostic_revision'=>self::REV]];
 		$GLOBALS['_test_current_user_can']=[Capabilities::MANAGE_SETTINGS=>true];
 		$GLOBALS['_test_wp_added_actions']=[];
@@ -31,7 +34,7 @@ final class ConnectionEvidenceTest extends TestCase {
 		unset($GLOBALS['wpdb']);
 	}
 	private function service(?SettingsRepository $settings=null,?ProviderRegistry $registry=null): ConnectionVerification {
-		return new ConnectionVerification($settings ?? new SettingsRepository(),$registry ?? new ProviderRegistry(),new ConnectionEvidenceRepository());
+		return new ConnectionVerification($settings ?? new SettingsRepository( $this->cipher ),$registry ?? new ProviderRegistry(),new ConnectionEvidenceRepository());
 	}
 	public function test_read_is_exact_scope_and_never_uses_legacy_verification(): void {
 		$GLOBALS['_test_wp_options'][SettingsRepository::OPTION_KEY]['provider']['verified']=true;
@@ -67,7 +70,7 @@ final class ConnectionEvidenceTest extends TestCase {
 		$this->assertSame('unknown',$this->service()->current()['status']);
 	}
 	public function test_scope_change_queries_new_revision_not_old_success(): void {
-		$settings=new SettingsRepository();
+		$settings=new SettingsRepository( $this->cipher );
 		$settings->save(['smtp'=>['host'=>'changed.example.com']]);
 		$this->assertSame('unknown',$this->service($settings)->current()['status']);
 		$call=end($GLOBALS['wpdb']->prepare_calls);
@@ -78,7 +81,7 @@ final class ConnectionEvidenceTest extends TestCase {
 		foreach(['pass','fail','throw'] as $mode) {
 			$GLOBALS['wpdb']=new WpdbStub();
 			$GLOBALS['_test_wp_options'][SettingsRepository::OPTION_KEY]=['provider'=>['active'=>'smtp'],'diagnostic_revision'=>self::REV];
-			$settings=new SettingsRepository();
+			$settings=new SettingsRepository( $this->cipher );
 			$registry=new ProviderRegistry();
 			$registry->register(new class($mode,$settings) implements ProviderInterface {
 				public function __construct(private string $mode,private SettingsRepository $settings) {}

@@ -1,7 +1,56 @@
 # Release Checklist
 
+## QA5 candidate-specific gates — 2026-11-07
+
+See [QA5 package verification](qa/dashboard-progress-qa5.md). These are QA gates,
+not production approval or proof of live installation.
+
+- [x] Dashboard authentication-progress defect reproduced and fixed with scoped result checks.
+- [x] Independent Dashboard review and installed local failure/render checks passed.
+- [x] Distinct QA5 version, unchanged schema, verified archive/source/dependency identity.
+- [x] Extracted-package strict regression suites pass PHP 8.2/8.3/8.5; production autoload, PHP lint and WPCS pass.
+- [x] Independent QA5 packaging audit recorded against exact ZIP hash.
+- [x] Dedicated-site replacement and corrected Dashboard progress observed (QA5 active and grey authentication step; user screenshots, not remote file checksums).
+- [x] Fresh locked-production Composer audit passed with no reported advisories/abandoned packages (November 7 preflight; no dependency change).
+- [ ] Review/integrate QA5 source and verify new remote CI against its actual commit.
+- [ ] Close agreed supported-environment compatibility gaps.
+- [ ] Jay explicitly approves production feature/support scope and deferred limitations.
+- [ ] Verify final production-version artifact and obtain separate release/rollout authorization.
+
+The finite remaining gates and exact current GitHub/advisory evidence are in
+[the November 7 release preflight](qa/release-preflight-2026-11-07.md). Historical
+QA4/auth/acceptance notes below are provenance, not reopened QA5 display gates.
+
+## QA4 candidate-specific gates — 2026-11-05
+
+Do not reuse historical release checkboxes as approval of this candidate.
+See [the QA4 verification record](qa/smtp-and-credential-protection-qa4.md).
+
+- [x] Default SMTP regression reproduced and fixed without enabling routing/recovery.
+- [x] Fresh credential plaintext regression reproduced and fixed without mandatory cPanel/key setup.
+- [x] Side-effect-free reads, explicit key initialization, key loss/corruption and legacy boundaries tested locally.
+- [x] Five pre-existing PHP 8.5 deprecations fixed; strict local suite passes three PHP runtimes.
+- [x] Current independent security/logic verdict and source identity confirmed.
+- [x] Exact QA4 ZIP installed-site functional/lifecycle acceptance confirmed (168/168).
+- [ ] Supported full WordPress/database version matrix verified beyond tested combinations.
+- [ ] Current integrated remote CI verified (uncommitted work has no CI result).
+- [ ] Controlled staging/real-provider acceptance and Jay's release approval.
+
+No push, merge, staging deployment or real mail is authorized by these local checks.
+
+
 Run through this list for every tagged release. Record the evidence (command
 output, screenshots) against the release entry in `docs/releases/`.
+
+## Current candidate evidence
+
+The [2026-11-01 readiness record](qa/release-readiness-2026-11-01.md) is the
+candidate-specific pass/open checklist. Items below are historical provenance,
+not reusable approvals. In particular the old six-table counts, POST-handler
+inventory and initial-release upgrade exemption are not current contracts.
+That earlier QA3 baseline completed with five PHP 8.5 deprecations. QA4 fixes
+those deprecations and passes the strict three-runtime local gate above.
+Current integrated remote CI still needs verification before release.
 
 ## Evidence status
 
@@ -166,5 +215,8 @@ unzip -l scalyn-mail-relay-*.zip | grep -E "tests/|docs/|\.github/|phpunit|phpcs
 - [ ] PR reviewed and merged to `develop`, then `develop` → `main` — first half done: PR #40 merged to `develop` 2026-09-04 with CI green, though GitHub records **no reviewer** on it. `develop` → `main` is still owed
 - [ ] Tag created on `main`
 - [ ] GitHub release created with the ZIP attached
-- [ ] Rollback notes recorded: previous tag, and whether the DB version changed
-      (a DB version bump means rollback needs a restore, not just a downgrade)
+- [ ] Rollback notes recorded: previous tag and schema changes. Assess each
+      migration explicitly: an engine-only conversion may safely retain InnoDB
+      with older code. Do not automatically reverse engines, lower the stored
+      version, or restore an old database over newer activity. Destructive schema
+      changes may require an approved restore/data-reconciliation plan.

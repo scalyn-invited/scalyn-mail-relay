@@ -1,5 +1,12 @@
 # ADR 0034 — Explicit mail origin and pinned ordered routes
 
+> QA4 amendment (Jay-approved): [ADR 0042](0042-install-and-use-smtp-and-local-credential-key.md)
+> supersedes only default selected-SMTP pass-through. With advanced routing and
+> recovery disabled, ordinary wp_mail uses selected SMTP synchronously and fails
+> without PHP-mail fallback. Earlier short-circuits remain respected. API defaults,
+> explicit advanced routing, pinned recovery and consent semantics below remain.
+
+
 Owner: Bernie. Implementation decision under the approved Milestone 9 plan.
 
 Routing is an opt-in option repository, independently versioned and non-autoloaded.
@@ -23,8 +30,8 @@ configuration. SMTP uses the common bridge only when explicit routing is enabled
 disabled routing preserves existing WordPress SMTP behavior.
 
 API bridge sender validation originally checked the configured default authorized
-sender before selecting the route. Proposed SMR-QA-03 correction (pending Bernie's
-review): resolve the trusted route before preparing mail and validate any supplied
+sender before selecting the route. The candidate SMR-QA-03 correction (pending Jay's
+integration review): resolve the trusted route before preparing mail and validate any supplied
 From against its first target's authorized sender, or the configured default when
 no route applies. Missing From uses that same sender; a mismatched From fails
 closed rather than being silently replaced. Headers never select a route. Pass

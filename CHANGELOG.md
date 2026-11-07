@@ -7,6 +7,39 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### 0.1.1-qa.5 local candidate (not a production release)
+
+- Dashboard authentication progress now requires explicit passing recorded SPF,
+  DKIM and DMARC checks for the selected configuration. Unknown, warning, failed,
+  missing or duplicate findings do not complete the step merely because a health
+  snapshot exists. Labels distinguish recorded DNS checks from actual message
+  authentication.
+- Retain QA4 SMTP and credential-protection fixes; schema remains 0.15.0.
+- Isolated ordinary WordPress SMTP authentication-rejection verification passed,
+  including Failed history, safe guidance, no PHP-mail fallback or automatic resend.
+
+### 0.1.1-qa.4 local candidate (not a production release)
+
+- Selected Custom SMTP handles ordinary WordPress mail synchronously without
+  requiring opt-in routing or recovery; failures do not fall back to PHP mail.
+- Protect fresh SMTP login saves even before a named configuration catalogue
+  exists. Authorized credential writes can initialize a separate private site
+  key without mandatory cPanel or external-key setup; reads/sends/workers cannot
+  initialize or replace a key. External v1 and local v2 envelopes retain their
+  own key-source/context identity.
+- Preserve existing legacy reads; explicit login saves/imports must protect them
+  or fail unchanged. Back up the matching key with the database. The separate
+  key artifact intentionally survives replacement and both uninstall modes;
+  database-data deletion removes its nonsecret marker, not that artifact.
+- Remove five PHP 8.5 reflection deprecations in tests rather than suppress them.
+- Preserve the earlier QA3 fail-closed recovery/history reads and honest
+  traffic-driven WordPress scheduling guidance. Schema remains 0.15.0.
+- Candidate-specific independent review, installed acceptance, compatibility,
+  integration and release gates are recorded in the QA4 verification document;
+  these local changes do not authorize deployment or real-provider mail.
+
+### Earlier unreleased work
+
 - Show overdue schedules, stale evidence, safe execution failures and unconfirmed
   completion on Dashboard and Diagnostics; document and verify low-traffic cron.
 
