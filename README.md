@@ -18,6 +18,21 @@ Scalyn Mail Relay is a WordPress Email Operations Platform focused on delivery, 
 The WordPress and PHP minimums are enforced at activation. CI runs checks on
 PHP 8.2 and 8.3; it is not a live WordPress/database compatibility matrix.
 
+## 0.1.1 support scope
+
+The supported first-release workflow is single-site Custom SMTP, ordinary
+WordPress mail, metadata Email Logs and terminal timelines, Dashboard visibility,
+and manual diagnostics. Advanced routing and recovery are optional and disabled
+by default; ordinary SMTP sending does not require them.
+
+API providers, webhooks, routing/recovery, agency and AI surfaces remain in the package
+unchanged. They are outside this SMTP-first acceptance scope, not removed or
+newly certified by the 0.1.1 package. Multisite is unsupported. External provider
+acceptance never proves inbox delivery. Visual/mobile/keyboard accessibility,
+every SMTP/TLS failure mode and every supported-version combination have not
+been exhaustively certified. A production-version ZIP is not a release approval;
+publication and deployment require Jay's separate authorization.
+
 ## Current implementation status
 
 SMTP sending, manual DNS/SMTP diagnostics, persisted health scoring, and
@@ -27,7 +42,7 @@ freshness/status is displayed on Dashboard and Diagnostics. Backend execution st
 records UTC start/finish times and fixed failure stages, separately for scheduled
 runs. Complete diagnostic runs and their
 computed health snapshots now publish atomically (requires InnoDB tables).
-The `0.1.1-qa.4` candidate makes selected Custom SMTP handle ordinary `wp_mail()`
+Version `0.1.1` retains QA4/QA5 fixes: selected Custom SMTP handles ordinary `wp_mail()`
 synchronously without enabling advanced routing or recovery. Earlier mail
 short-circuits are preserved; SMTP failure never silently falls back to PHP mail.
 Other API-provider routing behavior is unchanged. Use only one mail-control plugin.
@@ -57,8 +72,9 @@ checking retained backups and encrypted records. See
 [ADR 0042](docs/adr/0042-install-and-use-smtp-and-local-credential-key.md),
 [uninstall policy](docs/UNINSTALL-POLICY.md), [Project Status](docs/PROJECT_STATUS.md)
 and the [QA4 verification record](docs/qa/smtp-and-credential-protection-qa4.md).
-This is a QA candidate, not a production release. Prior QA3 installed acceptance
-and staging screenshots do not establish acceptance of QA4 or current inbox delivery.
+The production-version package retains the reviewed QA5 runtime, with version
+metadata updated. Earlier installed acceptance retains its original artifact
+identity; it does not establish every installed byte or future inbox delivery.
 Scheduling uses WordPress cron without a required cPanel setup; low traffic or
 host restrictions can delay work and must not be presented as a fixed cadence.
 Custom SMTP is a transport option, not a scheduler fallback. Provider acceptance is

@@ -5,7 +5,20 @@ All notable changes to Scalyn Mail Relay will be documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.1] — locally prepared; publication pending
+
+- Carry forward the reviewed QA5 runtime with production version metadata and
+  unchanged database schema 0.15.0. No new provider behavior or migration.
+- Support scope is single-site Custom SMTP, ordinary WordPress mail,
+  metadata logs/timelines, Dashboard visibility and manual diagnostics.
+- Optional API providers/webhooks/routing/recovery/agency/AI remain present and
+  unchanged, outside this SMTP-first acceptance scope. Routing/recovery remain
+  disabled by default. See README for retained limitations and key backups.
+- Preparing this package does not authorize a release, merge or deployment.
+
+## Historical development notes leading to 0.1.1
+
+The following QA labels record earlier checkpoints, not additional releases.
 
 ### 0.1.1-qa.5 local candidate (not a production release)
 

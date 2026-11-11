@@ -1,5 +1,21 @@
 # Project Status
 
+## Version 0.1.1 local preparation — 2026-11-11
+
+Jay approved the SMTP-first scope and production-version package preparation,
+with optional features unchanged and no publication or deployment. The exact
+`0.1.1` ZIP passed 162 installed checks on WordPress 7.1.4 / PHP 8.2 / MySQL 8.0,
+plus packaged strict PHP 8.2/8.3/8.5 suites, WPCS, syntax, 52 JavaScript tests and
+a refreshed production-lock audit. Schema remains `0.15.0`; runtime changes from
+QA5 are version literals only. Final independent review passed with no blocking
+security, logic or finite-scope evidence gaps; parent readback verified the pinned
+reviewed-file hashes and unchanged ZIP. Two nonblocking tooling/evidence suggestions
+remain disclosed. See the
+[artifact identity, evidence and remaining approvals](qa/release-0.1.1-2026-11-11.md).
+Earlier entries describe their original state; QA5 integration and minimum-DB
+acceptance subsequently completed in local artifact records. No current version
+commit/push, production publication, deployment or new real-mail send is claimed.
+
 ## Release preflight — 2026-11-07
 
 QA5 active-version and corrected Dashboard acceptance are closed from Jay's
