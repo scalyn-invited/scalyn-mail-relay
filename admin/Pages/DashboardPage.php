@@ -90,7 +90,17 @@ final class DashboardPage {
 		$health_components         = $health['components'];
 		$health_summary            = $health['summary'];
 		$has_completed_diagnostics = null !== $health['created_at'];
-		$score_freshness           = \Scalyn\MailRelay\Admin\MonitoringStatusPresenter::evidence( $health['created_at'], $settings->get_diagnostic_schedule(), time() );
+
+		// A completed run or high score does not mean every authentication check passed.
+		$authentication_records_passed = true;
+		foreach ( array( 'spf_record', 'dkim_record', 'dmarc_policy' ) as $check_name ) {
+			$matching = array_values( array_filter( $diagnostic_scope['results'], static fn( array $row ): bool => ( $row['check_name'] ?? '' ) === $check_name ) );
+			if ( 1 !== count( $matching ) || 'pass' !== ( $matching[0]['status'] ?? '' ) ) {
+				$authentication_records_passed = false;
+				break;
+			}
+		}
+		$score_freshness = \Scalyn\MailRelay\Admin\MonitoringStatusPresenter::evidence( $health['created_at'], $settings->get_diagnostic_schedule(), time() );
 
 		// Wire the "Run Diagnostics" button to the REST endpoint.
 		$diagnostics_run_url = rest_url( 'scalyn-mail-relay/v1/diagnostics/run' );

@@ -112,6 +112,8 @@ final class DataControlsPageTest extends TestCase {
 		$html = $this->render();
 		$this->assertStringContainsString( '100 messages', $html );
 		$this->assertStringContainsString( 'WP-Cron', $html );
+		$this->assertStringContainsString( 'The separate encryption key file is retained even when data deletion is enabled.', $html );
+		$this->assertStringContainsString( 'matching encryption key', $html );
 		$this->assertStringNotContainsString( 'secret-value', $html );
 		$this->assertStringContainsString( 'scalyn-mail-relay-data-controls', $html );
 	}

@@ -128,7 +128,8 @@ final class ApiWebhookSettings {
 					'password' => $password,
 				)
 			);
-			$envelope    = $this->cipher->encrypt( $credentials, $this->provider . '-webhook' );
+			$this->cipher->initialize_for_write();
+			$envelope = $this->cipher->encrypt( $credentials, $this->provider . '-webhook' );
 		}
 		unset( $credentials );
 		$draft = array(

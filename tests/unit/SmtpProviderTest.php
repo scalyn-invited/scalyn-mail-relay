@@ -320,6 +320,23 @@ final class SmtpProviderTest extends TestCase {
 		$this->assertStringNotContainsStringIgnoringCase( 'delivered', (string) $result->response_message );
 	}
 
+	public function test_configured_name_is_not_borrowed_by_another_sender_address(): void {
+		$mailer = new StubPHPMailer();
+		$message = new MailMessage( 'synthetic-name', 'other@example.com', array( 'to@example.com' ), 'Subject', 'Body' );
+		$this->assertTrue( $this->make_provider( $mailer )->send( $message, $this->valid_config() )->success );
+		$this->assertSame( '', $mailer->FromName );
+		$this->assertSame( 'other@example.com', $mailer->From );
+	}
+
+	public function test_configured_sender_name_injection_is_rejected_before_connect(): void {
+		$mailer = new StubPHPMailer();
+		$config = $this->valid_config();
+		$config['from_name'] = "Synthetic\r\nBcc: hidden@example.com";
+		$this->assertFalse( $this->make_provider( $mailer )->send( $this->make_message(), $config )->success );
+		$this->assertSame( 0, $mailer->connect_calls );
+		$this->assertSame( 0, $mailer->send_calls );
+	}
+
 	public function test_send_success_provider_id_is_smtp(): void {
 		$result = $this->make_provider()->send( $this->make_message(), $this->valid_config() );
 		$this->assertSame( 'smtp', $result->provider );

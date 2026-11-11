@@ -262,6 +262,13 @@ class SmtpProvider implements ProviderInterface {
 					failure_category: TransportFailureCategory::CONFIG
 				);
 			}
+			// A bare configured address must not erase its validated display name.
+			if ( '' === $from['name'] && 0 === strcasecmp( $from['email'], (string) $config['from_email'] ) ) {
+				$from['name'] = (string) ( $config['from_name'] ?? '' );
+				if ( preg_match( '/[\r\n\x00]/', $from['name'] ) ) {
+					return new SendResult( false, 'smtp', failure_category: TransportFailureCategory::CONFIG );
+				}
+			}
 			$mailer->setFrom( $from['email'], $from['name'] );
 
 			// Validate and add recipient addresses.

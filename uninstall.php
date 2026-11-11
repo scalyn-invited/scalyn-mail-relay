@@ -46,6 +46,9 @@ delete_option( 'scalyn_mail_relay_postmark_webhook' );
 delete_option( 'scalyn_mail_relay_agency' );
 delete_option( 'scalyn_mail_relay_branding' );
 delete_option( 'scalyn_mail_relay_settings_write_lock' );
+// The separately managed local key file is retained for backup recovery (ADR 0042).
+// Remove only this site's nonsecret database marker under explicit data deletion.
+delete_option( 'scalyn_mail_relay_local_key_state' );
 delete_option( 'scalyn_mail_relay_routing' );
 delete_option( 'scalyn_mail_relay_routing_lock' );
 delete_option( 'scalyn_mail_relay_recovery' );

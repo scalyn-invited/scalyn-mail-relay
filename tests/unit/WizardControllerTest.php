@@ -102,7 +102,6 @@ final class WizardControllerTest extends TestCase {
 		// Reset Plugin singleton so each test gets a fresh Container.
 		$reflection = new ReflectionClass( Plugin::class );
 		$prop       = $reflection->getProperty( 'instance' );
-		$prop->setAccessible( true );
 		$prop->setValue( null, null );
 
 		// Reset all test globals.
@@ -199,19 +198,19 @@ final class WizardControllerTest extends TestCase {
 		$this->run_handle();
 		$this->assertStringContainsString( 'step=4', (string) $this->get_redirect() );
 		$this->assertSame( 'PM.synthetic_test_credential_0123456789', $postmark->last_validate_config['api_key'] );
-		$this->assertSame( '', ( new SettingsRepository() )->get_smtp_config()['host'] );
+		$this->assertSame( '', ( new SettingsRepository( $this->cipher ) )->get_smtp_config()['host'] );
 
 		$this->post_step( 4 );
 		$this->run_handle();
 		$this->assertSame( 'PM.synthetic_test_credential_0123456789', $postmark->last_connection_config['api_key'] );
-		$this->assertTrue( ( new SettingsRepository() )->is_provider_verified() );
+		$this->assertTrue( ( new SettingsRepository( $this->cipher ) )->is_provider_verified() );
 
 		$postmark->send_result = new SendResult( true, 'postmark', null, '200', 'Accepted by Postmark.' );
 		$this->post_step( 5, array( 'test_recipient' => 'inbox@example.com' ) );
 		$this->run_handle();
 		$this->assertSame( 'verified@example.com', $postmark->last_sent_message->from );
 		$this->assertSame( 'inbox@example.com', $postmark->last_sent_message->to[0] );
-		$this->assertTrue( ( new SettingsRepository() )->has_accepted_test_email() );
+		$this->assertTrue( ( new SettingsRepository( $this->cipher ) )->has_accepted_test_email() );
 		$this->assertStringNotContainsString( 'PM.synthetic_test_credential', json_encode( get_transient( 'scalyn_wizard_email_1' ) ) );
 	}
 
@@ -234,7 +233,7 @@ final class WizardControllerTest extends TestCase {
 		$this->post_step( 5, array( 'test_recipient' => 'inbox@example.com' ) );
 		$this->run_handle();
 		$this->assertSame( array( 'started', 'unconfirmed' ), $events );
-		$this->assertFalse( ( new SettingsRepository() )->has_accepted_test_email() );
+		$this->assertFalse( ( new SettingsRepository( $this->cipher ) )->has_accepted_test_email() );
 	}
 
 
@@ -262,19 +261,19 @@ final class WizardControllerTest extends TestCase {
 		$this->run_handle();
 		$this->assertStringContainsString( 'step=4', (string) $this->get_redirect() );
 		$this->assertSame( 'SG.synthetic_test_credential_0123456789', $sendgrid->last_validate_config['api_key'] );
-		$this->assertSame( '', ( new SettingsRepository() )->get_smtp_config()['host'] );
+		$this->assertSame( '', ( new SettingsRepository( $this->cipher ) )->get_smtp_config()['host'] );
 
 		$this->post_step( 4 );
 		$this->run_handle();
 		$this->assertSame( 'SG.synthetic_test_credential_0123456789', $sendgrid->last_connection_config['api_key'] );
-		$this->assertTrue( ( new SettingsRepository() )->is_provider_verified() );
+		$this->assertTrue( ( new SettingsRepository( $this->cipher ) )->is_provider_verified() );
 
 		$sendgrid->send_result = new SendResult( true, 'sendgrid', null, '202', 'Accepted by SendGrid.' );
 		$this->post_step( 5, array( 'test_recipient' => 'inbox@example.com' ) );
 		$this->run_handle();
 		$this->assertSame( 'verified@example.com', $sendgrid->last_sent_message->from );
 		$this->assertSame( 'inbox@example.com', $sendgrid->last_sent_message->to[0] );
-		$this->assertTrue( ( new SettingsRepository() )->has_accepted_test_email() );
+		$this->assertTrue( ( new SettingsRepository( $this->cipher ) )->has_accepted_test_email() );
 		$this->assertStringNotContainsString( 'SG.synthetic_test_credential', json_encode( get_transient( 'scalyn_wizard_email_1' ) ) );
 	}
 
@@ -297,7 +296,7 @@ final class WizardControllerTest extends TestCase {
 		$this->post_step( 5, array( 'test_recipient' => 'inbox@example.com' ) );
 		$this->run_handle();
 		$this->assertSame( array( 'started', 'unconfirmed' ), $events );
-		$this->assertFalse( ( new SettingsRepository() )->has_accepted_test_email() );
+		$this->assertFalse( ( new SettingsRepository( $this->cipher ) )->has_accepted_test_email() );
 	}
 
 	// -------------------------------------------------------------------------
@@ -309,7 +308,7 @@ final class WizardControllerTest extends TestCase {
 
 		$this->run_handle();
 
-		$settings = new SettingsRepository();
+		$settings = new SettingsRepository( $this->cipher );
 		$this->assertSame( 'smtp', $settings->get_active_provider_id() );
 		$this->assertStringContainsString( 'step=3', (string) $this->get_redirect() );
 	}
@@ -319,7 +318,7 @@ final class WizardControllerTest extends TestCase {
 
 		$this->run_handle();
 
-		$settings = new SettingsRepository();
+		$settings = new SettingsRepository( $this->cipher );
 		$this->assertSame( '', $settings->get_active_provider_id() );
 		$this->assertStringContainsString( 'step=2', (string) $this->get_redirect() );
 	}
@@ -329,7 +328,7 @@ final class WizardControllerTest extends TestCase {
 
 		$this->run_handle();
 
-		$settings = new SettingsRepository();
+		$settings = new SettingsRepository( $this->cipher );
 		$this->assertSame( '', $settings->get_active_provider_id() );
 		$this->assertStringContainsString( 'step=2', (string) $this->get_redirect() );
 	}
@@ -378,7 +377,7 @@ final class WizardControllerTest extends TestCase {
 
 		$this->run_handle();
 
-		$smtp = ( new SettingsRepository() )->get_smtp_config();
+		$smtp = ( new SettingsRepository( $this->cipher ) )->get_smtp_config();
 		$this->assertSame( 'smtp.example.com', $smtp['host'] );
 		$this->assertStringContainsString( 'step=4', (string) $this->get_redirect() );
 	}
@@ -468,7 +467,7 @@ final class WizardControllerTest extends TestCase {
 		$this->run_handle();
 
 		// A fresh repository constructed from the DB must still report 'smtp'.
-		$fresh = new SettingsRepository();
+		$fresh = new SettingsRepository( $this->cipher );
 		$this->assertSame(
 			'smtp',
 			$fresh->get_active_provider_id(),
@@ -495,7 +494,7 @@ final class WizardControllerTest extends TestCase {
 
 		$this->run_handle();
 
-		$fresh = new SettingsRepository();
+		$fresh = new SettingsRepository( $this->cipher );
 		$this->assertSame(
 			'smtp',
 			$fresh->get_active_provider_id(),
@@ -623,7 +622,7 @@ final class WizardControllerTest extends TestCase {
 
 		$this->run_handle();
 
-		$fresh = new SettingsRepository();
+		$fresh = new SettingsRepository( $this->cipher );
 		$this->assertTrue( $fresh->is_provider_verified() );
 		$this->assertFalse( $fresh->has_accepted_test_email(), 'A connection test must not complete the test-email step.' );
 		$this->assertNotNull( $fresh->get_provider_verified_at() );
@@ -639,7 +638,7 @@ final class WizardControllerTest extends TestCase {
 
 		$this->run_handle();
 
-		$this->assertFalse( ( new SettingsRepository() )->is_provider_verified() );
+		$this->assertFalse( ( new SettingsRepository( $this->cipher ) )->is_provider_verified() );
 	}
 
 	public function test_step5_invalid_recipient_stores_failure_and_redirects(): void {
@@ -781,7 +780,7 @@ final class WizardControllerTest extends TestCase {
 		$this->post_step( 5, array( 'test_recipient' => 'to@example.com' ) );
 		$this->run_handle();
 
-		$fresh = new SettingsRepository();
+		$fresh = new SettingsRepository( $this->cipher );
 		$this->assertTrue( $fresh->is_provider_verified() );
 		$this->assertTrue( $fresh->has_accepted_test_email() );
 		$this->assertSame( 'from@example.com', $fresh->get_smtp_config()['from_email'], 'Marking verified must not clobber SMTP settings.' );
@@ -797,7 +796,7 @@ final class WizardControllerTest extends TestCase {
 		$this->post_step( 5, array( 'test_recipient' => 'to@example.com' ) );
 		$this->run_handle();
 
-		$this->assertFalse( ( new SettingsRepository() )->is_provider_verified() );
-		$this->assertFalse( ( new SettingsRepository() )->has_accepted_test_email() );
+		$this->assertFalse( ( new SettingsRepository( $this->cipher ) )->is_provider_verified() );
+		$this->assertFalse( ( new SettingsRepository( $this->cipher ) )->has_accepted_test_email() );
 	}
 }

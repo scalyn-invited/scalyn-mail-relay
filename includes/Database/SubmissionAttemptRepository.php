@@ -99,12 +99,21 @@ class SubmissionAttemptRepository {
 		if ( ! self::uuid( $logical ) ) {
 			return array();
 		}
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Bounded read through the correlation index.
-		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT attempt_uuid, logical_uuid, configuration_id, provider, origin, attempt_number, status, failure_category, safe_to_retry, created_at, finished_at FROM %i WHERE logical_uuid=%s ORDER BY attempt_number LIMIT 3', $wpdb->prefix . 'scalyn_submission_attempts', $logical ), ARRAY_A );
-		if ( ! is_array( $rows ) ) {
+		$previous = $wpdb->suppress_errors( true );
+		try {
+			// get_results() discards query(false), including failures before last_error is initialized.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Bounded read through the correlation index.
+			$result = $wpdb->query( $wpdb->prepare( 'SELECT attempt_uuid, logical_uuid, configuration_id, provider, origin, attempt_number, status, failure_category, safe_to_retry, created_at, finished_at FROM %i WHERE logical_uuid=%s ORDER BY attempt_number LIMIT 3', $wpdb->prefix . 'scalyn_submission_attempts', $logical ) );
+			if ( false === $result || ! empty( $wpdb->last_error ) || ! is_array( $wpdb->last_result ) ) {
+				throw new \RuntimeException( 'Submission history is unavailable.' );
+			}
+			return array_map( 'get_object_vars', $wpdb->last_result );
+		} catch ( \Throwable $error ) {
+			// Never retain private SQL/driver details in the public exception chain.
 			throw new \RuntimeException( 'Submission history is unavailable.' );
+		} finally {
+			$wpdb->suppress_errors( $previous );
 		}
-		return $rows;
 	}
 
 	/**

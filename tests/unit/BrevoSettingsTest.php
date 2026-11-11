@@ -1,4 +1,6 @@
 <?php
+// Explicit fourth-argument marker writer uses the mocked test add_option backend, not native wpdb.
+
 
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -16,6 +18,143 @@ final class BrevoSettingsTest extends TestCase {
 		$this->cipher->decrypt($value, 'sendgrid');
 	}
 
+
+	public function test_automatic_protection_copy_explains_backup_and_recovery(): void {
+		$html = $this->render();
+		$this->assertStringContainsString('protected automatically using a private local key file', $html);
+		$this->assertStringContainsString('secure and writable', $html);
+		$this->assertStringContainsString('Back up WordPress files and database together', $html);
+		$this->assertStringContainsString('Restores require the matching key', $html);
+		$this->assertStringContainsString('advanced, optional', $html);
+		$this->assertStringContainsString('never stored as plaintext', $html);
+		$this->assertStringNotContainsString('Before saving a key, configure', $html);
+	}
+
+	public function test_first_local_replacement_is_ready_on_get_and_initializes_only_on_save(): void {
+		$root = sys_get_temp_dir().'/scalyn-provider-form-'.bin2hex(random_bytes(8));
+		mkdir($root, 0700);
+		$store = new \Scalyn\MailRelay\Core\LocalCredentialKeyStore($root, static fn() => false, static fn() => get_option(\Scalyn\MailRelay\Core\LocalCredentialKeyStore::STATE_OPTION, null), static fn( $marker ) => \add_option( \Scalyn\MailRelay\Core\LocalCredentialKeyStore::STATE_OPTION, $marker, '', false ));
+		$cipher = new CredentialCipher(null, $store);
+		$GLOBALS['_test_current_user_can'][Capabilities::MANAGE_SETTINGS] = true;
+		$GLOBALS['_test_blog_id'] = 1;
+		try {
+			$before = $GLOBALS['_test_wp_options'];
+			$this->assertFalse($cipher->is_available());
+			$this->assertTrue($cipher->can_initialize());
+			$html = $this->render($cipher);
+			$this->assertSame([], array_values(array_diff(scandir($root), ['.', '..'])));
+			$this->assertSame($before, $GLOBALS['_test_wp_options']);
+			$this->assertStringNotContainsString('Server encryption is unavailable', $html);
+			$_SERVER['REQUEST_METHOD'] = 'POST';
+			$_POST = $this->input() + ['scalyn_brevo_settings' => '1'];
+			$html = $this->render($cipher);
+			$this->assertStringContainsString('configuration saved', $html);
+			$envelope = $GLOBALS['_test_wp_options'][SettingsRepository::OPTION_KEY]['brevo']['key_cipher'];
+			$this->assertStringStartsWith('v2:', $envelope);
+			$this->assertSame(self::SECRET, $cipher->decrypt($envelope, 'brevo'));
+			$this->assertStringNotContainsString(self::SECRET, $html);
+		} finally {
+			$iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
+			foreach ($iterator as $entry) {
+				if ($entry->isDir() && !$entry->isLink()) { rmdir($entry->getPathname()); }
+				else { unlink($entry->getPathname()); }
+			}
+			rmdir($root);
+		}
+	}
+
+	public function test_keep_uses_stored_envelope_even_when_new_write_key_is_invalid(): void {
+		$root = sys_get_temp_dir().'/scalyn-provider-keep-'.bin2hex(random_bytes(8));
+		mkdir($root, 0700);
+		$store = new \Scalyn\MailRelay\Core\LocalCredentialKeyStore($root, static fn() => false, static fn() => get_option(\Scalyn\MailRelay\Core\LocalCredentialKeyStore::STATE_OPTION, null), static fn( $marker ) => \add_option( \Scalyn\MailRelay\Core\LocalCredentialKeyStore::STATE_OPTION, $marker, '', false ));
+		$cipher = new CredentialCipher(null, $store);
+		$GLOBALS['_test_current_user_can'][Capabilities::MANAGE_SETTINGS] = true;
+		$GLOBALS['_test_blog_id'] = 1;
+		try {
+			$cipher->initialize_for_write();
+			$envelope = $cipher->encrypt(self::SECRET, 'brevo');
+			$GLOBALS['_test_wp_options'][SettingsRepository::OPTION_KEY] = ['brevo'=>['from_email'=>'sender@example.com','from_name'=>'Sender','key_cipher'=>$envelope]];
+			$read_cipher = new CredentialCipher('', $store);
+			$this->assertFalse($read_cipher->is_available());
+			$this->assertFalse($read_cipher->can_initialize());
+			$_SERVER['REQUEST_METHOD'] = 'POST';
+			$_POST = $this->input(['key_action'=>'keep','api_key'=>'','from_name'=>'Updated sender']) + ['scalyn_brevo_settings'=>'1'];
+			$html = $this->render($read_cipher);
+			$this->assertStringContainsString('configuration saved', $html);
+			$this->assertSame($envelope, $GLOBALS['_test_wp_options'][SettingsRepository::OPTION_KEY]['brevo']['key_cipher']);
+			$this->assertSame('Updated sender', (new SettingsRepository())->get_brevo_settings()['from_name']);
+			$this->assertStringNotContainsString(self::SECRET, $html);
+		} finally {
+			$iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
+			foreach ($iterator as $entry) {
+				if ($entry->isDir() && !$entry->isLink()) { rmdir($entry->getPathname()); }
+				else { unlink($entry->getPathname()); }
+			}
+			rmdir($root);
+		}
+	}
+
+	public function test_unavailable_storage_feedback_offers_safe_recovery_not_mandatory_setup(): void {
+		$html = $this->render(new CredentialCipher(''));
+		$this->assertStringContainsString('restore the matching key', $html);
+		$this->assertStringContainsString('private file permissions', $html);
+		$this->assertStringNotContainsString('and PHP OpenSSL are required', $html);
+		$_SERVER['REQUEST_METHOD'] = 'POST';
+		$_POST = $this->input() + ['scalyn_brevo_settings'=>'1'];
+		$html = $this->render(new CredentialCipher(''));
+		$this->assertStringContainsString('No changes saved: server encryption is unavailable. Restore the matching key', $html);
+		$_POST = $this->input(['key_action'=>'keep','api_key'=>'']) + ['scalyn_brevo_settings'=>'1'];
+		$GLOBALS['_test_wp_options'][SettingsRepository::OPTION_KEY] = ['brevo'=>['key_cipher'=>'v1:invalid']];
+		$html = $this->render(new CredentialCipher(''));
+		$this->assertStringContainsString('Restore the matching key or check private file permissions', $html);
+		$this->assertStringNotContainsString('valid server encryption key', $html);
+		$this->assertStringNotContainsString(self::SECRET, $html);
+		$this->assertStringNotContainsString('v1:invalid', $html);
+	}
+
+	#[DataProvider('rejected_local_posts')]
+	public function test_rejected_posts_never_initialize_local_storage(string $reason): void {
+		$root = sys_get_temp_dir().'/scalyn-provider-rejected-'.bin2hex(random_bytes(8));
+		mkdir($root, 0700);
+		$store = new \Scalyn\MailRelay\Core\LocalCredentialKeyStore($root, static fn() => false, static fn() => get_option(\Scalyn\MailRelay\Core\LocalCredentialKeyStore::STATE_OPTION, null), static fn( $marker ) => \add_option( \Scalyn\MailRelay\Core\LocalCredentialKeyStore::STATE_OPTION, $marker, '', false ));
+		$cipher = new CredentialCipher(null, $store);
+		$GLOBALS['_test_current_user_can'][Capabilities::MANAGE_SETTINGS] = true;
+		$GLOBALS['_test_blog_id'] = 1;
+		$_SERVER['REQUEST_METHOD'] = 'POST';
+		$_POST = $this->input() + ['scalyn_brevo_settings'=>'1'];
+		if ('nonce' === $reason) { $GLOBALS['_test_wp_nonce_valid'] = false; }
+		if ('capability' === $reason) { unset($GLOBALS['_test_current_user_can'][Capabilities::MANAGE_MAIL]); }
+		if ('managed' === $reason) { $GLOBALS['_test_wp_options'][\Scalyn\MailRelay\Agency\AgencyRepository::OPTION] = ['managed'=>true,'providers'=>true]; }
+		if ('stale' === $reason) { $GLOBALS['_test_wp_options'][SettingsRepository::OPTION_KEY] = ['configurations'=>['active'=>'synthetic-config'],'diagnostic_revision'=>'current']; $_POST['configuration_revision'] = 'stale'; }
+		if ('sender' === $reason) { $_POST['from_email'] = 'invalid'; }
+		if ('credential' === $reason) { $_POST['api_key'] = 'short'; }
+		if ('keep' === $reason) { $_POST['key_action'] = 'keep'; $_POST['api_key'] = ''; }
+		if ('remove' === $reason) { $_POST['key_action'] = 'remove'; $_POST['api_key'] = ''; }
+		$before = $GLOBALS['_test_wp_options'];
+		try {
+			try { $html = $this->render($cipher); }
+			catch (RuntimeException $error) { $html = $error->getMessage(); }
+			$this->assertStringNotContainsString('configuration saved', $html);
+			$this->assertStringNotContainsString(self::SECRET, $html);
+			if ('keep' === $reason) { $this->assertStringContainsString('there is no saved', $html); }
+			$this->assertSame($before, $GLOBALS['_test_wp_options']);
+			$this->assertSame([], array_values(array_diff(scandir($root), ['.', '..'])));
+		} finally { rmdir($root); }
+	}
+
+	public static function rejected_local_posts(): array {
+		return [['nonce'], ['capability'], ['managed'], ['stale'], ['sender'], ['credential'], ['keep'], ['remove']];
+	}
+
+	public function test_form_removes_saved_key_without_encryption(): void {
+		(new SettingsRepository())->save_brevo($this->input(), $this->cipher);
+		$_SERVER['REQUEST_METHOD'] = 'POST';
+		$_POST = $this->input(['key_action'=>'remove','api_key'=>'','confirm_remove'=>'1']) + ['scalyn_brevo_settings'=>'1'];
+		$html = $this->render(new CredentialCipher(''));
+		$this->assertStringContainsString('configuration saved', $html);
+		$this->assertFalse((new SettingsRepository())->get_brevo_settings()['has_key']);
+		$this->assertStringNotContainsString(self::SECRET, $html);
+	}
 
 	private CredentialCipher $cipher;
 	private const SECRET = 'PM.synthetic_test_credential_0123456789';

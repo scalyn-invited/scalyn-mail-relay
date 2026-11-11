@@ -3,6 +3,7 @@
 use PHPUnit\Framework\TestCase;
 use Scalyn\MailRelay\Database\Migrator;
 use Scalyn\MailRelay\Core\SettingsRepository;
+use Scalyn\MailRelay\Core\CredentialCipher;
 use Scalyn\MailRelay\Core\ProviderRegistry;
 use Scalyn\MailRelay\Core\HookNames;
 use Scalyn\MailRelay\Contracts\ProviderInterface;
@@ -19,8 +20,10 @@ use Scalyn\MailRelay\Providers\ValidationResult;
 require_once dirname(__DIR__) . '/fixtures/delivery-schema-wpdb.php';
 
 final class MailConfigurationTest extends TestCase {
+	private CredentialCipher $cipher;
 	private const REVISION = '11111111-1111-4111-8111-111111111111';
 	protected function setUp(): void {
+		$this->cipher = new CredentialCipher( base64_encode( str_repeat( 'x', 32 ) ) );
 		$GLOBALS['_test_wp_options'] = ['scalyn_mail_relay_db_version'=>'0.8.0'];
 		$GLOBALS['_test_wp_added_actions'] = [];
 		$GLOBALS['_test_wp_actions'] = [];
@@ -83,7 +86,7 @@ final class MailConfigurationTest extends TestCase {
 			$GLOBALS['wpdb']=new WpdbStub();
 			$GLOBALS['_test_wp_added_actions']=[];
 			$GLOBALS['_test_wp_options'][SettingsRepository::OPTION_KEY]=['provider'=>['active'=>'smtp'],'diagnostic_revision'=>self::REVISION];
-			$settings=new SettingsRepository();
+			$settings=new SettingsRepository( $this->cipher );
 			$provider=new class($settings,$outcome) implements ProviderInterface {
 				public function __construct(private SettingsRepository $settings,private string $outcome) {}
 				public function get_id(): string { return 'smtp'; }
@@ -110,7 +113,7 @@ final class MailConfigurationTest extends TestCase {
 		do_action(HookNames::MAIL_FAILED,new SendResult(false,'smtp'),$this->message());
 		$this->assertNull($GLOBALS['wpdb']->inserts[0]['data']['configuration_id']);
 		$GLOBALS['wpdb']=new WpdbStub();
-		(new MailDispatcher(new ProviderRegistry(),new SettingsRepository()))->dispatch($this->message());
+		(new MailDispatcher(new ProviderRegistry(),new SettingsRepository( $this->cipher )))->dispatch($this->message());
 		$this->assertNull($GLOBALS['wpdb']->inserts[0]['data']['configuration_id']);
 	}
 }

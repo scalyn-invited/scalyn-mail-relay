@@ -310,6 +310,7 @@ final class SettingsRepository {
 		$old    = $before['sendgrid'] ?? array();
 		$stored = $old['key_cipher'] ?? '';
 		if ( 'replace' === $action ) {
+			$cipher->initialize_for_write();
 			$stored = $cipher->encrypt( $secret );
 		} elseif ( 'remove' === $action ) {
 			$stored = '';
@@ -393,6 +394,7 @@ final class SettingsRepository {
 		$old    = $before['postmark'] ?? array();
 		$stored = $old['key_cipher'] ?? '';
 		if ( 'replace' === $action ) {
+			$cipher->initialize_for_write();
 			$stored = $cipher->encrypt( $secret, 'postmark' );
 		} elseif ( 'remove' === $action ) {
 			$stored = '';
@@ -476,6 +478,7 @@ final class SettingsRepository {
 		$old    = $before['smtp2go'] ?? array();
 		$stored = $old['key_cipher'] ?? '';
 		if ( 'replace' === $action ) {
+			$cipher->initialize_for_write();
 			$stored = $cipher->encrypt( $secret, 'smtp2go' );
 		} elseif ( 'remove' === $action ) {
 			$stored = '';
@@ -559,6 +562,7 @@ final class SettingsRepository {
 		$old    = $before['brevo'] ?? array();
 		$stored = $old['key_cipher'] ?? '';
 		if ( 'replace' === $action ) {
+			$cipher->initialize_for_write();
 			$stored = $cipher->encrypt( $secret, 'brevo' );
 		} elseif ( 'remove' === $action ) {
 			$stored = '';
@@ -696,10 +700,13 @@ final class SettingsRepository {
 			$this->data = $before;
 		}
 		if ( $saved ) {
-			$changes = array();
+			$changes              = array();
+			$smtp_login_rewritten = ( $before['smtp']['credentials_cipher'] ?? null ) !== ( $this->data['smtp']['credentials_cipher'] ?? null );
 			foreach ( AuditEvent::FIELDS as $field ) {
 				list( $group, $key ) = explode( '.', $field );
-				if ( ( $before[ $group ][ $key ] ?? null ) !== ( $this->data[ $group ][ $key ] ?? null ) ) {
+				// An envelope rewrite affects the protected login pair; record names only.
+				$protected_login = $smtp_login_rewritten && in_array( $field, array( 'smtp.username', 'smtp.password' ), true );
+				if ( $protected_login || ( $before[ $group ][ $key ] ?? null ) !== ( $this->data[ $group ][ $key ] ?? null ) ) {
 					$action = match ( $field ) {
 						'advanced.log_retention_days' => 'retention_changed',
 						'advanced.delete_data_on_uninstall' => 'uninstall_policy_changed',
@@ -812,11 +819,29 @@ final class SettingsRepository {
 			throw new \RuntimeException( 'Configuration management is not authorized.' );
 		}
 		\Scalyn\MailRelay\Agency\ManagedAccess::assert_unlocked( 'providers' );
-		$next = NamedConfigurations::import( $this->data, $this->cipher ?? new CredentialCipher() );
+		if ( ! in_array( $operation, array( 'import', 'create', 'select', 'rename', 'archive' ), true ) ) {
+			throw new \InvalidArgumentException( 'Unsupported configuration operation.' );
+		}
+		$cipher = $this->cipher ?? new CredentialCipher();
 		if ( 'create' === $operation ) {
-			if ( ! ( $this->cipher ?? new CredentialCipher() )->is_available() ) {
-				throw new \RuntimeException( 'Server encryption is required for new configurations.' );
+			// Validate before initialization can create a separately protected key file.
+			NamedConfigurations::name( $name );
+			$items     = $this->data['configurations']['items'] ?? array();
+			$revisions = $this->data['configurations']['revisions'] ?? array();
+			if ( ! in_array( $id, NamedConfigurations::PROVIDERS, true ) || ! is_array( $items ) || ! is_array( $revisions ) || count( $items ) >= 50 || count( $revisions ) >= 1000 ) {
+				throw new \InvalidArgumentException( 'Invalid provider or configuration limit reached.' );
 			}
+			$cipher->initialize_for_write();
+		} elseif ( 'import' === $operation && ! isset( $this->data['configurations'] )
+			&& ! isset( $this->data['smtp']['credentials_cipher'] )
+			&& ( 'smtp' === $this->get_active_provider_id() || ! empty( $this->data['smtp']['host'] ) ) ) {
+			// An explicit legacy import protects existing credentials, never duplicates plaintext.
+			$cipher->initialize_for_write();
+		} elseif ( 'rename' === $operation ) {
+			NamedConfigurations::name( $name );
+		}
+		$next = NamedConfigurations::import( $this->data, $cipher );
+		if ( 'create' === $operation ) {
 			$next = NamedConfigurations::create( $next, $id, $name );
 		} elseif ( 'select' === $operation ) {
 			$next = NamedConfigurations::select( $next, $id );
@@ -993,14 +1018,21 @@ final class SettingsRepository {
 			if ( '' === $output['smtp']['username'] ) {
 				$output['smtp']['username'] = $stored_login['username'];
 			}
-			// Decrypt only in memory; an edited login gets a new protected envelope.
-			if ( isset( $this->data['smtp']['credentials_cipher'] ) ) {
-				if ( count( $output['smtp'] ) === count( $stored_login ) && array() === array_diff_assoc( $output['smtp'], $stored_login ) ) {
-					$output['smtp'] = $this->data['smtp'];
-				} else {
-					$output['smtp']['credentials_cipher'] = null;
-				}
+			// Keep a readable unchanged login envelope even when sender/host fields change.
+			if ( isset( $this->data['smtp']['credentials_cipher'] )
+				&& $output['smtp']['username'] === $stored_login['username']
+				&& $output['smtp']['password'] === $stored_login['password'] ) {
+				$output['smtp']['credentials_cipher'] = $this->data['smtp']['credentials_cipher'];
+				$output['smtp']['has_password']       = '' !== $stored_login['password'];
+				$output['smtp']['has_username']       = '' !== $stored_login['username'];
+				$output['smtp']['username']           = '';
+				$output['smtp']['password']           = '';
+			} else {
+				// Recursive merging must not resurrect the previous encrypted login.
+				$output['smtp']['credentials_cipher'] = null;
 			}
+			// All explicit SMTP saves protect login fields, including fresh/legacy slots.
+			$output['smtp'] = NamedConfigurations::protect( 'smtp', $output['smtp'], $this->cipher ?? new CredentialCipher() );
 		}
 
 		if ( isset( $input['advanced'] ) && is_array( $input['advanced'] ) ) {

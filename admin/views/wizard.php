@@ -198,6 +198,7 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 					</div>
 				<?php endif; ?>
 
+				<p class="description"><?php esc_html_e( 'Saving SMTP login fields uses protected storage, normally a separate private site key outside the database. Back up WordPress files and database together; restores need the matching key. No manual server-key or cPanel setup is required on supported hosts.', 'scalyn-mail-relay' ); ?></p>
 				<form method="post" action="<?php echo esc_url( $wizard_base_url ); ?>">
 					<?php wp_nonce_field( 'scalyn_wizard_step3' ); ?>
 					<?php \Scalyn\MailRelay\Admin\ConfigurationGuard::field( $settings ); ?>

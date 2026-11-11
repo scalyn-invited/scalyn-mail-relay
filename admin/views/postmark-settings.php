@@ -11,9 +11,9 @@ defined( 'ABSPATH' ) || exit;
 	<h2 id="scalyn-postmark-heading"><?php echo esc_html( $in_wizard ? __( 'Configure Postmark', 'scalyn-mail-relay' ) : __( 'Postmark settings', 'scalyn-mail-relay' ) ); ?></h2>
 	<p><?php echo esc_html( $in_wizard ? __( 'Save your sender and Server API token here, then continue to connection verification. Saving changes the Postmark configuration used by this site.', 'scalyn-mail-relay' ) : __( 'Save your sender and Server API token, then use the Setup Wizard to select Postmark and verify the connection.', 'scalyn-mail-relay' ) ); ?></p>
 	<?php if ( ! $encryption_available ) : ?>
-		<div class="notice notice-error inline"><p><?php esc_html_e( 'Server encryption is unavailable. A valid SCALYN_MAIL_RELAY_ENCRYPTION_KEY and PHP OpenSSL are required before an Server API token can be saved.', 'scalyn-mail-relay' ); ?></p></div>
+		<div class="notice notice-error inline"><p><?php esc_html_e( 'Server encryption is unavailable. To save credentials, restore the matching key or check private file permissions and PHP OpenSSL support. An advanced externally managed SCALYN_MAIL_RELAY_ENCRYPTION_KEY is optional; plaintext storage is never used.', 'scalyn-mail-relay' ); ?></p></div>
 	<?php endif; ?>
-	<p><?php esc_html_e( 'Before saving a key, configure SCALYN_MAIL_RELAY_ENCRYPTION_KEY on the server with a base64-encoded random 32-byte key. Keep it outside Git and back it up separately. Missing or changed encryption keys require credential replacement.', 'scalyn-mail-relay' ); ?></p>
+	<p><?php esc_html_e( 'API keys are protected automatically using a private local key file outside the database when the filesystem is secure and writable. Back up WordPress files and database together. Restores require the matching key. SCALYN_MAIL_RELAY_ENCRYPTION_KEY is an advanced, optional externally managed key. Credentials are never stored as plaintext.', 'scalyn-mail-relay' ); ?></p>
 	<p><?php echo esc_html( $config['has_key'] ? __( 'An encrypted credential is stored. This does not confirm readability, authentication or delivery.', 'scalyn-mail-relay' ) : __( 'No Server API token is stored.', 'scalyn-mail-relay' ) ); ?></p>
 	<?php if ( $notice ) : ?>
 		<div class="notice <?php echo $saved ? 'notice-success' : 'notice-error'; ?> inline" role="status"><p><?php echo esc_html( $notice ); ?></p></div>

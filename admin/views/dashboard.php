@@ -13,6 +13,7 @@
  *   array      $health_components    Component label => score (0-100) or null when not evaluated.
  *   string     $health_summary       HealthScorer summary of what the score is based on, or ''.
  *   bool       $has_completed_diagnostics Whether at least one health snapshot exists.
+ *   bool       $authentication_records_passed Whether all three scoped published-record checks passed.
  *   string     $test_email_url       Setup Wizard URL for the test-email step.
  *
  * Privacy: Do not render response_message, event_data, recipient, subject, body,
@@ -51,8 +52,8 @@ $setup_steps = array(
 		'status' => $test_email_accepted ? 'complete' : 'pending',
 	),
 	array(
-		'label'  => __( 'Verify SPF, DKIM and DMARC', 'scalyn-mail-relay' ),
-		'status' => $has_completed_diagnostics ? 'complete' : 'pending',
+		'label'  => __( 'Recorded SPF, DKIM and DMARC checks passed', 'scalyn-mail-relay' ),
+		'status' => $authentication_records_passed ? 'complete' : 'pending',
 	),
 	array(
 		'label'  => __( 'Run diagnostics and health check', 'scalyn-mail-relay' ),

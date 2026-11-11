@@ -1,6 +1,6 @@
 <?php
 /**
- * Routes ordinary WordPress mail through the selected API provider.
+ * Routes ordinary WordPress mail through the selected provider.
  *
  * @package ScalynMailRelay
  */
@@ -13,7 +13,7 @@ use Scalyn\MailRelay\Core\HookNames;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Intercepts API mail, or SMTP only when routing/recovery is explicitly enabled.
+ * Intercepts selected SMTP/API mail; routing and recovery are optional.
  * Unsupported mail shapes fail closed instead of silently falling back to PHP mail.
  */
 final class WordPressMailBridge {
@@ -37,19 +37,25 @@ final class WordPressMailBridge {
 	}
 
 	/**
-	 * Preserves an earlier short-circuit and leaves non-API mail untouched.
+	 * Preserves an earlier short-circuit and leaves unconfigured mail untouched.
 	 *
 	 * @param mixed $pre  Prior pre_wp_mail result.
 	 * @param mixed $atts Filtered WordPress mail arguments.
 	 * @return mixed Null for core mail; otherwise acknowledgement or opted-in durable ownership.
 	 */
 	public function maybe_send( mixed $pre, mixed $atts ): mixed {
-		if ( null !== $pre || ( ! $this->recovery?->enabled() && true !== ( new RoutingRepository() )->policy()['enabled'] && ! in_array( $this->settings->get_active_provider_id(), array( 'sendgrid', 'postmark', 'smtp2go', 'brevo' ), true ) ) ) {
+		if ( null !== $pre || ( ! $this->recovery?->enabled() && true !== ( new RoutingRepository() )->policy()['enabled'] && ! in_array( $this->settings->get_active_provider_id(), array( 'smtp', 'sendgrid', 'postmark', 'smtp2go', 'brevo' ), true ) ) ) {
 			return $pre;
 		}
-		$uuid = wp_generate_uuid4();
+		$native_smtp = ! $this->recovery?->enabled() && true !== ( new RoutingRepository() )->policy()['enabled'] && 'smtp' === $this->settings->get_active_provider_id();
+		$uuid        = wp_generate_uuid4();
 		try {
-			$message = $this->prepare( $atts, $uuid );
+			$plan = ( new RoutingRepository() )->plan( $this->settings, MailOrigin::current() );
+			if ( array() === $plan && $this->recovery?->enabled() ) {
+				$plan = array( $this->settings->configuration_target( $this->settings->get_active_configuration_id() ) );
+			}
+			$target  = $plan[0] ?? null;
+			$message = $this->prepare( $atts, $uuid, $target );
 		} catch ( \Throwable $error ) {
 			// Do not copy even partially parsed customer content into the failure event.
 			$message = new MailMessage(
@@ -70,17 +76,50 @@ final class WordPressMailBridge {
 				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Fixed text only.
 				error_log( 'Scalyn Mail Relay: mail preparation observer failed.' );
 			}
+			if ( $native_smtp ) {
+				$this->publish_native_failure();
+			}
 			return false;
 		}
 		try {
 			if ( $this->recovery?->enabled() ) {
-				return $this->recovery->own( $message );
+				return $this->recovery->own( $message, $plan );
 			}
-			$target = ( new RoutingRepository() )->plan( $this->settings, MailOrigin::current() )[0] ?? null;
-			return $this->dispatcher->dispatch( $message, $target )->success;
+			$accepted = $this->dispatcher->dispatch( $message, $target )->success;
 		} catch ( \Throwable $error ) {
 			// Do not fabricate a preparation failure after dispatch may have started.
-			return false;
+			$accepted = false;
+		}
+		if ( $native_smtp && $accepted ) {
+			try {
+				do_action(
+					'wp_mail_succeeded',
+					array(
+						'to'          => $message->to,
+						'subject'     => $message->subject,
+						'message'     => $message->body,
+						'headers'     => $message->headers,
+						'attachments' => $message->attachments,
+					)
+				);
+			} catch ( \Throwable $observer_error ) {
+				// Publication must never reverse acceptance or trigger another attempt.
+				unset( $observer_error );
+			}
+		}
+		if ( $native_smtp && ! $accepted ) {
+			$this->publish_native_failure();
+		}
+		return $accepted;
+	}
+
+	/** Publishes only a fixed native error, never configuration or exception data. */
+	private function publish_native_failure(): void {
+		try {
+			do_action( 'wp_mail_failed', new \WP_Error( 'wp_mail_failed', 'WordPress SMTP mail could not be accepted. Check mail diagnostics before retrying.' ) );
+		} catch ( \Throwable $observer_error ) {
+			// Observers cannot change the outcome or cause fallback/retry.
+			unset( $observer_error );
 		}
 	}
 
@@ -88,12 +127,13 @@ final class WordPressMailBridge {
 	 * Maps the common wp_mail shape without dropping unsupported headers or embeds.
 	 * The selected adapter performs the final address, size and attachment checks.
 	 *
-	 * @param mixed  $atts WordPress arguments after the wp_mail filter.
-	 * @param string $uuid Correlation allocated before preparation.
+	 * @param mixed      $atts WordPress arguments after the wp_mail filter.
+	 * @param string     $uuid Correlation allocated before preparation.
+	 * @param array|null $target Trusted pinned route, resolved before header validation.
 	 * @return MailMessage Prepared message.
 	 * @throws \InvalidArgumentException When a structure cannot be mapped safely.
 	 */
-	private function prepare( mixed $atts, string $uuid ): MailMessage {
+	private function prepare( mixed $atts, string $uuid, ?array $target ): MailMessage {
 		if ( ! is_array( $atts ) || ! is_string( $atts['subject'] ?? null ) || ! is_string( $atts['message'] ?? null ) ) {
 			throw new \InvalidArgumentException( 'Unsupported WordPress mail arguments.' );
 		}
@@ -123,7 +163,7 @@ final class WordPressMailBridge {
 			'brevo' => $this->settings->get_brevo_settings(),
 			default => $this->settings->get_sendgrid_settings(),
 		};
-		$from_email   = $config['from_email'];
+		$from_email   = $target['from'] ?? $config['from_email'];
 		$content_type = apply_filters( 'wp_mail_content_type', 'text/plain' );
 		$forwarded    = array();
 		$from_seen    = false;

@@ -21,6 +21,13 @@ final class MonitoringStatusPresenterTest extends TestCase {
 		$this->assertStringContainsString('stale',$view['freshness']);
 		$this->assertStringContainsString('overdue',$view['schedule']);
 	}
+	public function test_overdue_guidance_explains_native_wp_cron_without_requiring_server_setup(): void {
+		$view=Presenter::present('hourly',array(),4600,'hourly',4901);
+		$this->assertSame(
+			'Scheduled monitoring is overdue. WordPress normally runs WP-Cron when the site receives traffic. Check site traffic, WP-Cron configuration and locks, and host restrictions. If WP-Cron is disabled, verify the configured external cron trigger.',
+			$view['schedule']
+		);
+	}
 	public function test_manual_success_does_not_mask_failed_scheduled_run(): void {
 		$state=array('last_success'=>$this->record(),'scheduled'=>$this->record('failed'),'latest'=>$this->record());
 		$view=Presenter::present('daily',$state,3000,'daily',2000);

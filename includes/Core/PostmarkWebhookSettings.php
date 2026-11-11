@@ -122,7 +122,8 @@ final class PostmarkWebhookSettings {
 					'password' => $password,
 				)
 			);
-			$envelope    = $this->cipher->encrypt( $credentials, 'postmark-webhook' );
+			$this->cipher->initialize_for_write();
+			$envelope = $this->cipher->encrypt( $credentials, 'postmark-webhook' );
 		}
 		unset( $credentials );
 		$draft = array(

@@ -20,10 +20,16 @@ Do not rely on tickets, prompts, branch names, or historical descriptions withou
 
 The plugin is a WordPress modular monolith with explicit contracts and a shared, lazy service container. Keep provider-specific behavior behind `ProviderInterface`; keep persistence behind repositories; keep Admin code dependent on approved services/read models rather than direct table or transport access.
 
-- **Bernie — Sole Project Owner and Developer:** owns every module, architecture, implementation, UI, transport, backend, testing, review, integration, and release decisions.
+- **Jay — current project decision owner:** directs integration, QA acceptance,
+  staging installation and release decisions. Bernie is no longer in the current
+  project review path; earlier records describing his ownership are historical.
 - **Former team:** Kim, Saturn, Yaj, and Mikko have no continuing assignments or required review responsibilities. Names in historical documents and source comments describe past contributions, not current ownership.
 
-Use one focused ticket, branch, and pull request per change. Cross-module work is permitted when required by the requested outcome; identify affected contracts and preserve module boundaries. Bernie makes architecture and integration decisions. Do not wait for former team members or request their approval.
+Use one focused ticket, branch, and pull request per change unless Jay explicitly
+approves an integrated QA candidate. Cross-module work is permitted when required
+by the requested outcome; identify affected contracts and preserve module
+boundaries. Jay makes architecture and integration decisions. Do not wait for
+former team members or request their approval.
 
 ## Development Workflow
 
@@ -69,8 +75,16 @@ Work is ready when its user outcome and acceptance criteria are clear; owner, mo
 
 ## Definition of Done
 
-Work is done when implementation and tests satisfy the acceptance criteria; lint, WPCS, PHPUnit, and diff checks have been run with results reported; security/privacy, accessibility, migration, retention, and lifecycle effects are addressed; documentation is updated where behavior changed; and Bernie has reviewed the change and validation evidence. No former team review is required; existing repository protection rules still apply.
+Work is done when implementation and tests satisfy the acceptance criteria; lint,
+WPCS, PHPUnit, and diff checks have been run with results reported; security/privacy,
+accessibility, migration, retention, and lifecycle effects are addressed;
+documentation is updated where behavior changed; and Jay has reviewed the change
+and validation evidence. Existing repository protection rules still apply.
 
 ## Architecture Changes
 
-Changes to shared interfaces, the service container, database schema, REST contracts, security or capability models, lifecycle terminology, provider architecture, or dependencies require deliberate review by Bernie as sole owner. Record durable architectural decisions in `docs/adr/`; do not redesign the architecture incidentally inside a feature.
+Changes to shared interfaces, the service container, database schema, REST
+contracts, security or capability models, lifecycle terminology, provider
+architecture, or dependencies require Jay's deliberate review. Record durable
+architectural decisions in `docs/adr/`; do not redesign the architecture
+incidentally inside a feature.

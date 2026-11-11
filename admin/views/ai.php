@@ -64,8 +64,8 @@ defined( 'ABSPATH' ) || exit;
 		<input type="hidden" name="revision" value="<?php echo esc_attr( $config['revision'] ); ?>">
 		<div id="scalyn-panel-ai-settings" class="scalyn-provider-tab-panel" data-provider-panel="ai-settings">
 		<section class="scalyn-card"><h2><?php esc_html_e( 'AI model and connection', 'scalyn-mail-relay' ); ?></h2>
-		<p><?php echo esc_html( $config['encryption'] ? __( 'Server encryption available.', 'scalyn-mail-relay' ) : __( 'Server encryption unavailable. AI chat and new credential storage are blocked; email sending is unaffected.', 'scalyn-mail-relay' ) ); ?></p>
-		<p><label for="scalyn-ai-model"><?php esc_html_e( 'Model', 'scalyn-mail-relay' ); ?></label><br><select id="scalyn-ai-model" name="model" data-ai-model data-encryption="<?php echo $config['encryption'] ? '1' : '0'; ?>" data-active-model="<?php echo esc_attr( $config['model'] ); ?>"><option value=""><?php esc_html_e( 'Choose a model to configure', 'scalyn-mail-relay' ); ?></option>
+		<p><?php echo esc_html( $config['encryption'] ? __( 'Protected credential storage is available. Back up the site key with the WordPress files and database.', 'scalyn-mail-relay' ) : ( ! empty( $config['encryption_setup'] ) ? __( 'Protected storage will be initialized when you save a provider key. No manual server key is required.', 'scalyn-mail-relay' ) : __( 'Protected storage is unavailable. Restore the matching site key or check private storage permissions before saving credentials.', 'scalyn-mail-relay' ) ) ); ?></p>
+		<p><label for="scalyn-ai-model"><?php esc_html_e( 'Model', 'scalyn-mail-relay' ); ?></label><br><select id="scalyn-ai-model" name="model" data-ai-model data-encryption="<?php echo $config['encryption'] || ! empty( $config['encryption_setup'] ) ? '1' : '0'; ?>" data-active-model="<?php echo esc_attr( $config['model'] ); ?>"><option value=""><?php esc_html_e( 'Choose a model to configure', 'scalyn-mail-relay' ); ?></option>
 		<?php
 		foreach ( \Scalyn\MailRelay\AI\AiCatalog::PROVIDERS as $provider => $label ) :
 			?>

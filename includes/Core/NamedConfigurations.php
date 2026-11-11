@@ -40,7 +40,7 @@ final class NamedConfigurations {
 			$id       = wp_generate_uuid4();
 			$revision = $active && ! empty( $data['diagnostic_revision'] ) ? $data['diagnostic_revision'] : wp_generate_uuid4();
 			// Legacy SMTP can keep sending without a server key. Never duplicate plaintext.
-			$legacy                                 = 'smtp' === $provider && ! $cipher->is_available();
+			$legacy                                 = 'smtp' === $provider && ! isset( $config['credentials_cipher'] ) && ! $cipher->is_available();
 			$config                                 = $legacy ? array() : self::protect( $provider, $config, $cipher );
 			$data['configurations']['items'][ $id ] = array(
 				'name'     => strtoupper( $provider ) . ' — existing',
@@ -220,7 +220,7 @@ final class NamedConfigurations {
 	 * @return array Protected storage representation.
 	 * @throws \InvalidArgumentException For excessive SMTP login input.
 	 */
-	private static function protect( string $provider, #[\SensitiveParameter] array $config, CredentialCipher $cipher ): array {
+	public static function protect( string $provider, #[\SensitiveParameter] array $config, CredentialCipher $cipher ): array {
 		if ( 'smtp' === $provider && ! isset( $config['credentials_cipher'] ) ) {
 			$login = wp_json_encode(
 				array(
@@ -231,6 +231,7 @@ final class NamedConfigurations {
 			if ( ! is_string( $login ) || strlen( $login ) > 6000 ) {
 				throw new \InvalidArgumentException( 'SMTP login is too long.' );
 			}
+			$cipher->initialize_for_write();
 			$config['credentials_cipher'] = $cipher->encrypt( $login, 'smtp' );
 			$config['has_password']       = '' !== ( $config['password'] ?? '' );
 			$config['has_username']       = '' !== ( $config['username'] ?? '' );

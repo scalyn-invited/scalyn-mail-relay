@@ -814,14 +814,92 @@ final class DashboardPageTest extends TestCase {
 		$this->assertMatchesRegularExpression( '/scalyn-step--complete[^>]*>.*Send test email/s', $output );
 	}
 
+	public function test_unknown_dkim_does_not_complete_authentication_progress(): void {
+		$this->grant_view_dashboard();
+		$this->store_health_row( 89, 100, 100, 66, 'Configuration evidence only.' );
+		$this->set_mock_diagnostic_data(
+			array(
+				array( 'diagnostic_uuid' => 'current-run', 'configuration_id' => 'current-revision', 'provider_id' => 'smtp', 'sending_domain' => 'example.com', 'check_name' => 'spf_record', 'status' => 'pass' ),
+				array( 'diagnostic_uuid' => 'current-run', 'configuration_id' => 'current-revision', 'provider_id' => 'smtp', 'sending_domain' => 'example.com', 'check_name' => 'dkim_record', 'status' => 'unknown' ),
+				array( 'diagnostic_uuid' => 'current-run', 'configuration_id' => 'current-revision', 'provider_id' => 'smtp', 'sending_domain' => 'example.com', 'check_name' => 'dmarc_policy', 'status' => 'pass' ),
+			)
+		);
+
+		$output = $this->render_and_capture();
+
+		$this->assertStringContainsString( '89/100', $output );
+		$this->assertMatchesRegularExpression( '/<li class="scalyn-step scalyn-step--pending">(?:(?!<\/li>).)*Recorded SPF, DKIM and DMARC checks passed/s', $output );
+		$this->assertStringNotContainsString( 'Verify SPF, DKIM and DMARC', $output );
+	}
+
+	public function test_authentication_progress_requires_three_explicit_passes(): void {
+		$passing = array( 'spf_record' => 'pass', 'dkim_record' => 'pass', 'dmarc_policy' => 'pass' );
+		$cases   = array( 'all-pass' => $passing, 'no-results' => array() );
+		foreach ( array_keys( $passing ) as $name ) {
+			foreach ( array( 'unknown', 'warn', 'fail', 'error', '' ) as $status ) {
+				$cases[ $name . '-' . $status ]          = $passing;
+				$cases[ $name . '-' . $status ][ $name ] = $status;
+			}
+			$missing = $passing;
+			unset( $missing[ $name ] );
+			$cases[ $name . '-missing' ] = $missing;
+		}
+
+		$this->grant_view_dashboard();
+		foreach ( $cases as $case => $checks ) {
+			$this->store_health_row( 100, 100, 100, 100, 'Configuration evidence only.' );
+			$rows = array();
+			foreach ( $checks as $name => $status ) {
+				$rows[] = array(
+					'diagnostic_uuid'  => 'current-run',
+					'configuration_id' => 'current-revision',
+					'provider_id'      => 'smtp',
+					'sending_domain'   => 'example.com',
+					'check_name'       => $name,
+					'status'           => $status,
+				);
+			}
+			$this->set_mock_diagnostic_data( $rows );
+			$output = $this->render_and_capture();
+			$status = 'all-pass' === $case ? 'complete' : 'pending';
+			$this->assertMatchesRegularExpression( '/<li class="scalyn-step scalyn-step--' . $status . '">(?:(?!<\/li>).)*Recorded SPF, DKIM and DMARC checks passed/s', $output, $case );
+		}
+	}
+
+	public function test_ambiguous_or_superseded_authentication_does_not_complete_progress(): void {
+		$this->grant_view_dashboard();
+		foreach ( array( 'duplicate', 'configuration_id', 'provider_id', 'sending_domain' ) as $case ) {
+			$this->store_health_row( 100, 100, 100, 100, 'Configuration evidence only.' );
+			$rows = array();
+			foreach ( array( 'spf_record', 'dkim_record', 'dmarc_policy' ) as $name ) {
+				$rows[] = array(
+					'diagnostic_uuid'  => 'current-run',
+					'configuration_id' => 'current-revision',
+					'provider_id'      => 'smtp',
+					'sending_domain'   => 'example.com',
+					'check_name'       => $name,
+					'status'           => 'pass',
+				);
+			}
+			if ( 'duplicate' === $case ) {
+				$rows[] = $rows[1];
+			} else {
+				$rows[1][ $case ] = 'superseded';
+			}
+			$this->set_mock_diagnostic_data( $rows );
+			$output = $this->render_and_capture();
+			$this->assertMatchesRegularExpression( '/<li class="scalyn-step scalyn-step--pending">(?:(?!<\/li>).)*Recorded SPF, DKIM and DMARC checks passed/s', $output, $case );
+		}
+	}
+
 	public function test_completed_diagnostics_updates_setup_progress(): void {
 		$this->grant_view_dashboard();
 		$this->store_health_row( 88, 88, null, null, 'Health score based on: DNS & authentication.' );
 
-		$output = $this->render_verified_provider_dashboard();
+		$output = $this->render_and_capture();
 
-		$this->assertMatchesRegularExpression( '/scalyn-step--complete[^>]*>.*Verify SPF, DKIM and DMARC/s', $output );
-		$this->assertMatchesRegularExpression( '/scalyn-step--complete[^>]*>.*Run diagnostics and health check/s', $output );
+		$this->assertMatchesRegularExpression( '/<li class="scalyn-step scalyn-step--pending">(?:(?!<\/li>).)*Recorded SPF, DKIM and DMARC checks passed/s', $output );
+		$this->assertMatchesRegularExpression( '/<li class="scalyn-step scalyn-step--complete">(?:(?!<\/li>).)*Run diagnostics and health check/s', $output );
 	}
 
 	// =========================================================================

@@ -64,8 +64,8 @@ final class Smtp2goSettingsForm {
 				$input[ $field ] = isset( $_POST[ $field ] ) && is_string( $_POST[ $field ] ) ? wp_unslash( $_POST[ $field ] ) : null;
 			}
 			$input['confirm_remove'] = isset( $_POST['confirm_remove'] ) && '1' === $_POST['confirm_remove'];
-			if ( in_array( $input['key_action'], array( 'keep', 'replace' ), true ) && ! $this->cipher->is_available() ) {
-				$this->notice = __( 'No changes saved: server encryption is unavailable. Configure a valid SCALYN_MAIL_RELAY_ENCRYPTION_KEY and enable PHP OpenSSL, then save again.', 'scalyn-mail-relay' );
+			if ( 'replace' === $input['key_action'] && ! ( $this->cipher->is_available() || $this->cipher->can_initialize() ) ) {
+				$this->notice = __( 'No changes saved: server encryption is unavailable. Restore the matching key or check private file permissions and PHP OpenSSL support. An advanced externally managed SCALYN_MAIL_RELAY_ENCRYPTION_KEY is optional; plaintext storage is never used.', 'scalyn-mail-relay' );
 				return;
 			}
 			if ( 'keep' === $input['key_action'] && ! $this->settings->get_smtp2go_settings()['has_key'] ) {
@@ -76,7 +76,7 @@ final class Smtp2goSettingsForm {
 				$this->saved  = $this->settings->save_smtp2go( $input, $this->cipher );
 				$this->notice = $this->saved ? __( 'SMTP2GO configuration saved. Use the Setup Wizard to verify the connection. Removing a saved key does not revoke it at SMTP2GO.', 'scalyn-mail-relay' ) : __( 'SMTP2GO settings could not be saved. Try again.', 'scalyn-mail-relay' );
 			} catch ( \Throwable $error ) {
-				$this->notice = __( 'No changes saved. Check the sender fields, credential action and removal confirmation. Saving a key requires a valid server encryption key; an unreadable saved key must be replaced or removed.', 'scalyn-mail-relay' );
+				$this->notice = __( 'No changes saved. Check the sender fields, credential action and removal confirmation. Restore the matching key or check private file permissions if a saved key is unreadable. An advanced externally managed SCALYN_MAIL_RELAY_ENCRYPTION_KEY is optional; plaintext storage is never used.', 'scalyn-mail-relay' );
 			}
 			unset( $input );
 		}
@@ -95,7 +95,7 @@ final class Smtp2goSettingsForm {
 		if ( $in_wizard && $saved ) {
 			$notice = __( 'SMTP2GO configuration saved. Continue to verify the connection. Removing a saved key does not revoke it at SMTP2GO.', 'scalyn-mail-relay' );
 		}
-		$encryption_available = $this->cipher->is_available();
+		$encryption_available = $this->cipher->is_available() || $this->cipher->can_initialize();
 		$wizard_step          = 'smtp2go' === $this->settings->get_active_provider_id() ? 4 : 2;
 		$config               = $this->settings->get_smtp2go_settings();
 		require SCALYN_MAIL_RELAY_PATH . 'admin/views/smtp2go-settings.php';

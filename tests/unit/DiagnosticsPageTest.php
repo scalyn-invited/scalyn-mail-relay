@@ -288,7 +288,6 @@ final class DiagnosticsPageTest extends TestCase {
 
 		// Use reflection to test private method.
 		$reflection = new ReflectionMethod( $page, 'organize_diagnostics' );
-		$reflection->setAccessible( true );
 
 		$raw_results = array(
 			array(
@@ -339,7 +338,6 @@ final class DiagnosticsPageTest extends TestCase {
 
 		$page       = new DiagnosticsPage();
 		$reflection = new ReflectionMethod( $page, 'organize_diagnostics' );
-		$reflection->setAccessible( true );
 
 		$raw_results = array(
 			array(
@@ -363,7 +361,6 @@ final class DiagnosticsPageTest extends TestCase {
 
 		$page       = new DiagnosticsPage();
 		$reflection = new ReflectionMethod( $page, 'get_ui_status' );
-		$reflection->setAccessible( true );
 
 		$this->assertSame( 'healthy', $reflection->invoke( $page, 'pass' ) );
 		$this->assertSame( 'warning', $reflection->invoke( $page, 'warn' ) );
@@ -379,7 +376,6 @@ final class DiagnosticsPageTest extends TestCase {
 
 		$page       = new DiagnosticsPage();
 		$reflection = new ReflectionMethod( $page, 'get_severity_class' );
-		$reflection->setAccessible( true );
 
 		$this->assertSame( 'scalyn-severity-low', $reflection->invoke( $page, 'low' ) );
 		$this->assertSame( 'scalyn-severity-medium', $reflection->invoke( $page, 'medium' ) );

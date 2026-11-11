@@ -103,6 +103,160 @@ namespace {
   /** @dataProvider blockedText */
   public function test_recognizable_secret_inputs_are_blocked(string $text):void {$this->expectException(InvalidArgumentException::class);AiRedaction::input($text);}
   public static function blockedText():array {return [['api_key=secret-value'],['password: very-secret'],['Authorization: Bearer xyz'],['sk-'.str_repeat('x',30)],['-----BEGIN RSA PRIVATE KEY-----'],[str_repeat('x',4001)],['']];}
+  /** @dataProvider credentialProse */
+  public function test_credential_prose_is_rejected_before_vendor_or_persistence(string $text):void {
+   $this->configured();$repo=new AiRepository($this->cipher);$id=$repo->create();
+   $GLOBALS['wpdb']->get_row_return=['payload'=>end($GLOBALS['wpdb']->inserts)['data']['payload']];
+   $this->response($this->answer());
+   $before=[$GLOBALS['wpdb']->queries,$GLOBALS['wpdb']->inserts,$GLOBALS['wpdb']->updates,$GLOBALS['wpdb']->prepare_calls];
+   $handle=tmpfile();$previous=ini_set('error_log',stream_get_meta_data($handle)['uri']);$error=null;
+   try {
+    try{(new AiService($this->settings,$repo,new OpenAiAdapter($this->settings),$this->evidence()))->send($id,$text);}
+    catch(InvalidArgumentException $caught){$error=$caught;}
+    rewind($handle);$log=stream_get_contents($handle);
+   }finally{ini_set('error_log',$previous);fclose($handle);}
+   $this->assertInstanceOf(InvalidArgumentException::class,$error);
+   $this->assertSame('Enter up to 4,000 characters without credentials or private keys.',$error->getMessage());
+   $this->assertSame([],$GLOBALS['_ai_http_calls']);
+   $this->assertSame($before,[$GLOBALS['wpdb']->queries,$GLOBALS['wpdb']->inserts,$GLOBALS['wpdb']->updates,$GLOBALS['wpdb']->prepare_calls]);
+   $this->assertSame('',$log);
+  }
+  public static function credentialProse():array {return [
+   'encoded script credential'=>['Help with SMTP: &lt;script&gt;pass&#119;ord is ExampleOnly1234&lt;/script&gt;'],
+   'encoded style credential'=>['Help with SMTP: &lt;style&gt;pass&#119;ord is ExampleOnly1234&lt;/style&gt;'],
+   'encoded comment credential'=>['Help with SMTP: &lt;!-- pass&#119;ord is ExampleOnly1234 --&gt;'],
+   'encoded script nested credential'=>['Help with SMTP: &lt;script&gt;pass&amp;#119;ord is ExampleOnly1234&lt;/script&gt;'],
+   'encoded style nested credential'=>['Help with SMTP: &lt;style&gt;pass&amp;#119;ord is ExampleOnly1234&lt;/style&gt;'],
+   'encoded comment nested credential'=>['Help with SMTP: &lt;!-- pass&amp;#119;ord is ExampleOnly1234 --&gt;'],
+   'appended after short status'=>['My password is missing ExampleOnly1234'],
+   'appended after status clause'=>['My password is missing when connecting to SMTP ExampleOnly1234'],
+   ['My password is missing. What should I do? ExampleOnly1234'],
+   ["My password is missing\nCan you help? ExampleOnly1234"],
+   ['My password is missing ExampleOnly1234. What should I do?'],
+   ['My password is missing. What should I do ExampleOnly1234?'],
+   ['My password is incorrect when connecting to Gmail ExampleOnly1234. What should I try?'],
+   ['My password is incorrect when connecting to Gmail. What should I try? ExampleOnly1234'],
+   ['My password is missing. What should I do? My token is ExampleOnly1234'],
+   ['My password is missing. What should I do? Can you help?'],
+   ['My password is invalid ExampleOnly1234'],
+   ['My password is not set ExampleOnly1234'],
+   ['My password is missing. ExampleOnly1234'],
+   ["My password is missing\nExampleOnly1234"],
+   ['My password is missing when connecting to SMTP &#69;xampleOnly1234'],
+   ['My password is missing when connecting to SMTP <b>ExampleOnly1234</b>'],
+   ['My password is missing when connecting to SMTP. My API key is ExampleOnly1234'],
+   ['My password is x'],
+   ['My password is "x"'],
+   ['My API key equals abc'],
+   ['My password is long enough ExampleOnly1234'],
+   ['The token is used for authentication ExampleOnly1234'],
+   ['My pass&#119;ord is ExampleOnly1234'],
+   ['My password&#32;is ExampleOnly1234'],
+   ['My pass&#x77;ord is Abcdefgh'],
+   ['My password&nbsp;is ExampleOnly1234'],
+   ['My password&Tab;is&NewLine;ExampleOnly1234'],
+   ['My pass&lt;b&gt;word&lt;/b&gt; is ExampleOnly1234'],
+   ['My pass&amp;#119;ord is ExampleOnly1234'],
+   ['My password is Abcdefgh'],
+   ['Password is abcdefghijklmnop'],
+   ['My API key equals ExampleOnlyAlphabetic'],
+   ['My password is incorrectExample'],
+   ['My password is incorrect Abcdefgh'],
+   ['My password is incorrect when connecting to SMTP Abcdefgh'],
+   ['My password is required to connect ExampleOnly1234'],
+   ['My password is unavailable after migration Abcdefgh'],
+   ['My password is incorrect when connecting to ExampleOnlyServer'],
+   ['My password is required to connect. My API key is Abcdefgh'],
+   ['My password is "incorrect"'],
+   ['My SMTP password is ExampleOnly1234'],
+   ['My SMTP PASSWORD IS SET TO ExampleOnly1234.'],
+   ['The API key equals ExampleOnlyKey1234'],
+   ['My access token is ExampleOnlyToken1234'],
+   ['The refresh_token is ExampleOnlyRefresh1234'],
+   ['My client secret is ExampleOnlyClient1234'],
+   ['My SMTP password is 12345678'],
+   ['My password is "example only passphrase"'],
+   ["My passwd is 'ExampleOnly1234'"],
+   ['My passphrase is example-only-phrase'],
+   ['The authorization is Bearer ExampleOnlyAuth1234'],
+   ['My pass<b>word</b> is ExampleOnly1234'],
+  ];}
+
+  /** @dataProvider safeEncodedMarkup */
+  public function test_safe_encoded_markup_keeps_original_output_semantics(string $text):void {
+   $this->assertFalse(AiRedaction::has_secret($text));
+   $this->assertSame($text,AiRedaction::input($text));
+  }
+  public static function safeEncodedMarkup():array {return [
+   ['Help with SMTP: &lt;script&gt;SMTP setup help&lt;/script&gt;'],
+   ['Help with SMTP: &lt;style&gt;color: blue&lt;/style&gt;'],
+   ['Help with SMTP: &lt;!-- SMTP setup help --&gt;'],
+   ['Help with SMTP: &lt;script&gt;SMTP &amp;amp; IMAP setup&lt;/script&gt;'],
+  ];}
+
+  /** @dataProvider safeStatusHelp */
+  public function test_complete_status_help_question_is_not_a_secret(string $text):void {
+   $this->assertFalse(AiRedaction::has_secret($text));
+   $this->assertSame($text,AiRedaction::input($text));
+  }
+  public static function safeStatusHelp():array {return [
+   ['My password is missing. What should I do?'],
+   ["My password is missing\nCan you help?"],
+   ['My password is incorrect when connecting to Gmail. What should I try?'],
+   ['My password is missing when connecting to SMTP. What should I check?'],
+   ['My password is required to connect to SMTP. How can I fix this?'],
+  ];}
+
+  /** @dataProvider benignCredentialProse */
+  public function test_credential_status_and_help_prose_is_not_blocked(string $text):void {
+   $this->assertFalse(AiRedaction::has_secret($text));
+   $this->assertSame($text,AiRedaction::input($text));
+  }
+  public static function benignCredentialProse():array {return [
+   ['My password is missing'],
+   ['My password is missing when connecting to SMTP.'],
+   ['My password is invalid when connecting to SMTP.'],
+   ['My password is incorrect when connecting to SMTP.'],
+   ['My password is required to connect.'],
+   ['My password is missing after migration.'],
+   ['My password is unavailable after migration.'],
+   ['The access token is unavailable after an update.'],
+   ['My password is incorrect when authenticating to IMAP.'],
+   ['My password is required to authenticate to SMTP.'],
+   ['My password is incorrect after a password reset.'],
+   ['My pass&#119;ord is incorrect when connecting to SMTP.'],
+   ['The SMTP password is incorrect.'],['My API key is missing.'],['The access token is expired.'],
+   ['My password is not set.'],['The password is required for SMTP.'],
+   ['How do I rotate an API key?'],['The token is used for authentication.'],
+   ['The password policy is ExampleOnly1234'],['Passwordless is ExampleOnly1234'],
+   ['Tokenization is ExampleOnly1234'],['My password is long enough.'],
+   ['My pass&#119;ord is incorrect.'],['My password&#32;is required for SMTP.'],
+   ['What does &amp; mean in SMTP configuration?'],['Explain &lt;b&gt;SMTP&lt;/b&gt; setup.'],
+   ['Passwordless&#32;is ExampleOnly1234'],
+  ];}
+
+  /** @dataProvider benignServiceStatus */
+  public function test_benign_credential_status_reaches_mock_vendor_and_saves_normally(string $text):void {
+   $this->configured();$repo=new AiRepository($this->cipher);$id=$repo->create();
+   $GLOBALS['wpdb']->get_row_return=['payload'=>end($GLOBALS['wpdb']->inserts)['data']['payload']];
+   $this->response($this->answer());$before=count($GLOBALS['wpdb']->prepare_calls);
+   $session=(new AiService($this->settings,$repo,new OpenAiAdapter($this->settings),$this->evidence()))->send($id,$text);
+   $this->assertSame($text,$session['messages'][0]['text']);
+   $this->assertCount(1,$GLOBALS['_ai_http_calls']);
+   $this->assertStringContainsString($text,$GLOBALS['_ai_http_calls'][0][1]['body']);
+   $writes=array_values(array_filter(array_slice($GLOBALS['wpdb']->prepare_calls,$before),static fn($call)=>str_starts_with($call['query'],'UPDATE %i SET payload=%s')));
+   $this->assertCount(1,$writes);
+   $saved=json_decode($this->cipher->decrypt($writes[0]['args'][1],'ai-session'),true);
+   $this->assertSame($text,$saved['messages'][0]['text']);
+  }
+  public static function benignServiceStatus():array {return [
+   ['My password is incorrect when connecting to Gmail. What should I try?'],
+   ['My password is missing when connecting to SMTP. What should I do?'],
+   ['My password is missing when connecting to SMTP.'],
+   ['My password is incorrect when connecting to SMTP.'],
+   ['My password is required to connect to SMTP.'],
+  ];}
+
   public function test_input_addresses_and_html_are_removed():void {$this->assertSame('My SMTP sender [address removed] fails',AiRedaction::input('My SMTP sender <b>me@example.com</b> fails'));}
   public function test_openai_payload_is_stateless_bounded_and_has_no_tools():void {
    $this->configured();$this->response($this->answer());$adapter=new OpenAiAdapter($this->settings);
@@ -279,6 +433,9 @@ namespace {
   }
   public function test_ai_page_has_no_credentials_or_private_histories_in_markup():void {
    $this->configured();ob_start();(new \Scalyn\MailRelay\Admin\Pages\AiPage($this->settings,new \Scalyn\MailRelay\AI\AiAdapters($this->settings,new OpenAiAdapter($this->settings))))->render();$html=(string)ob_get_clean();
+   $this->assertStringContainsString('Never paste credentials, message bodies, subjects or recipients.',$html);
+   $this->assertStringContainsString('Recognizable credentials are blocked, but detection is not perfect.',$html);
+   $this->assertStringContainsString('Chats expire after 30 days without a new message.',$html);
    $this->assertStringContainsString('data-provider-tab="chats"',$html);$this->assertStringContainsString('data-provider-tab="mcp"',$html);
    $this->assertStringNotContainsString('sk-'.str_repeat('test',12),$html);$this->assertStringNotContainsString(get_option(AiSettings::OPTION)['profiles']['openai']['key'],$html);
   }
@@ -326,7 +483,7 @@ namespace {
    $GLOBALS['_test_wp_options']['scalyn_mail_relay_db_version']='0.13.0';$GLOBALS['_test_dbdelta_queries']=[];
    try{\Scalyn\MailRelay\Database\Migrator::migrate();$this->fail();}catch(RuntimeException $e){}
    $this->assertSame('0.13.0',get_option('scalyn_mail_relay_db_version'));$GLOBALS['wpdb']->missingAi=false;
-   \Scalyn\MailRelay\Database\Migrator::migrate();$this->assertSame('0.14.0',get_option('scalyn_mail_relay_db_version'));
+   \Scalyn\MailRelay\Database\Migrator::migrate();$this->assertSame(SCALYN_MAIL_RELAY_DB_VERSION,get_option('scalyn_mail_relay_db_version'));
    $before=count($GLOBALS['_test_dbdelta_queries']);\Scalyn\MailRelay\Database\Migrator::migrate();$this->assertCount($before,$GLOBALS['_test_dbdelta_queries']);
   }
   public function test_lost_claim_fence_blocks_inference_before_dispatch():void {
