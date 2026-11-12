@@ -1,0 +1,398 @@
+<?php
+/**
+ * Diagnostics page view.
+ *
+ * Variables injected by DiagnosticsPage::render():
+ *   bool                         $provider_configured   Whether a provider is configured and registered.
+ *   string                       $wizard_url            URL to Setup Wizard.
+ *   string                       $diagnostics_run_url   URL to trigger diagnostics (empty if endpoint not ready).
+ *   array<string, array|null>    $diagnostics           Results organized by check type, or null if no results.
+ *   int|null                     $health_score          Overall health score (0-100) or null if no results.
+ *   string                       $health_ui_status      UI status for the score (healthy, warning, critical, unknown).
+ *   string                       $health_ui_label       Formatted score label (e.g., "80/100" or "Unknown").
+ *   array<string, int|null>      $health_components     Component label => score, or null when not evaluated.
+ *   string                       $health_summary        HealthScorer summary of what the score is based on, or ''.
+ *   string                       $spf_ui_status         UI status for SPF (healthy, warning, critical, unknown).
+ *   string                       $spf_severity          CSS class for SPF severity (scalyn-severity-*).
+ *   string                       $mx_ui_status          UI status for MX (healthy, warning, critical, unknown).
+ *   string                       $mx_severity           CSS class for MX severity.
+ *   string                       $dkim_ui_status        UI status for DKIM (healthy, warning, critical, unknown).
+ *   string                       $dkim_severity         CSS class for DKIM severity.
+ *   string                       $dmarc_ui_status       UI status for DMARC (healthy, warning, critical, unknown).
+ *   string                       $dmarc_severity        CSS class for DMARC severity.
+ *   string                       $smtp_tls_ui_status    UI status for SMTP/TLS (healthy, warning, critical, unknown).
+ *   string                       $smtp_tls_severity     CSS class for SMTP/TLS severity.
+ *   array<int, array>            $recent_failures       Recent failed sends with classified category and remediation.
+ *
+ * Displays real diagnostic findings organized by category (DNS vs Provider checks).
+ * Each finding includes: status, message, evidence, impact, severity, and recommended action.
+ * Also displays recent mail send failures with deterministic failure classification and remediation.
+ *
+ * Privacy: Do not render credentials, SMTP transcripts, provider metadata,
+ * email bodies, or recipient information. Render only sanitized evidence and status.
+ *
+ * @package ScalynMailRelay
+ */
+
+use Scalyn\MailRelay\Admin\Components\ActionButton;
+use Scalyn\MailRelay\Admin\Components\DiagnosticResultCard;
+use Scalyn\MailRelay\Admin\Components\EvidenceDisplay;
+use Scalyn\MailRelay\Admin\Components\EmptyState;
+use Scalyn\MailRelay\Admin\Components\HealthScoreBreakdown;
+use Scalyn\MailRelay\Admin\Components\StatusBadge;
+
+defined( 'ABSPATH' ) || exit;
+?>
+<div class="wrap scalyn-mail-relay scalyn-diagnostics">
+	<h1><?php esc_html_e( 'Diagnostics', 'scalyn-mail-relay' ); ?></h1>
+	<p class="scalyn-lead"><?php esc_html_e( 'Find configuration issues, understand their impact and review the next action.', 'scalyn-mail-relay' ); ?></p>
+	<?php
+	\Scalyn\MailRelay\Admin\Components\PageTabs::render(
+		array(
+			'configuration-checks' => __( 'Configuration Checks', 'scalyn-mail-relay' ),
+			'deliverability-score' => __( 'Deliverability Score', 'scalyn-mail-relay' ),
+			'failures-guidance'    => __( 'Failures & Guidance', 'scalyn-mail-relay' ),
+			'header-analysis'      => __( 'Header Analysis', 'scalyn-mail-relay' ),
+		)
+	);
+	?>
+	<div id="scalyn-panel-configuration-checks" class="scalyn-provider-tab-panel" data-provider-panel="configuration-checks">
+	<?php if ( current_user_can( \Scalyn\MailRelay\Core\Capabilities::MANAGE_SETTINGS ) ) : ?>
+		<p><a href="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-data-controls#scalyn-dkim-heading' ) ); ?>"><?php esc_html_e( 'Configure DKIM in Settings', 'scalyn-mail-relay' ); ?></a></p>
+	<?php endif; ?>
+
+	<?php if ( $provider_configured ) : ?>
+		<!-- Run Diagnostics Action (Header) -->
+		<div class="scalyn-panel-heading scalyn-diagnostics-run-toolbar">
+			<div>
+				<?php
+				$last_run_time = null;
+				if ( ! empty( $diagnostics ) ) {
+					// Get created_at from first diagnostic result.
+					foreach ( $diagnostics as $check_data ) {
+						if ( null !== $check_data && isset( $check_data['created_at'] ) ) {
+							$last_run_time = $check_data['created_at'];
+							break;
+						}
+					}
+				}
+				?>
+				<?php if ( null !== $last_run_time ) : ?>
+					<p style="margin: 0 0 8px 0; font-size: 13px; color: #50575e;">
+						<?php esc_html_e( 'Last recorded run (site time): ', 'scalyn-mail-relay' ); ?>
+						<time datetime="<?php echo esc_attr( $last_run_time ); ?>">
+							<?php echo esc_html( $last_run_time ); ?>
+						</time>
+					</p>
+				<?php endif; ?>
+			</div>
+			<div class="scalyn-actions">
+				<?php
+				echo '<button type="button" class="button button-primary" id="scalyn-run-diagnostics" data-scalyn-action="run-diagnostics" data-endpoint="' . esc_url( $diagnostics_run_url ) . '">' . esc_html__( 'Run Diagnostics Now', 'scalyn-mail-relay' ) . '</button>';
+				?>
+			</div>
+		</div>
+	<?php endif; ?>
+
+	<?php if ( ! $provider_configured ) : ?>
+		<div class="scalyn-card">
+			<?php
+			EmptyState::render(
+				__( 'Configure a mail provider first using the Setup Wizard, then return here to run diagnostics.', 'scalyn-mail-relay' ),
+				__( 'Open Setup Wizard', 'scalyn-mail-relay' ),
+				$wizard_url
+			);
+			?>
+		</div>
+	<?php else : ?>
+		<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/diagnostics-overview.php'; ?>
+		<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/diagnostic-scope.php'; ?>
+
+		<!-- DNS Validation Checks -->
+		<section class="scalyn-diagnostics-section" aria-labelledby="scalyn-diagnostics-dns-heading">
+			<h2 id="scalyn-diagnostics-dns-heading" class="scalyn-diagnostics-section__title"><?php esc_html_e( 'DNS Configuration', 'scalyn-mail-relay' ); ?></h2>
+			<p class="scalyn-diagnostics-section__description"><?php esc_html_e( 'Inspect SPF, DKIM, DMARC, and MX DNS records. A passing record check does not verify message authentication or delivery.', 'scalyn-mail-relay' ); ?></p>
+
+			<div class="scalyn-diagnostics-grid">
+
+				<?php
+				$spf          = $diagnostics['spf'] ?? null;
+				$spf_ui_label = $spf ? ucfirst( $spf['status'] ) : __( 'Unknown', 'scalyn-mail-relay' );
+
+				DiagnosticResultCard::render(
+					__( 'SPF Record', 'scalyn-mail-relay' ),
+					$spf_ui_status,
+					$spf_ui_label,
+					function () use ( $spf, $spf_severity ) {
+						if ( null === $spf ) {
+							EmptyState::render(
+								__( 'SPF record status has not yet been checked. Run diagnostics to verify your SPF configuration.', 'scalyn-mail-relay' )
+							);
+							return;
+						}
+
+						echo '<p class="scalyn-finding__message">' . esc_html( $spf['result_message'] ) . '</p>';
+						EvidenceDisplay::render( $spf, 'SPF Record', 'pass' !== $spf['status'] );
+
+						if ( $spf['recommended_action'] ) {
+							echo '<p class="scalyn-finding__action"><strong>' . esc_html__( 'Recommended action: ', 'scalyn-mail-relay' ) . '</strong>' . esc_html( $spf['recommended_action'] ) . '</p>';
+						}
+					},
+					'scalyn-diagnostics-spf-heading',
+					$spf ?? array()
+				);
+				?>
+
+				<?php
+				$mx          = $diagnostics['mx'] ?? null;
+				$mx_ui_label = $mx ? ucfirst( $mx['status'] ) : __( 'Unknown', 'scalyn-mail-relay' );
+
+				DiagnosticResultCard::render(
+					__( 'MX Records', 'scalyn-mail-relay' ),
+					$mx_ui_status,
+					$mx_ui_label,
+					function () use ( $mx, $mx_severity ) {
+						if ( null === $mx ) {
+							EmptyState::render(
+								__( 'MX record status has not yet been checked. Run diagnostics to verify your MX configuration.', 'scalyn-mail-relay' )
+							);
+							return;
+						}
+
+						echo '<p class="scalyn-finding__message">' . esc_html( $mx['result_message'] ) . '</p>';
+						EvidenceDisplay::render( $mx, 'MX Records', 'pass' !== $mx['status'] );
+
+						if ( $mx['recommended_action'] ) {
+							echo '<p class="scalyn-finding__action"><strong>' . esc_html__( 'Recommended action: ', 'scalyn-mail-relay' ) . '</strong>' . esc_html( $mx['recommended_action'] ) . '</p>';
+						}
+					},
+					'scalyn-diagnostics-mx-heading',
+					$mx ?? array()
+				);
+				?>
+
+				<?php
+				$dkim          = $diagnostics['dkim'] ?? null;
+				$dkim_ui_label = $dkim ? ucfirst( $dkim['status'] ) : __( 'Unknown', 'scalyn-mail-relay' );
+
+				DiagnosticResultCard::render(
+					__( 'DKIM Records', 'scalyn-mail-relay' ),
+					$dkim_ui_status,
+					$dkim_ui_label,
+					function () use ( $dkim, $dkim_severity ) {
+						if ( null === $dkim ) {
+							EmptyState::render(
+								__( 'DKIM record status has not yet been checked. Run diagnostics to verify your DKIM configuration.', 'scalyn-mail-relay' )
+							);
+							return;
+						}
+
+						echo '<p class="scalyn-finding__message">' . esc_html( $dkim['result_message'] ) . '</p>';
+						EvidenceDisplay::render( $dkim, 'DKIM Records', 'pass' !== $dkim['status'] );
+
+						if ( $dkim['recommended_action'] ) {
+							echo '<p class="scalyn-finding__action"><strong>' . esc_html__( 'Recommended action: ', 'scalyn-mail-relay' ) . '</strong>' . esc_html( $dkim['recommended_action'] ) . '</p>';
+						}
+					},
+					'scalyn-diagnostics-dkim-heading',
+					$dkim ?? array()
+				);
+				?>
+
+				<?php
+				$dmarc          = $diagnostics['dmarc'] ?? null;
+				$dmarc_ui_label = $dmarc ? ucfirst( $dmarc['status'] ) : __( 'Unknown', 'scalyn-mail-relay' );
+
+				DiagnosticResultCard::render(
+					__( 'DMARC Policy', 'scalyn-mail-relay' ),
+					$dmarc_ui_status,
+					$dmarc_ui_label,
+					function () use ( $dmarc, $dmarc_severity ) {
+						if ( null === $dmarc ) {
+							EmptyState::render(
+								__( 'DMARC policy status has not yet been checked. Run diagnostics to verify your DMARC configuration.', 'scalyn-mail-relay' )
+							);
+							return;
+						}
+
+						echo '<p class="scalyn-finding__message">' . esc_html( $dmarc['result_message'] ) . '</p>';
+						EvidenceDisplay::render( $dmarc, 'DMARC Policy', 'pass' !== $dmarc['status'] );
+
+						if ( $dmarc['recommended_action'] ) {
+							echo '<p class="scalyn-finding__action"><strong>' . esc_html__( 'Recommended action: ', 'scalyn-mail-relay' ) . '</strong>' . esc_html( $dmarc['recommended_action'] ) . '</p>';
+						}
+					},
+					'scalyn-diagnostics-dmarc-heading',
+					$dmarc ?? array()
+				);
+				?>
+
+			</div>
+		</section>
+
+		<!-- Provider Health Checks -->
+		<?php if ( 'smtp' === ( $diagnostic_scope['provider'] ?? 'smtp' ) ) : ?>
+		<section class="scalyn-diagnostics-section" aria-labelledby="scalyn-diagnostics-provider-heading">
+			<h2 id="scalyn-diagnostics-provider-heading" class="scalyn-diagnostics-section__title"><?php esc_html_e( 'Provider Connection · TLS and Certificates', 'scalyn-mail-relay' ); ?></h2>
+			<p class="scalyn-diagnostics-section__description"><?php esc_html_e( 'Verify SMTP server reachability, TLS support, and certificate validity.', 'scalyn-mail-relay' ); ?></p>
+
+			<div class="scalyn-diagnostics-grid">
+
+				<?php
+				$smtp_tls          = $diagnostics['smtp_tls'] ?? null;
+				$smtp_tls_ui_label = $smtp_tls ? ucfirst( $smtp_tls['status'] ) : __( 'Unknown', 'scalyn-mail-relay' );
+
+				DiagnosticResultCard::render(
+					__( 'SMTP/TLS Configuration', 'scalyn-mail-relay' ),
+					$smtp_tls_ui_status,
+					$smtp_tls_ui_label,
+					function () use ( $smtp_tls, $smtp_tls_severity ) {
+						if ( null === $smtp_tls ) {
+							EmptyState::render(
+								__( 'SMTP/TLS server status has not yet been checked. Run diagnostics to verify your SMTP provider configuration.', 'scalyn-mail-relay' )
+							);
+							return;
+						}
+
+						echo '<p class="scalyn-finding__message">' . esc_html( $smtp_tls['result_message'] ) . '</p>';
+						EvidenceDisplay::render( $smtp_tls, 'SMTP/TLS Configuration', 'pass' !== $smtp_tls['status'] );
+
+						if ( $smtp_tls['recommended_action'] ) {
+							echo '<p class="scalyn-finding__action"><strong>' . esc_html__( 'Recommended action: ', 'scalyn-mail-relay' ) . '</strong>' . esc_html( $smtp_tls['recommended_action'] ) . '</p>';
+						}
+					},
+					'scalyn-diagnostics-smtp-tls-heading',
+					$smtp_tls ?? array()
+				);
+
+				$rdns          = $diagnostics['rdns'] ?? null;
+				$rdns_ui_label = $rdns ? ucfirst( $rdns['status'] ) : __( 'Unknown', 'scalyn-mail-relay' );
+				DiagnosticResultCard::render(
+					__( 'Reverse DNS (submission server)', 'scalyn-mail-relay' ),
+					$rdns_ui_status ?? 'unknown',
+					$rdns_ui_label,
+					function () use ( $rdns ) {
+						if ( null === $rdns ) {
+							EmptyState::render(
+								__( 'Reverse DNS has not yet been checked. Run diagnostics to check the SMTP server’s addresses.', 'scalyn-mail-relay' )
+							);
+							return;
+						}
+						echo '<p class="scalyn-finding__message">' . esc_html( $rdns['result_message'] ) . '</p>';
+						EvidenceDisplay::render( $rdns, 'Reverse DNS', true );
+						if ( $rdns['recommended_action'] ) {
+							echo '<p class="scalyn-finding__action"><strong>' . esc_html__( 'Recommended action: ', 'scalyn-mail-relay' ) . '</strong>' . esc_html( $rdns['recommended_action'] ) . '</p>';
+						}
+						echo '<p class="scalyn-card__note">' . esc_html__( 'Informational: not included in the configuration score.', 'scalyn-mail-relay' ) . '</p>';
+					},
+					'scalyn-diagnostics-rdns-heading',
+					$rdns ?? array()
+				);
+				?>
+
+			</div>
+		</section>
+
+		<!-- Overall Health Score -->
+		<?php else : ?>
+		<section class="scalyn-card">
+			<h2 id="scalyn-diagnostics-provider-heading"><?php esc_html_e( 'API provider health: Not assessed', 'scalyn-mail-relay' ); ?></h2>
+			<p><?php esc_html_e( 'SMTP/TLS checks do not apply to this API provider and are excluded from the score. Use Verify Connection in the Setup Wizard for a separate API connection check. DNS checks do not prove API authorization or delivery.', 'scalyn-mail-relay' ); ?></p>
+		</section>
+		<?php endif; ?>
+		<section class="scalyn-diagnostics-section" aria-labelledby="scalyn-diagnostics-health-section-heading">
+			<h2 id="scalyn-diagnostics-health-section-heading" class="scalyn-diagnostics-section__title"><?php esc_html_e( 'Overall Email Health', 'scalyn-mail-relay' ); ?></h2>
+			<p><?php esc_html_e( 'Configuration score only; authentication and delivery not verified.', 'scalyn-mail-relay' ); ?></p>
+
+			<div class="scalyn-diagnostics-grid">
+				<?php
+				DiagnosticResultCard::render(
+					__( 'Configuration Score', 'scalyn-mail-relay' ),
+					$health_ui_status,
+					$health_ui_label,
+					function () use ( $health_score, $health_components, $health_summary ) {
+						if ( null === $health_score ) {
+							echo '<p class="scalyn-card__note">' . esc_html__( 'Run diagnostics to generate a configuration score. It combines limited DNS-record checks, SMTP/TLS connectivity and recent submission outcomes, not recipient delivery results.', 'scalyn-mail-relay' ) . '</p>';
+							return;
+						}
+
+						// Be explicit about provenance: a component whose checks returned
+						// Unknown (or never ran) is excluded from the weighted score, not
+						// scored as zero, so the number can be high while cards are Unknown.
+						echo '<p class="scalyn-card__note">' . esc_html__( 'The score is a weighted average of the components below that have evidence. A component shows "Not evaluated" when its checks returned Unknown or have not run; it is excluded rather than counted as zero.', 'scalyn-mail-relay' ) . '</p>';
+						HealthScoreBreakdown::render( $health_components, $health_summary );
+					},
+					'scalyn-diagnostics-health-card-heading'
+				);
+				?>
+			</div>
+		</section>
+
+	<?php endif; ?>
+	<details class="scalyn-card scalyn-disclosure"><summary><?php esc_html_e( 'Evidence freshness and coverage', 'scalyn-mail-relay' ); ?></summary>
+	<p><?php esc_html_e( 'Displayed diagnostic results:', 'scalyn-mail-relay' ); ?> <?php echo esc_html( $results_freshness ); ?></p>
+	<p><?php esc_html_e( 'Displayed health snapshot:', 'scalyn-mail-relay' ); ?> <?php echo esc_html( $score_freshness ); ?></p>
+	<p><?php esc_html_e( 'Results and the latest retained health snapshot may come from different runs. Evidence is stale after the configured cadence plus five minutes, or 24 hours plus five minutes when monitoring is disabled.', 'scalyn-mail-relay' ); ?></p>
+	</details>
+	</div>
+	<div id="scalyn-panel-deliverability-score" class="scalyn-provider-tab-panel" data-provider-panel="deliverability-score">
+		<?php if ( $provider_configured && isset( $deliverability ) ) : ?>
+			<?php $deliverability->render(); ?>
+		<?php else : ?>
+			<p><?php esc_html_e( 'Configure a mail provider before assessing deliverability.', 'scalyn-mail-relay' ); ?></p>
+		<?php endif; ?>
+	</div>
+	<div id="scalyn-panel-failures-guidance" class="scalyn-provider-tab-panel" data-provider-panel="failures-guidance">
+	<?php if ( $provider_configured ) : ?>
+		<!-- Recent Failure Classifications -->
+		<?php if ( ! empty( $recent_failures ) ) : ?>
+			<section class="scalyn-diagnostics-section" aria-labelledby="scalyn-diagnostics-failures-heading">
+				<h2 id="scalyn-diagnostics-failures-heading" class="scalyn-diagnostics-section__title"><?php esc_html_e( 'Recent Send Failures', 'scalyn-mail-relay' ); ?></h2>
+				<p class="scalyn-diagnostics-section__description"><?php esc_html_e( 'Recent mail delivery failures classified by type with remediation guidance.', 'scalyn-mail-relay' ); ?></p>
+
+				<div class="scalyn-failures-list">
+					<?php foreach ( $recent_failures as $failure ) : ?>
+						<div class="scalyn-failure-item scalyn-card">
+							<div class="scalyn-failure-header">
+								<span class="scalyn-failure-category scalyn-badge scalyn-badge--<?php echo esc_attr( $failure['category'] ); ?>">
+									<?php echo esc_html( ucfirst( str_replace( '-', ' ', $failure['category'] ) ) ); ?>
+								</span>
+								<span class="scalyn-failure-provider"><?php echo esc_html( $failure['provider'] ); ?></span>
+								<?php if ( $failure['failed_at'] ) : ?>
+									<time class="scalyn-failure-time" datetime="<?php echo esc_attr( wp_date( 'c', strtotime( $failure['failed_at'] ) ) ); ?>" title="<?php echo esc_attr( $failure['failed_at'] ); ?>">
+										<?php echo esc_html( $failure['failed_at_formatted'] ?? $failure['failed_at'] ); ?>
+									</time>
+								<?php endif; ?>
+							</div>
+
+							<div class="scalyn-failure-content">
+								<p class="scalyn-failure-remediation">
+									<strong><?php esc_html_e( 'Remediation:', 'scalyn-mail-relay' ); ?></strong> <?php echo esc_html( $failure['remediation'] ); ?>
+								</p>
+								<?php if ( $failure['evidence'] ) : ?>
+									<p class="scalyn-failure-evidence">
+										<small><?php echo esc_html( $failure['evidence'] ); ?></small>
+									</p>
+								<?php endif; ?>
+							</div>
+						</div>
+					<?php endforeach; ?>
+				</div>
+			</section>
+		<?php endif; ?>
+
+	<?php endif; ?>
+	<div class="scalyn-diagnostics-guidance">
+		<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/recommendations.php'; ?>
+		<?php \Scalyn\MailRelay\Admin\Components\VerificationScope::render(); ?>
+	</div>
+	</div>
+	<div id="scalyn-panel-header-analysis" class="scalyn-provider-tab-panel" data-provider-panel="header-analysis">
+	<?php
+	if ( isset( $header_analysis ) ) {
+		$header_analysis->render();
+	}
+	?>
+	</div>
+	<?php require SCALYN_MAIL_RELAY_PATH . 'admin/views/diagnostics-guide.php'; ?>
+</div>

@@ -1,0 +1,149 @@
+<?php
+/**
+ * Dashboard admin page.
+ *
+ * @package ScalynMailRelay
+ */
+
+namespace Scalyn\MailRelay\Admin\Pages;
+
+use Scalyn\MailRelay\Admin\HealthScorePresenter;
+use Scalyn\MailRelay\Core\Capabilities;
+use Scalyn\MailRelay\Core\Plugin;
+use Scalyn\MailRelay\Core\ProviderRegistry;
+use Scalyn\MailRelay\Core\SettingsRepository;
+use Scalyn\MailRelay\Logging\MailLogRepository;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Prepares dashboard data and renders the dashboard view.
+ *
+ * Data boundary: reads from Core services (SettingsRepository, ProviderRegistry)
+ * and the shared MailLogRepository. Must not query database tables directly,
+ * construct transports, access Saturn/Yaj internals, or calculate health scores.
+ *
+ * Ownership: Bernie / Admin.
+ */
+final class DashboardPage {
+
+	/**
+	 * Performs a capability check and renders the dashboard view.
+	 */
+	public function render(): void {
+		if ( ! current_user_can( Capabilities::VIEW_DASHBOARD ) ) {
+			wp_die( esc_html__( 'You do not have permission to view Scalyn Mail Relay.', 'scalyn-mail-relay' ) );
+		}
+
+		if ( \Scalyn\MailRelay\Agency\ManagedAccess::is_client() ) {
+			( new ClientPage() )->render();
+			return;
+		}
+
+		$container      = Plugin::instance()->container();
+		$deliverability = new \Scalyn\MailRelay\Admin\Components\DeliverabilityCard( $container->get( \Scalyn\MailRelay\Diagnostics\DeliverabilityAssessment::class ) );
+		$deliverability->handle();
+		$monitoring          = \Scalyn\MailRelay\Admin\MonitoringStatusPresenter::load();
+		$settings            = $container->get( SettingsRepository::class );
+		$provider_configured = $this->is_provider_configured();
+		$provider_verified   = $provider_configured && $settings->is_provider_verified();
+		$test_email_accepted = $provider_configured && $settings->has_accepted_test_email();
+
+		// Only label and verification metadata reach this card; never read credentials.
+		$active_provider_id    = $settings->get_active_provider_id();
+		$active_provider_label = $provider_configured ? $container->get( ProviderRegistry::class )->get( $active_provider_id )->get_label() : '';
+		$provider_transport    = match ( $active_provider_id ) {
+			'smtp' => __( 'SMTP', 'scalyn-mail-relay' ),
+			'sendgrid' => __( 'API (HTTPS)', 'scalyn-mail-relay' ),
+			'postmark' => __( 'API (HTTPS)', 'scalyn-mail-relay' ),
+			'smtp2go' => __( 'API (HTTPS)', 'scalyn-mail-relay' ),
+			'brevo' => __( 'API (HTTPS)', 'scalyn-mail-relay' ),
+			default => __( 'Not reported', 'scalyn-mail-relay' ),
+		};
+		$verified_at          = $provider_verified ? $settings->get_provider_verified_at() : null;
+		$verified_timestamp   = $verified_at ? strtotime( $verified_at ) : false;
+		$provider_verified_at = false !== $verified_timestamp ? wp_date( 'Y-m-d H:i:s', $verified_timestamp ) : __( 'Not recorded', 'scalyn-mail-relay' );
+
+		$log_repo         = $container->get( MailLogRepository::class );
+		$rows             = $log_repo->find_recent( 1, 0 );
+		$latest_log       = $rows[0] ?? null;
+		$activity_summary = \Scalyn\MailRelay\Admin\ActivitySummaryPresenter::load( $log_repo, current_time( 'mysql' ) );
+
+		$timeline_url = '';
+		if ( null !== $latest_log ) {
+			$uuid = (string) ( $latest_log['message_uuid'] ?? '' );
+			if ( null !== $this->validate_uuid( $uuid ) ) {
+				$timeline_url = add_query_arg(
+					array( 'message_uuid' => $uuid ),
+					admin_url( 'admin.php?page=scalyn-mail-relay-logs' )
+				);
+			}
+		}
+
+		// Health score: read the last HealthScorer snapshot — the same source and
+		// presentation the Diagnostics page uses — so both screens agree.
+		$diagnostic_scope          = $container->get( \Scalyn\MailRelay\Diagnostics\CurrentDiagnostics::class )->snapshot();
+		$health                    = HealthScorePresenter::present( $diagnostic_scope['health'] );
+		$health_score              = $health['score'];
+		$health_ui_status          = $health['ui_status'];
+		$health_ui_label           = $health['label'];
+		$health_components         = $health['components'];
+		$health_summary            = $health['summary'];
+		$has_completed_diagnostics = null !== $health['created_at'];
+
+		// A completed run or high score does not mean every authentication check passed.
+		$authentication_records_passed = true;
+		foreach ( array( 'spf_record', 'dkim_record', 'dmarc_policy' ) as $check_name ) {
+			$matching = array_values( array_filter( $diagnostic_scope['results'], static fn( array $row ): bool => ( $row['check_name'] ?? '' ) === $check_name ) );
+			if ( 1 !== count( $matching ) || 'pass' !== ( $matching[0]['status'] ?? '' ) ) {
+				$authentication_records_passed = false;
+				break;
+			}
+		}
+		$score_freshness = \Scalyn\MailRelay\Admin\MonitoringStatusPresenter::evidence( $health['created_at'], $settings->get_diagnostic_schedule(), time() );
+
+		// Wire the "Run Diagnostics" button to the REST endpoint.
+		$diagnostics_run_url = rest_url( 'scalyn-mail-relay/v1/diagnostics/run' );
+		$test_email_url      = add_query_arg(
+			array( 'step' => 5 ),
+			admin_url( 'admin.php?page=scalyn-mail-relay-wizard' )
+		);
+
+		require SCALYN_MAIL_RELAY_PATH . 'admin/views/dashboard.php';
+	}
+
+	/**
+	 * Returns whether a provider is actively configured and registered in the plugin.
+	 *
+	 * Reads the active provider ID from SettingsRepository and checks presence
+	 * in ProviderRegistry. Returns false when no provider ID is stored or when
+	 * the stored ID has not been registered by a provider module.
+	 */
+	private function is_provider_configured(): bool {
+		$container = Plugin::instance()->container();
+		$settings  = $container->get( SettingsRepository::class );
+		$registry  = $container->get( ProviderRegistry::class );
+		$id        = $settings->get_active_provider_id();
+
+		return '' !== $id && $registry->has( $id );
+	}
+
+	/**
+	 * Validates a UUID string against the standard 8-4-4-4-12 hexadecimal format.
+	 *
+	 * Returns the UUID unchanged if valid, or null if the format does not match.
+	 * Case-insensitive to accommodate both upper- and lower-case hex.
+	 *
+	 * Note: The same validation pattern exists in LogsPage::validate_uuid().
+	 * A future consolidation may extract a shared UUID helper.
+	 *
+	 * @param string $uuid The UUID string to validate.
+	 * @return string|null The UUID if valid; null if the format is invalid.
+	 */
+	private function validate_uuid( string $uuid ): ?string {
+		if ( 1 === preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $uuid ) ) {
+			return $uuid;
+		}
+		return null;
+	}
+}

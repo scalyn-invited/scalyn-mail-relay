@@ -1,0 +1,161 @@
+<?php
+/**
+ * Core mail dispatch orchestrator.
+ *
+ * @package ScalynMailRelay
+ */
+
+namespace Scalyn\MailRelay\Mail;
+
+use Scalyn\MailRelay\Core\HookNames;
+use Scalyn\MailRelay\Core\ProviderRegistry;
+use Scalyn\MailRelay\Core\SettingsRepository;
+use Scalyn\MailRelay\Delivery\DeliveryTracker;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Orchestrates the complete mail dispatch sequence.
+ *
+ * Responsibilities (in order):
+ *   1. Verify that an active provider is configured.
+ *   2. Resolve the active provider from the registry.
+ *   3. Retrieve the provider configuration from settings.
+ *   4. Delegate the send operation to the provider.
+ *   5. Publish a lifecycle hook so other modules can respond without coupling.
+ *   6. Return the normalized SendResult to the caller.
+ *
+ * Submission evidence is an explicit repository dependency. Timeline and log
+ * writers remain independent hook subscribers. Ordinary-mail route selection
+ * belongs to WordPressMailBridge; direct wizard dispatch uses the site default.
+ *
+ * Ownership: Bernie / Core.
+ */
+final class MailDispatcher {
+
+	/**
+	 * Creates a new mail dispatcher.
+	 *
+	 * @param ProviderRegistry                                            $registry The registry of available mail providers.
+	 * @param SettingsRepository                                          $settings The repository for reading plugin settings.
+	 * @param DeliveryTracker|null                                        $tracker Optional opted-in delivery evidence associations.
+	 * @param \Scalyn\MailRelay\Database\SubmissionAttemptRepository|null $attempts Submission evidence repository.
+	 */
+	public function __construct(
+		private readonly ProviderRegistry $registry,
+		private readonly SettingsRepository $settings,
+		private readonly ?DeliveryTracker $tracker = null,
+		private readonly ?\Scalyn\MailRelay\Database\SubmissionAttemptRepository $attempts = null
+	) {}
+
+	/**
+	 * Dispatches a prepared mail message through the active provider.
+	 *
+	 * On provider acceptance, fires HookNames::MAIL_SENT.
+	 * On provider failure or configuration error, fires HookNames::MAIL_FAILED.
+	 *
+	 * @param MailMessage $message The prepared message to send.
+	 * @param array|null  $target Optional pinned target for recovery; never user-controlled.
+	 * @param bool        $require_evidence Recovery must establish durable evidence before any transport call.
+	 * @throws \RuntimeException If mandatory recovery evidence cannot be established.
+	 * @return SendResult The normalized result from the provider.
+	 */
+	public function dispatch( MailMessage $message, ?array $target = null, bool $require_evidence = false ): SendResult {
+		$provider_id = $this->settings->get_active_provider_id();
+		// Capture attribution before transport; missing legacy revisions stay unknown.
+		$revision         = $this->settings->get_diagnostic_revision();
+		$configuration_id = preg_match( '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/D', $revision ) ? $revision : null;
+		if ( null !== $target ) {
+			$provider_id      = $target['provider'];
+			$configuration_id = $target['revision'];
+			$message          = new MailMessage( $message->uuid, $target['from'], $message->to, $message->subject, $message->body, $message->content_type, $message->headers, $message->attachments, $message->context, $message->attachment_names );
+		}
+
+		if ( '' === $provider_id ) {
+			$result = new SendResult( false, '', null, null, 'No mail provider is configured.', false, 'config' );
+			$this->publish( HookNames::MAIL_FAILED, $result, $message, $configuration_id );
+			return $result;
+		}
+
+		if ( ! $this->registry->has( $provider_id ) ) {
+			$result = new SendResult( false, $provider_id, null, null, 'Configured mail provider is not registered.', false, 'config' );
+			$this->publish( HookNames::MAIL_FAILED, $result, $message, $configuration_id );
+			return $result;
+		}
+
+		$provider = $this->registry->get( $provider_id );
+		try {
+			$config = null === $target ? $this->settings->get_provider_config( $provider_id ) : $this->settings->resolve_target( $target );
+		} catch ( \Throwable $error ) {
+			$result = new SendResult( false, $provider_id, null, null, 'Stored provider credentials are unavailable. Replace the key in Providers.', false, 'config' );
+			$this->publish( HookNames::MAIL_FAILED, $result, $message, $configuration_id );
+			return $result;
+		}
+		$recorded = false;
+		try {
+			if ( null !== $this->attempts ) {
+				$this->attempts->begin( $message->context['logical_uuid'] ?? $message->uuid, $message->uuid, $message->context['attempt_number'] ?? 1, $provider_id, $configuration_id, $message->context['origin'] ?? MailOrigin::current() );
+				$recorded = true;
+			}
+		} catch ( \Throwable $error ) {
+			$recorded = false;
+		}
+		if ( $require_evidence && ! $recorded ) {
+			throw new \RuntimeException( 'Durable submission evidence is unavailable. No submission was attempted.' );
+		}
+		// Optional tracking must be associated before submission and can never block it.
+		$association = null;
+		try {
+			// Existing sources are active-revision scoped, never bind another revision.
+			$association = null === $target || $configuration_id === $revision ? $this->tracker?->prepare( $message, $provider_id ) : null;
+		} catch ( \Throwable $error ) {
+			$association = null;
+		}
+		try {
+			$result = $provider->send( $message, $config );
+		} catch ( \Throwable $error ) {
+			$result = new SendResult( false, $provider_id, null, null, 'Provider acceptance is unconfirmed. Check provider activity before retrying.', false, 'unknown', array(), true );
+		}
+		try {
+			if ( $recorded ) {
+				$this->attempts->finish( $message->uuid, $result );
+			}
+		} catch ( \Throwable $error ) {
+			// Never reverse observed acceptance, nor retry because an observer failed.
+			unset( $error );
+		}
+		try {
+			$this->tracker?->acknowledge( $association, $result );
+		} catch ( \Throwable $error ) {
+			// Acknowledgement binding is evidence metadata; it never changes the outcome.
+			unset( $error );
+		}
+
+		if ( $result->success ) {
+			$this->publish( HookNames::MAIL_SENT, $result, $message, $configuration_id );
+		} elseif ( $result->acceptance_unconfirmed ) {
+			$this->publish( HookNames::MAIL_OUTCOME_UNCONFIRMED, $result, $message, $configuration_id );
+		} else {
+			$this->publish( HookNames::MAIL_FAILED, $result, $message, $configuration_id );
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Observer errors cannot reverse an observed outcome or trigger another send.
+	 *
+	 * @param string      $hook Established lifecycle hook.
+	 * @param SendResult  $result Normalized provider result.
+	 * @param MailMessage $message Correlated message.
+	 * @param string|null $configuration_id Dispatch-time revision, or unknown.
+	 */
+	private function publish( string $hook, SendResult $result, MailMessage $message, ?string $configuration_id ): void {
+		try {
+			do_action( $hook, $result, $message, $configuration_id );
+		} catch ( \Throwable $error ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Fixed text only; never include the observer exception or mail content.
+			error_log( 'Scalyn Mail Relay: mail outcome observer failed.' );
+		}
+	}
+}

@@ -2,14 +2,179 @@
 
 All notable changes to Scalyn Mail Relay will be documented here.
 
-## [0.1.0-demo] - 2026-07-17
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
+this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-### Planned
-- Initial MVP demo release.
-- Core plugin bootstrap.
-- SMTP configuration.
-- Test email.
-- Email logging.
-- Diagnostics.
-- Health score.
-- Dashboard framework.
+## [0.1.1] — locally prepared; publication pending
+
+- Carry forward the reviewed QA5 runtime with production version metadata and
+  unchanged database schema 0.15.0. No new provider behavior or migration.
+- Support scope is single-site Custom SMTP, ordinary WordPress mail,
+  metadata logs/timelines, Dashboard visibility and manual diagnostics.
+- Optional API providers/webhooks/routing/recovery/agency/AI remain present and
+  unchanged, outside this SMTP-first acceptance scope. Routing/recovery remain
+  disabled by default. See README for retained limitations and key backups.
+- Preparing this package does not authorize a release, merge or deployment.
+
+## Historical development notes leading to 0.1.1
+
+The following QA labels record earlier checkpoints, not additional releases.
+
+### 0.1.1-qa.5 local candidate (not a production release)
+
+- Dashboard authentication progress now requires explicit passing recorded SPF,
+  DKIM and DMARC checks for the selected configuration. Unknown, warning, failed,
+  missing or duplicate findings do not complete the step merely because a health
+  snapshot exists. Labels distinguish recorded DNS checks from actual message
+  authentication.
+- Retain QA4 SMTP and credential-protection fixes; schema remains 0.15.0.
+- Isolated ordinary WordPress SMTP authentication-rejection verification passed,
+  including Failed history, safe guidance, no PHP-mail fallback or automatic resend.
+
+### 0.1.1-qa.4 local candidate (not a production release)
+
+- Selected Custom SMTP handles ordinary WordPress mail synchronously without
+  requiring opt-in routing or recovery; failures do not fall back to PHP mail.
+- Protect fresh SMTP login saves even before a named configuration catalogue
+  exists. Authorized credential writes can initialize a separate private site
+  key without mandatory cPanel or external-key setup; reads/sends/workers cannot
+  initialize or replace a key. External v1 and local v2 envelopes retain their
+  own key-source/context identity.
+- Preserve existing legacy reads; explicit login saves/imports must protect them
+  or fail unchanged. Back up the matching key with the database. The separate
+  key artifact intentionally survives replacement and both uninstall modes;
+  database-data deletion removes its nonsecret marker, not that artifact.
+- Remove five PHP 8.5 reflection deprecations in tests rather than suppress them.
+- Preserve the earlier QA3 fail-closed recovery/history reads and honest
+  traffic-driven WordPress scheduling guidance. Schema remains 0.15.0.
+- Candidate-specific independent review, installed acceptance, compatibility,
+  integration and release gates are recorded in the QA4 verification document;
+  these local changes do not authorize deployment or real-provider mail.
+
+### Earlier unreleased work
+
+- Show overdue schedules, stale evidence, safe execution failures and unconfirmed
+  completion on Dashboard and Diagnostics; document and verify low-traffic cron.
+
+- Persist bounded diagnostic execution status with UTC timestamps, safe failure
+  stages, separate scheduled freshness and completion-unconfirmed recovery.
+
+- Publish diagnostic groups and their health snapshot in one InnoDB transaction,
+  with shared run UUID/time, isolated error results and rollback on partial failure.
+
+- Extract shared manual/scheduled diagnostic orchestration; add opt-in hourly,
+  twice-daily or daily scheduling in Data Controls, shared overlap exclusion and
+  bounded check execution. Read scoring inputs by the current run UUID.
+
+- Add runtime actor/source attribution, capability-protected Audit History with
+  50-row cursor pagination, privacy-safe read models and 100-row audit expiry
+  batches under the existing Data Controls retention policy.
+
+- Add an allowlisted audit event contract and append-only repository, with
+  failure-isolated capture of configuration/retention changes, wizard verification,
+  test-email acceptance/failure, and correlated diagnostic run outcomes.
+
+- Add hourly retention scheduling, database overlap protection and safe cleanup
+  status; failed or full batches resume on later ticks.
+- Add capability/nonce-protected Data Controls for 1–3650 day retention and
+  separately confirmed uninstall deletion; preserve omitted advanced settings.
+- Share scheduled-hook ownership across activation, deactivation and both
+  uninstall modes; reject truthy non-boolean deletion flags and clean up status
+  during explicitly destructive uninstall.
+- Treat retention selection errors as failures rather than empty successful batches.
+
+### Added
+
+- Bounded, oldest-first mail retention repository that transactionally removes
+  expired mail logs with their related timeline events. Cutoff calculation,
+  scheduling and settings-driven execution remain pending.
+- Bounded diagnostic retention that deletes complete diagnostic-run groups and
+  independently expires health snapshots without inventing absent correlation.
+
+### 0.1.1-qa.2 local QA candidate (not released)
+
+- SMR-QA-03–07: route-aware WordPress sender validation, explicit recovery read
+  failures, composite recovery-history pagination and stronger AI credential-prose
+  screening. These source changes still need affected live-flow acceptance.
+- Add schema gate 0.15.0: convert the exact legacy MyISAM alert table to InnoDB
+  with verification before advancing the stored version; create fresh alerts on
+  InnoDB. The upgrade can rebuild/lock the table and requires a backup, database
+  privileges, maintenance window and staging recipient safeguard.
+- The tested ZIP is a local QA artifact, not a production release. GitHub CI and
+  local database checks do not establish staging acceptance or inbox delivery.
+
+## [0.1.0] - 2026-09-04
+
+First MVP release: configure a mail provider, send through it, see what happened,
+and diagnose it when it fails.
+
+### Added
+
+**Core**
+- Modular monolith bootstrap: service container, singleton `Plugin`, PSR-4
+  autoloading with a source-tree fallback, and a `scalyn_mail_relay_booted`
+  extension point for module-owned registration.
+- Seven granular capabilities (`scalyn_mail_relay_*`), granted to Administrator
+  on activation.
+- Versioned schema migrations via `dbDelta()` behind a DB version gate.
+- Settings repository with typed accessors, defaults and sanitization.
+
+**Mail transport**
+- SMTP provider built on the WordPress-bundled PHPMailer, behind
+  `ProviderInterface`.
+- Mail dispatcher with normalized `SendResult`, and a failure classifier that
+  maps transport errors to stable categories with remediation suggestions.
+- Connection test and test-send, neither of which persists or echoes credentials.
+
+**Logging**
+- Mail log and append-only timeline, correlated by `message_uuid`.
+- Email Logs admin screen with pagination, filtering and a detail view.
+
+**Diagnostics**
+- SPF, MX, DKIM and DMARC DNS checks.
+- SMTP reachability, STARTTLS and certificate diagnostics. The probe never
+  authenticates, and reports "unknown" rather than "fail" when a transient
+  failure leaves no real evidence.
+- Explainable health score derived from diagnostic results and recent mail
+  history.
+- `POST /wp-json/scalyn-mail-relay/v1/diagnostics/run`, gated on
+  `RUN_DIAGNOSTICS`.
+
+**Admin**
+- Dashboard, Diagnostics, Email Logs and Providers screens.
+- Five-step setup wizard: provider → SMTP settings → connection test → test
+  email → verification. Every state-changing step is capability- and
+  nonce-checked.
+- Shared UI components: status badge, diagnostic result card, evidence display,
+  empty state, step indicator.
+
+### Security
+- Every admin screen and REST route is capability-gated; every state-changing
+  admin POST verifies a nonce.
+- All database access is via prepared statements.
+- Credentials, tokens and full email bodies are never persisted to log or
+  diagnostic tables, never returned in REST responses, and never rendered in the
+  admin. Diagnostic error responses carry no exception text.
+
+### Known limitations
+
+Recorded in
+[ADR-0002](docs/adr/0002-mvp-release-hardening-accepted-risks.md):
+
+- **Log retention is not enforced.** `log_retention_days` is stored but no purge
+  job runs; tables grow without bound. First post-MVP ticket.
+- **Destructive uninstall has no UI.** The opt-in flag is programmatic-only; see
+  [UNINSTALL-POLICY.md](docs/UNINSTALL-POLICY.md).
+- **Multisite is unsupported.** Uninstall operates on a single site's prefix.
+
+### Release hardening
+- Uninstall now revokes every granted capability from every role in delete mode.
+  Previously `scalyn_mail_relay_*` capabilities persisted on the Administrator
+  role after the plugin and all of its data were removed.
+- No recurring cron event is scheduled. `scalyn_mail_relay_cleanup_logs` and
+  `scalyn_mail_relay_run_daily_diagnostics` were being scheduled daily with no
+  listener registered for either. Activation now also clears events left behind
+  by an earlier install.
+- Added `.gitattributes`: `eol=lf` normalization, and `export-ignore` rules that
+  keep tests, docs and development tooling out of a release archive.
+- Documented the packaging procedure and its verification steps.

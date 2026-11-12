@@ -1,0 +1,261 @@
+<?php
+/**
+ * Diagnostic result database repository.
+ *
+ * @package ScalynMailRelay
+ */
+
+namespace Scalyn\MailRelay\Database;
+
+use Scalyn\MailRelay\Diagnostics\DiagnosticResult;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Reads and writes rows in the scalyn_diagnostics table.
+ *
+ * Each row is one DiagnosticCheckInterface result. Rows produced by the same
+ * diagnostic run share the same diagnostic_uuid (the column is intentionally
+ * not unique), forming a run snapshot per Engineering Handbook §6.3/§11.2.
+ * Generating and grouping runs by diagnostic_uuid is the caller's
+ * responsibility; this repository only persists what it is given.
+ *
+ * Storage note: the scalyn_diagnostics table (frozen schema) has no dedicated
+ * columns for DiagnosticResult::$evidence or DiagnosticResult::$impact. Both are
+ * folded into raw_result as structured JSON alongside DiagnosticResult::$raw
+ * rather than widening the schema. Flagged to Kim in the PR description as the
+ * smallest non-schema-changing option; result_message/recommended_action map
+ * 1:1 to their own columns as before.
+ *
+ * Privacy: DiagnosticResult's own contract already forbids credentials/secrets
+ * in evidence/raw; this repository does not add, strip, or otherwise interpret
+ * that data, and never logs $wpdb->last_error or raw SQL on failure.
+ *
+ * Ownership: Yaj / Database.
+ */
+final class DiagnosticRepository {
+
+	/**
+	 * Maximum number of rows returned by find_recent().
+	 *
+	 * Prevents unbounded queries from saturating memory or overwhelming the UI.
+	 */
+	public const MAX_PAGE_SIZE = 250;
+
+	/**
+	 * Reads the latest retained run selected by its newest row in the period.
+	 *
+	 * Rejects oversized or boundary-spanning runs rather than exporting partial findings.
+	 * Free-text messages and raw evidence are deliberately excluded.
+	 *
+	 * @param \Scalyn\MailRelay\Reporting\ReportPeriod $period Site-local boundaries.
+	 * @return array Safe finding metadata with row and run references.
+	 * @throws \RuntimeException When reading fails or the run is incomplete for the window.
+	 */
+	public function report_findings( \Scalyn\MailRelay\Reporting\ReportPeriod $period ): array {
+		global $wpdb;
+		$sql = $wpdb->prepare(
+			'SELECT id, diagnostic_uuid, check_type, check_name, status, severity, score, created_at FROM %i WHERE diagnostic_uuid = (SELECT diagnostic_uuid FROM %i WHERE created_at >= %s AND created_at < %s ORDER BY created_at DESC, id DESC LIMIT 1) ORDER BY created_at ASC, id ASC LIMIT 251',
+			$wpdb->prefix . 'scalyn_diagnostics',
+			$wpdb->prefix . 'scalyn_diagnostics',
+			$period->start,
+			$period->end
+		);
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared -- Prepared bounded repository read; evidence is not cached.
+		$rows = $wpdb->get_results( $sql, ARRAY_A );
+		if ( ! is_array( $rows ) || ! empty( $wpdb->last_error ) || count( $rows ) > self::MAX_PAGE_SIZE ) {
+			throw new \RuntimeException( 'Reporting data unavailable.' );
+		}
+		foreach ( $rows as $row ) {
+			if ( $row['created_at'] < $period->start || $row['created_at'] >= $period->end ) {
+				throw new \RuntimeException( 'Reporting data unavailable.' );
+			}
+		}
+		return $rows;
+	}
+
+	/**
+	 * Persists a single check result as one row in scalyn_diagnostics.
+	 *
+	 * @param string           $diagnostic_uuid Shared identifier for the run this result belongs to.
+	 * @param string           $check_type      The check's category (DiagnosticCheckInterface::get_category()).
+	 * @param string           $check_name      The check's identifier (DiagnosticCheckInterface::get_id()).
+	 * @param DiagnosticResult $result          The normalized result to persist.
+	 * @param string|null      $created_at      Shared publication timestamp, or current site time.
+	 * @param array            $scope Public configuration attribution; empty for historical callers.
+	 * @throws \RuntimeException When the DB write fails. Message is a fixed safe string
+	 *                           with no SQL, last_error, or credential content.
+	 */
+	public function persist_result( string $diagnostic_uuid, string $check_type, string $check_name, DiagnosticResult $result, ?string $created_at = null, array $scope = array() ): void {
+		global $wpdb;
+
+		$table = $wpdb->prefix . 'scalyn_diagnostics';
+
+		$raw_payload = array(
+			'raw'      => $result->raw,
+			'evidence' => $result->evidence,
+			'impact'   => $result->impact,
+		);
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Intentional repository INSERT; diagnostic history is never cached.
+		$inserted = $wpdb->insert(
+			$table,
+			array(
+				'configuration_id'   => $scope['configuration_id'] ?? null,
+				'provider_id'        => $scope['provider_id'] ?? null,
+				'sending_domain'     => $scope['sending_domain'] ?? null,
+				'diagnostic_uuid'    => $diagnostic_uuid,
+				'check_type'         => $check_type,
+				'check_name'         => $check_name,
+				'status'             => $result->status,
+				'severity'           => $result->severity,
+				'score'              => $result->score,
+				'result_message'     => $result->message,
+				'recommended_action' => $result->recommended_action,
+				'raw_result'         => wp_json_encode( $raw_payload ),
+				'created_at'         => $created_at ?? current_time( 'mysql' ),
+			)
+		);
+		if ( 1 !== $inserted ) {
+			// Fixed safe message: $wpdb->last_error and SQL are deliberately excluded.
+			throw new \RuntimeException( 'Diagnostic result insert failed.' );
+		}
+	}
+
+	/**
+	 * Returns all rows for a given diagnostic run, oldest first.
+	 *
+	 * @param string $diagnostic_uuid The run identifier shared by all rows in the run.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function find_by_uuid( string $diagnostic_uuid ): array {
+		global $wpdb;
+
+		$table = $wpdb->prefix . 'scalyn_diagnostics';
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $table is derived from $wpdb->prefix, not user input.
+		$sql = $wpdb->prepare( "SELECT * FROM {$table} WHERE diagnostic_uuid = %s ORDER BY created_at ASC, id ASC", $diagnostic_uuid );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- $sql is the output of $wpdb->prepare(); diagnostic rows must not be cached.
+		$results = $wpdb->get_results( $sql, ARRAY_A );
+
+		return $results ? $results : array();
+	}
+
+	/**
+	 * Returns the most recent diagnostic rows, newest first, bounded by MAX_PAGE_SIZE.
+	 *
+	 * The $limit parameter is silently clamped to 1–MAX_PAGE_SIZE. Callers requesting
+	 * more than MAX_PAGE_SIZE rows receive MAX_PAGE_SIZE rows.
+	 *
+	 * @param int $limit  Number of rows to return; clamped to 1–MAX_PAGE_SIZE.
+	 * @param int $offset Zero-based row offset for pagination; negative values treated as 0.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function find_recent( int $limit = 25, int $offset = 0 ): array {
+		global $wpdb;
+
+		$limit  = min( max( 1, $limit ), self::MAX_PAGE_SIZE );
+		$offset = max( 0, $offset );
+
+		$table = $wpdb->prefix . 'scalyn_diagnostics';
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $table is derived from $wpdb->prefix, not user input.
+		$sql = $wpdb->prepare( "SELECT * FROM {$table} ORDER BY created_at DESC, id DESC LIMIT %d OFFSET %d", $limit, $offset );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- $sql is the output of $wpdb->prepare(); diagnostic rows must not be cached.
+		$results = $wpdb->get_results( $sql, ARRAY_A );
+
+		return $results ? $results : array();
+	}
+
+	/**
+	 * Returns all results from the most recent diagnostic run, with an interim
+	 * average health score for that run.
+	 *
+	 * "Most recent run" is the diagnostic_uuid attached to the newest row
+	 * (by created_at, then id as a tiebreaker). The returned health_score is a
+	 * plain average of the individual check scores in that run — it is a
+	 * provisional stand-in, not the Engineering Handbook's weighted formula
+	 * (DNS/provider/operational/WordPress/security components), which needs a
+	 * dedicated scoring service that does not exist yet. Rows with a null
+	 * score are excluded from the average.
+	 *
+	 * @return array{results: array<int, array<string, mixed>>, health_score: int|null}
+	 *         health_score is null when the run has no scored rows, or when no
+	 *         diagnostics exist yet at all.
+	 */
+	public function find_latest_run(): array {
+		global $wpdb;
+
+		$table = $wpdb->prefix . 'scalyn_diagnostics';
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $table is derived from $wpdb->prefix, not user input; no bindable values in this query. Diagnostic rows must not be cached.
+		$latest_uuid = $wpdb->get_var( "SELECT diagnostic_uuid FROM {$table} ORDER BY created_at DESC, id DESC LIMIT 1" );
+
+		if ( null === $latest_uuid ) {
+			return array(
+				'results'      => array(),
+				'health_score' => null,
+			);
+		}
+
+		$results = $this->find_by_uuid( (string) $latest_uuid );
+
+		return array(
+			'results'      => $results,
+			'health_score' => self::average_score( $results ),
+		);
+	}
+
+	/** Reads only evidence produced for this exact current configuration.
+	 *
+	 * @param string $revision Opaque configuration revision.
+	 * @param string $provider Active provider identifier.
+	 * @param string $domain Current sending domain.
+	 * @return array Bounded complete run, or no evidence.
+	 */
+	public function find_current_run( string $revision, string $provider, string $domain ): array {
+		global $wpdb;
+		if ( '' === $revision || '' === $provider ) {
+			return array();
+		}
+		$sql = $wpdb->prepare(
+			'SELECT * FROM %i WHERE diagnostic_uuid = (SELECT diagnostic_uuid FROM %i WHERE configuration_id = %s AND provider_id = %s AND sending_domain = %s ORDER BY created_at DESC, id DESC LIMIT 1) ORDER BY id ASC LIMIT 21',
+			$wpdb->prefix . 'scalyn_diagnostics',
+			$wpdb->prefix . 'scalyn_diagnostics',
+			$revision,
+			$provider,
+			$domain
+		);
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared -- Prepared, indexed, bounded repository read.
+		$rows = $wpdb->get_results( $sql, ARRAY_A );
+		if ( ! is_array( $rows ) || ! empty( $wpdb->last_error ) || count( $rows ) > 20 ) {
+			return array();
+		}
+		foreach ( $rows as $row ) {
+			if ( ( $row['configuration_id'] ?? '' ) !== $revision || ( $row['provider_id'] ?? '' ) !== $provider || ( $row['sending_domain'] ?? '' ) !== $domain ) {
+				return array();
+			}
+		}
+		return $rows;
+	}
+
+	/**
+	 * Computes a plain average of the numeric score values in a set of rows.
+	 *
+	 * @param array<int, array<string, mixed>> $rows Rows as returned by find_by_uuid().
+	 */
+	private static function average_score( array $rows ): ?int {
+		$total = 0;
+		$count = 0;
+
+		foreach ( $rows as $row ) {
+			$score = $row['score'] ?? null;
+			if ( null !== $score && is_numeric( $score ) ) {
+				$total += (int) $score;
+				++$count;
+			}
+		}
+
+		return $count > 0 ? intval( $total / $count ) : null;
+	}
+}

@@ -1,0 +1,267 @@
+<?php
+
+use PHPUnit\Framework\TestCase;
+use Scalyn\MailRelay\Core\Capabilities;
+
+/**
+ * Covers both uninstall modes.
+ *
+ * Retain (the default) must remove nothing at all. Delete must remove the owned
+ * tables, the plugin options, the granted capabilities, the scheduled events and
+ * the transients — and nothing outside that set.
+ *
+ * uninstall.php is a script, not a class, so each test runs it with `require`
+ * (not require_once) against freshly seeded globals.
+ */
+final class UninstallTest extends TestCase {
+
+	private const OWNED_TABLES = array(
+		'wp_scalyn_ai_sessions',
+		'wp_scalyn_ai_usage',
+		'wp_scalyn_connection_evidence',
+		'wp_scalyn_delivery_events',
+		'wp_scalyn_delivery_recipients',
+		'wp_scalyn_delivery_attempts',
+		'wp_scalyn_delivery_keys',
+		'wp_scalyn_mail_logs',
+		'wp_scalyn_mail_timeline',
+		'wp_scalyn_submission_attempts',
+		'wp_scalyn_recovery_queue',
+		'wp_scalyn_diagnostics',
+		'wp_scalyn_health_scores',
+		'wp_scalyn_deliverability_evidence',
+		'wp_scalyn_alerts',
+		'wp_scalyn_alert_notifications',
+		'wp_scalyn_audit_logs',
+	);
+
+	private WpdbStub $wpdb;
+
+	public static function setUpBeforeClass(): void {
+		if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
+			define( 'WP_UNINSTALL_PLUGIN', 'scalyn-mail-relay/scalyn-mail-relay.php' );
+		}
+	}
+
+	protected function setUp(): void {
+		$this->wpdb                        = new WpdbStub();
+		$GLOBALS['wpdb']                   = $this->wpdb;
+		$GLOBALS['_test_wp_cron']          = array();
+		$GLOBALS['_test_wp_cleared_hooks'] = array();
+		$GLOBALS['_test_wp_transients']    = array(
+			'scalyn_mail_relay_health_cache'      => 'cached',
+			'scalyn_mail_relay_diagnostics_cache' => 'cached',
+			'unrelated_plugin_cache'              => 'keep me',
+		);
+
+		$administrator = new RoleStub();
+		foreach ( Capabilities::all() as $capability ) {
+			$administrator->add_cap( $capability );
+		}
+		$administrator->add_cap( 'manage_options' );
+
+		$GLOBALS['_test_wp_roles'] = array(
+			'administrator' => $administrator,
+			'editor'        => new RoleStub(),
+		);
+
+		$GLOBALS['_test_wp_options'] = array(
+			'scalyn_mail_relay_db_version' => '0.1.0',
+			'scalyn_mail_relay_version'    => '0.1.0',
+			'scalyn_mail_relay_retention_status' => array( 'state' => 'complete' ),
+			'scalyn_mail_relay_diagnostic_run_status' => array( 'latest' => null ),
+			'scalyn_mail_relay_alert_status' => array( 'state' => 'completed', 'at' => 100000 ),
+			'unrelated_plugin_option'      => 'keep me',
+		);
+	}
+
+	protected function tearDown(): void {
+		unset( $GLOBALS['wpdb'] );
+		$GLOBALS['_test_wp_roles']         = array();
+		$GLOBALS['_test_wp_cleared_hooks'] = array();
+	}
+
+	/**
+	 * Seeds the settings option and runs uninstall.php.
+	 *
+	 * @param bool|null $delete_flag Value for advanced.delete_data_on_uninstall,
+	 *                               or null to omit the key entirely.
+	 */
+	private function run_uninstall( ?bool $delete_flag ): void {
+		$settings = array( 'general' => array( 'from_name' => 'Site' ) );
+
+		if ( null !== $delete_flag ) {
+			$settings['advanced'] = array( 'delete_data_on_uninstall' => $delete_flag );
+		}
+
+		$GLOBALS['_test_wp_options']['scalyn_mail_relay_settings'] = $settings;
+
+		require dirname( __DIR__, 2 ) . '/uninstall.php';
+	}
+
+	private function administrator(): RoleStub {
+		return $GLOBALS['_test_wp_roles']['administrator'];
+	}
+
+	public function test_agency_data_is_retained_by_default_and_deleted_only_for_this_site(): void {
+		$GLOBALS['_test_blog_id'] = 1;
+		$GLOBALS['_test_wp_options']['scalyn_mail_relay_agency'] = ['managed' => true];
+		$GLOBALS['_test_wp_options']['scalyn_mail_relay_branding'] = ['name'=>'Agency'];
+		$GLOBALS['_test_user_meta'][2] = [
+			'scalyn_mail_relay_access_profile_1' => 'client',
+			'scalyn_mail_relay_access_profile_2' => 'agency',
+			'unrelated_meta' => 'keep',
+		];
+		$this->run_uninstall(false);
+		$this->assertArrayHasKey('scalyn_mail_relay_agency', $GLOBALS['_test_wp_options']);
+		$this->assertArrayHasKey('scalyn_mail_relay_branding', $GLOBALS['_test_wp_options']);
+		$this->assertSame('client', $GLOBALS['_test_user_meta'][2]['scalyn_mail_relay_access_profile_1']);
+		$this->run_uninstall(true);
+		$this->assertArrayNotHasKey('scalyn_mail_relay_agency', $GLOBALS['_test_wp_options']);
+		$this->assertArrayNotHasKey('scalyn_mail_relay_branding', $GLOBALS['_test_wp_options']);
+		$this->assertArrayNotHasKey('scalyn_mail_relay_access_profile_1', $GLOBALS['_test_user_meta'][2]);
+		$this->assertSame('agency', $GLOBALS['_test_user_meta'][2]['scalyn_mail_relay_access_profile_2']);
+		$this->assertSame('keep', $GLOBALS['_test_user_meta'][2]['unrelated_meta']);
+		$GLOBALS['_test_user_meta'] = [];
+	}
+
+	public function test_webhook_draft_and_its_budget_follow_explicit_uninstall_policy(): void {
+		$id='12345678-1234-4234-8234-123456789abc';
+		$GLOBALS['_test_wp_options']['scalyn_mail_relay_postmark_webhook']=['id'=>$id,'credentials'=>'synthetic envelope','enabled'=>false];
+		$GLOBALS['_test_wp_options']['scalyn_webhook_budget_'.$id]='counter';
+		$this->run_uninstall(false);
+		$this->assertArrayHasKey('scalyn_mail_relay_postmark_webhook',$GLOBALS['_test_wp_options']);
+		$this->assertArrayHasKey('scalyn_webhook_budget_'.$id,$GLOBALS['_test_wp_options']);
+		$this->run_uninstall(true);
+		$this->assertArrayNotHasKey('scalyn_mail_relay_postmark_webhook',$GLOBALS['_test_wp_options']);
+		$this->assertArrayNotHasKey('scalyn_webhook_budget_'.$id,$GLOBALS['_test_wp_options']);
+		$this->assertSame('keep me',$GLOBALS['_test_wp_options']['unrelated_plugin_option']);
+	}
+
+	public function test_local_key_marker_follows_data_policy_without_touching_separate_key_artifacts(): void {
+		$marker=['version'=>1,'blog_id'=>1,'fingerprint'=>str_repeat('a',64)];
+		$GLOBALS['_test_wp_options']['scalyn_mail_relay_local_key_state']=$marker;
+		$this->run_uninstall(false);
+		$this->assertSame($marker,$GLOBALS['_test_wp_options']['scalyn_mail_relay_local_key_state']);
+		$this->run_uninstall(true);
+		$this->assertArrayNotHasKey('scalyn_mail_relay_local_key_state',$GLOBALS['_test_wp_options']);
+		$this->assertSame('keep me',$GLOBALS['_test_wp_options']['unrelated_plugin_option']);
+	}
+
+	// -------------------------------------------------------------------------
+	// Retain mode — the default
+	// -------------------------------------------------------------------------
+
+	public function test_retains_everything_when_the_flag_is_absent(): void {
+		$this->run_uninstall( null );
+
+		$this->assertSame( array(), $this->wpdb->queries, 'No table may be dropped by default.' );
+		$this->assertArrayHasKey( 'scalyn_mail_relay_settings', $GLOBALS['_test_wp_options'] );
+		$this->assertArrayHasKey( 'scalyn_mail_relay_db_version', $GLOBALS['_test_wp_options'] );
+		$this->assertArrayHasKey( 'scalyn_mail_relay_retention_status', $GLOBALS['_test_wp_options'] );
+		$this->assertArrayHasKey( 'scalyn_mail_relay_diagnostic_run_status', $GLOBALS['_test_wp_options'] );
+		$this->assertTrue( $this->administrator()->has_cap( Capabilities::VIEW_DASHBOARD ) );
+		$this->assertArrayHasKey( 'scalyn_mail_relay_health_cache', $GLOBALS['_test_wp_transients'] );
+		$this->assertSame( \Scalyn\MailRelay\Core\ScheduledHooks::all(), $GLOBALS['_test_wp_cleared_hooks'] );
+	}
+
+	public function test_retains_everything_when_the_flag_is_false(): void {
+		$this->run_uninstall( false );
+
+		$this->assertSame( array(), $this->wpdb->queries );
+		$this->assertArrayHasKey( 'scalyn_mail_relay_settings', $GLOBALS['_test_wp_options'] );
+		$this->assertTrue( $this->administrator()->has_cap( Capabilities::VIEW_DASHBOARD ) );
+	}
+
+	/**
+	 * A truthy-but-not-true value must not be enough to destroy data.
+	 */
+	public function test_retains_everything_for_a_truthy_non_boolean_flag(): void {
+		$GLOBALS['_test_wp_options']['scalyn_mail_relay_settings'] = array(
+			'advanced' => array( 'delete_data_on_uninstall' => 'true' ),
+		);
+
+		require dirname( __DIR__, 2 ) . '/uninstall.php';
+
+		$this->assertSame( array(), $this->wpdb->queries );
+		$this->assertTrue( $this->administrator()->has_cap( Capabilities::VIEW_DASHBOARD ) );
+	}
+
+	// -------------------------------------------------------------------------
+	// Delete mode — explicit opt-in
+	// -------------------------------------------------------------------------
+
+	public function test_drops_every_owned_table_when_deletion_is_enabled(): void {
+		$this->run_uninstall( true );
+
+		$this->assertCount( count( self::OWNED_TABLES ), $this->wpdb->queries );
+
+		foreach ( self::OWNED_TABLES as $table ) {
+			$this->assertContains(
+				"DROP TABLE IF EXISTS `{$table}`",
+				$this->wpdb->queries,
+				sprintf( '%s should be dropped in delete mode.', $table )
+			);
+		}
+	}
+
+	public function test_removes_plugin_options_but_leaves_others(): void {
+		$this->run_uninstall( true );
+
+		$this->assertArrayNotHasKey( 'scalyn_mail_relay_settings', $GLOBALS['_test_wp_options'] );
+		$this->assertArrayNotHasKey( 'scalyn_mail_relay_db_version', $GLOBALS['_test_wp_options'] );
+		$this->assertArrayNotHasKey( 'scalyn_mail_relay_version', $GLOBALS['_test_wp_options'] );
+		$this->assertArrayNotHasKey( 'scalyn_mail_relay_retention_status', $GLOBALS['_test_wp_options'] );
+		$this->assertArrayNotHasKey( 'scalyn_mail_relay_diagnostic_run_status', $GLOBALS['_test_wp_options'] );
+		$this->assertSame( 'keep me', $GLOBALS['_test_wp_options']['unrelated_plugin_option'] );
+	}
+
+	public function test_revokes_every_granted_capability_from_every_role(): void {
+		$this->run_uninstall( true );
+
+		foreach ( Capabilities::all() as $capability ) {
+			$this->assertFalse(
+				$this->administrator()->has_cap( $capability ),
+				sprintf( '%s must not survive an uninstall.', $capability )
+			);
+		}
+
+		$this->assertSame(
+			Capabilities::all(),
+			$GLOBALS['_test_wp_roles']['editor']->removed,
+			'Revocation must sweep every role, not only administrator.'
+		);
+	}
+
+	public function test_leaves_unrelated_capabilities_intact(): void {
+		$this->run_uninstall( true );
+
+		$this->assertTrue(
+			$this->administrator()->has_cap( 'manage_options' ),
+			'Uninstall must not touch capabilities the plugin never granted.'
+		);
+	}
+
+	public function test_clears_every_owned_cron_hook(): void {
+		$this->run_uninstall( true );
+
+		$this->assertSame(
+			array(
+				'scalyn_mail_relay_cleanup_logs',
+				'scalyn_mail_relay_run_daily_diagnostics',
+				'scalyn_mail_relay_generate_health_snapshot',
+				'scalyn_mail_relay_send_alerts',
+				'scalyn_mail_relay_recovery_tick',
+			),
+			$GLOBALS['_test_wp_cleared_hooks']
+		);
+	}
+
+	public function test_deletes_plugin_transients_but_leaves_others(): void {
+		$this->run_uninstall( true );
+
+		$this->assertArrayNotHasKey( 'scalyn_mail_relay_health_cache', $GLOBALS['_test_wp_transients'] );
+		$this->assertArrayNotHasKey( 'scalyn_mail_relay_diagnostics_cache', $GLOBALS['_test_wp_transients'] );
+		$this->assertSame( 'keep me', $GLOBALS['_test_wp_transients']['unrelated_plugin_cache'] );
+	}
+}

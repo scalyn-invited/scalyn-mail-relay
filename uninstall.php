@@ -2,15 +2,33 @@
 /**
  * Uninstall handler. Data is retained unless explicit deletion was enabled.
  *
+ * Two modes:
+ *
+ *  1. Retain (default). Scheduled work stops. Settings, tables, logs, diagnostics
+ *     and health scores survive an uninstall/reinstall cycle intact.
+ *  2. Delete. Enabled only when advanced.delete_data_on_uninstall is true.
+ *     Removes tables, options, capabilities, scheduled events and transients.
+ *
+ * The Data Controls UI requires confirmation before enabling deletion; see
+ * docs/UNINSTALL-POLICY.md. The default is false, so an operator who never
+ * touches the option can never lose data by uninstalling.
+ *
+ * Scope: single site only. On multisite this removes data for the site that
+ * runs the uninstall and leaves other sites in the network untouched. See
+ * docs/adr/0002-mvp-release-hardening-accepted-risks.md.
+ *
  * @package ScalynMailRelay
  */
 
 defined( 'WP_UNINSTALL_PLUGIN' ) || exit;
 
+require_once __DIR__ . '/includes/Core/ScheduledHooks.php';
+\Scalyn\MailRelay\Core\ScheduledHooks::clear();
+
 $settings = get_option( 'scalyn_mail_relay_settings', array() );
 $delete   = is_array( $settings )
 	&& isset( $settings['advanced']['delete_data_on_uninstall'] )
-	&& true === (bool) $settings['advanced']['delete_data_on_uninstall'];
+	&& true === $settings['advanced']['delete_data_on_uninstall'];
 
 if ( ! $delete ) {
 	return;
@@ -18,33 +36,97 @@ if ( ! $delete ) {
 
 global $wpdb;
 
+// Disabled webhook drafts use a separate credential envelope and a single source budget.
+$scalyn_webhook_draft = get_option( 'scalyn_mail_relay_postmark_webhook', array() );
+$scalyn_webhook_id    = is_array( $scalyn_webhook_draft ) ? ( $scalyn_webhook_draft['id'] ?? '' ) : '';
+if ( is_string( $scalyn_webhook_id ) && preg_match( '/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/D', $scalyn_webhook_id ) ) {
+	delete_option( 'scalyn_webhook_budget_' . $scalyn_webhook_id );
+}
+delete_option( 'scalyn_mail_relay_postmark_webhook' );
+delete_option( 'scalyn_mail_relay_agency' );
+delete_option( 'scalyn_mail_relay_branding' );
+delete_option( 'scalyn_mail_relay_settings_write_lock' );
+// The separately managed local key file is retained for backup recovery (ADR 0042).
+// Remove only this site's nonsecret database marker under explicit data deletion.
+delete_option( 'scalyn_mail_relay_local_key_state' );
+delete_option( 'scalyn_mail_relay_routing' );
+delete_option( 'scalyn_mail_relay_routing_lock' );
+delete_option( 'scalyn_mail_relay_recovery' );
+delete_option( 'scalyn_mail_relay_ai' );
+delete_option( 'scalyn_mail_relay_ai_write_lock' );
+delete_option( 'scalyn_mail_relay_recovery_lock' );
+delete_option( 'scalyn_mail_relay_queue_capacity_lock' );
+
+// Remove only owned access metadata, and only under explicit deletion opt-in.
+delete_metadata( 'user', 0, 'scalyn_mail_relay_access_profile_' . get_current_blog_id(), '', true );
+foreach ( array( 'smtp2go', 'brevo' ) as $scalyn_provider ) {
+	$scalyn_option = 'scalyn_mail_relay_' . $scalyn_provider . '_webhook';
+	$scalyn_draft  = get_option( $scalyn_option, array() );
+	$scalyn_id     = is_array( $scalyn_draft ) ? ( $scalyn_draft['id'] ?? '' ) : '';
+	if ( is_string( $scalyn_id ) && preg_match( '/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/D', $scalyn_id ) ) {
+		delete_option( 'scalyn_webhook_budget_' . $scalyn_id );
+	}
+	delete_option( $scalyn_option );
+}
+
 $owned_tables = array(
+	'scalyn_ai_sessions',
+	'scalyn_ai_usage',
+	'scalyn_connection_evidence',
+	'scalyn_delivery_events',
+	'scalyn_delivery_recipients',
+	'scalyn_delivery_attempts',
+	'scalyn_delivery_keys',
 	'scalyn_mail_logs',
 	'scalyn_mail_timeline',
+	'scalyn_submission_attempts',
+	'scalyn_recovery_queue',
 	'scalyn_diagnostics',
 	'scalyn_health_scores',
+	'scalyn_deliverability_evidence',
 	'scalyn_alerts',
+	'scalyn_alert_notifications',
 	'scalyn_audit_logs',
 );
 
 foreach ( $owned_tables as $suffix ) {
 	$table = $wpdb->prefix . $suffix;
 	// Table names cannot be parameterized; suffixes are fixed internal constants above.
-	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
 	$wpdb->query( "DROP TABLE IF EXISTS `{$table}`" );
 }
 
-foreach ( array( 'scalyn_mail_relay_settings', 'scalyn_mail_relay_db_version', 'scalyn_mail_relay_version' ) as $option ) {
+foreach ( array( 'scalyn_mail_relay_settings', 'scalyn_mail_relay_db_version', 'scalyn_mail_relay_version', 'scalyn_mail_relay_retention_status', 'scalyn_mail_relay_diagnostic_run_status', 'scalyn_mail_relay_alert_status' ) as $option ) {
 	delete_option( $option );
 }
 
-foreach ( array(
-	'scalyn_mail_relay_cleanup_logs',
-	'scalyn_mail_relay_run_daily_diagnostics',
-	'scalyn_mail_relay_generate_health_snapshot',
-	'scalyn_mail_relay_send_alerts',
-) as $hook ) {
-	wp_clear_scheduled_hook( $hook );
+// Revoke the capabilities Lifecycle::grant_capabilities() added on activation.
+// Without this, scalyn_mail_relay_* capabilities stay on the Administrator role
+// permanently after the plugin and all of its data are gone.
+//
+// The plugin is not loaded during uninstall, so the class file is required
+// directly to keep Core\Capabilities the single source of truth rather than
+// duplicating the capability strings here. The autoloader is deliberately not
+// used: it resolves paths through SCALYN_MAIL_RELAY_PATH, which only the main
+// plugin file defines and which does not exist in the uninstall context.
+$scalyn_capabilities_file = __DIR__ . '/includes/Core/Capabilities.php';
+
+if ( is_readable( $scalyn_capabilities_file ) ) {
+	require_once $scalyn_capabilities_file;
+
+	$scalyn_roles = wp_roles();
+
+	foreach ( array_keys( $scalyn_roles->get_names() ) as $scalyn_role_name ) {
+		$scalyn_role = get_role( $scalyn_role_name );
+
+		if ( ! $scalyn_role ) {
+			continue;
+		}
+
+		foreach ( \Scalyn\MailRelay\Core\Capabilities::all() as $scalyn_capability ) {
+			$scalyn_role->remove_cap( $scalyn_capability );
+		}
+	}
 }
 
 delete_transient( 'scalyn_mail_relay_health_cache' );

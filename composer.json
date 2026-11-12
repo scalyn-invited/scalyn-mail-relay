@@ -10,7 +10,8 @@
     }
   },
   "require": {
-    "php": ">=8.2"
+    "php": ">=8.2",
+    "dompdf/dompdf": "^3.1"
   },
   "require-dev": {
     "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
@@ -23,5 +24,10 @@
     "lint:wpcs": "phpcs --standard=phpcs.xml.dist",
     "test": "phpunit",
     "check": ["@lint:php", "@lint:wpcs", "@test"]
+  },
+  "config": {
+    "allow-plugins": {
+      "dealerdirect/phpcodesniffer-composer-installer": true
+    }
   }
 }

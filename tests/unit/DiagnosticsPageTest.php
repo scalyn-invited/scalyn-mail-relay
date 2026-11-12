@@ -1,0 +1,504 @@
+<?php
+
+use PHPUnit\Framework\TestCase;
+use Scalyn\MailRelay\Admin\Pages\DiagnosticsPage;
+use Scalyn\MailRelay\Contracts\ProviderInterface;
+use Scalyn\MailRelay\Core\Capabilities;
+use Scalyn\MailRelay\Core\Plugin;
+use Scalyn\MailRelay\Core\ProviderRegistry;
+use Scalyn\MailRelay\Core\SettingsRepository;
+use Scalyn\MailRelay\Mail\MailMessage;
+use Scalyn\MailRelay\Mail\SendResult;
+use Scalyn\MailRelay\Providers\ConnectionResult;
+use Scalyn\MailRelay\Providers\ValidationResult;
+
+/**
+ * Tests for DiagnosticsPage.
+ *
+ * Covers the capability gate plus configured and not-configured B1 states.
+ */
+final class DiagnosticsPageTest extends TestCase {
+	public function test_tab_panels_keep_assessments_and_guidance_separate(): void {
+		$this->grant_run_diagnostics();
+		$this->configure_provider();
+		$html = $this->render_and_capture();
+		$dom = new DOMDocument(); @$dom->loadHTML('<?xml encoding="utf-8" ?>' . $html);
+		$xpath = new DOMXPath($dom);
+		$this->assertSame(4, $xpath->query('//*[@data-provider-tab]')->length);
+		$this->assertStringContainsString('Overall Email Health', $dom->getElementById('scalyn-panel-configuration-checks')->textContent);
+		$this->assertStringNotContainsString('What to address next', $dom->getElementById('scalyn-panel-configuration-checks')->textContent);
+		$this->assertStringContainsString('What to address next', $dom->getElementById('scalyn-panel-failures-guidance')->textContent);
+		$this->assertSame(0, $xpath->query('//*[@data-provider-panel and @hidden]')->length);
+	}
+	public function test_guidance_follows_health_and_preserves_score_disclaimer(): void {
+		$this->grant_run_diagnostics();
+		$this->configure_provider();
+		$output = $this->render_and_capture();
+		$health = strpos( $output, 'Overall Email Health' );
+		$guidance = strpos( $output, 'What to address next' );
+		$scope = strpos( $output, 'Message authentication and delivery: not verified' );
+		$this->assertNotFalse( $health );
+		$this->assertNotFalse( $guidance );
+		$this->assertNotFalse( $scope );
+		$this->assertTrue( $health < $guidance && $guidance < $scope );
+		$this->assertSame( 1, substr_count( $output, 'What to address next' ) );
+		$this->assertStringContainsString( 'Configuration score only; authentication and delivery not verified.', substr( $output, $health, $guidance - $health ) );
+		$this->assertStringContainsString( 'diagnostics#configuration-checks', $output );
+		$this->assertStringContainsString( 'matching diagnostic cards for the observed details', $output );
+		$this->assertStringContainsString( '<div class="scalyn-diagnostics-guidance">', $output );
+	}
+	public function test_recommendations_render_refresh_when_no_evidence(): void {
+		$this->grant_run_diagnostics();
+		$output = $this->render_and_capture();
+		$this->assertStringContainsString( 'What to address next', $output );
+		$this->assertStringContainsString( 'Refresh diagnostic evidence first', $output );
+		$this->assertStringContainsString( 'No settings are changed automatically', $output );
+	}
+	public function test_monitoring_panel_and_dkim_form_are_not_on_diagnostics(): void {
+		$this->grant_run_diagnostics();
+		$GLOBALS['_test_current_user_can'][Capabilities::MANAGE_SETTINGS]=true;
+		$html=$this->render_and_capture();
+		$this->assertStringNotContainsString('Scheduled health monitoring',$html);
+		$this->assertStringNotContainsString('name="dkim_selector"',$html);
+		$this->assertStringContainsString('Configure DKIM in Settings',$html);
+	}
+
+	protected function setUp(): void {
+		$GLOBALS['_test_current_user_can'] = array();
+		$GLOBALS['_test_wp_options']       = array();
+		$GLOBALS['_test_wp_actions']       = array();
+		$GLOBALS['_test_wp_added_actions'] = array();
+		$this->reset_plugin_singleton();
+		$this->setup_wpdb_mock();
+	}
+
+	protected function tearDown(): void {
+		$this->reset_plugin_singleton();
+	}
+
+	private function reset_plugin_singleton(): void {
+		$property = new ReflectionProperty( Plugin::class, 'instance' );
+		$property->setValue( null, null );
+	}
+
+	private $wpdb_mock_data = array();
+
+	private function setup_wpdb_mock(): void {
+		global $wpdb;
+		$self = $this;
+		$wpdb = new class( $self ) {
+			public $prefix = 'wp_';
+			private $parent;
+
+			public function __construct( $parent ) {
+				$this->parent = $parent;
+			}
+
+			public function prepare( string $query, ...$args ) {
+				return $query;
+			}
+
+			public function get_var( string $sql ) {
+				$data = $this->parent->get_mock_diagnostic_data();
+				return ! empty( $data ) ? 'latest-uuid' : null;
+			}
+
+			public function get_results( string $sql, string $output = 'OBJECT' ) {
+				return $this->parent->get_mock_diagnostic_data();
+			}
+
+			public function get_row( string $sql, string $output = 'OBJECT' ) {
+				return $this->parent->get_mock_health_row();
+			}
+		};
+	}
+
+	public function set_mock_diagnostic_data( array $data ): void {
+		$this->wpdb_mock_data = array_map( static fn( $row ) => array_merge( array( 'configuration_id' => 'current-revision', 'provider_id' => 'smtp', 'sending_domain' => 'example.com', 'diagnostic_uuid' => 'current-run' ), $row ), $data );
+	}
+
+	public function get_mock_diagnostic_data(): array {
+		return $this->wpdb_mock_data;
+	}
+
+	private ?array $health_row_mock = null;
+
+	public function set_mock_health_row( ?array $row ): void {
+		$this->health_row_mock = null === $row ? null : array_merge( array( 'score_uuid' => 'current-run' ), $row );
+		if ( null !== $row && empty( $this->wpdb_mock_data ) ) {
+			$this->set_mock_diagnostic_data( array( array( 'check_name' => 'fixture_unknown', 'status' => 'unknown' ) ) );
+		}
+	}
+
+	public function get_mock_health_row(): ?array {
+		return $this->health_row_mock;
+	}
+
+	private function grant_run_diagnostics(): void {
+		$GLOBALS['_test_current_user_can'][ Capabilities::RUN_DIAGNOSTICS ] = true;
+	}
+
+	private function boot_plugin(): void {
+		Plugin::instance()->boot();
+	}
+
+	private function configure_provider(): void {
+		$GLOBALS['_test_wp_options'][ SettingsRepository::OPTION_KEY ] = array(
+			'provider' => array( 'active' => 'smtp' ),
+			'diagnostic_revision' => 'current-revision',
+		);
+
+		$this->boot_plugin();
+		Plugin::instance()->container()->get( ProviderRegistry::class )->register(
+			new class() implements ProviderInterface {
+				public function get_id(): string {
+					return 'smtp';
+				}
+
+				public function get_label(): string {
+					return 'Test Provider';
+				}
+
+				public function validate_config( array $config ): ValidationResult {
+					throw new LogicException( 'Not called in this test.' );
+				}
+
+				public function test_connection( array $config ): ConnectionResult {
+					throw new LogicException( 'Not called in this test.' );
+				}
+
+				public function send( MailMessage $message, array $config ): SendResult {
+					throw new LogicException( 'Not called in this test.' );
+				}
+
+				public function get_capabilities(): array {
+					return array();
+				}
+			}
+		);
+	}
+
+	private function render_and_capture(): string {
+		$this->boot_plugin();
+		ob_start();
+		( new DiagnosticsPage() )->render();
+
+		return (string) ob_get_clean();
+	}
+
+	public function test_render_rejects_user_without_run_diagnostics_capability(): void {
+		$this->expectException( RuntimeException::class );
+		( new DiagnosticsPage() )->render();
+	}
+
+	public function test_not_configured_state_prompts_for_setup_and_hides_results(): void {
+		$this->grant_run_diagnostics();
+
+		$output = $this->render_and_capture();
+
+		$this->assertStringContainsString( 'Configure a mail provider first', $output );
+		$this->assertStringContainsString( 'Open Setup Wizard', $output );
+		$this->assertStringContainsString( 'admin.php?page=scalyn-mail-relay-wizard', $output );
+		$this->assertStringNotContainsString( 'scalyn-diagnostics-grid', $output );
+		$this->assertStringNotContainsString( 'scalyn-diagnostic-card', $output );
+		$this->assertStringNotContainsString( 'Run Diagnostics Now', $output );
+	}
+
+	public function test_unregistered_active_provider_uses_not_configured_state(): void {
+		$this->grant_run_diagnostics();
+		$GLOBALS['_test_wp_options'][ SettingsRepository::OPTION_KEY ] = array(
+			'provider' => array( 'active' => 'missing-provider' ),
+		);
+
+		$output = $this->render_and_capture();
+
+		$this->assertStringContainsString( 'Configure a mail provider first', $output );
+		$this->assertStringNotContainsString( 'scalyn-diagnostics-grid', $output );
+	}
+
+	public function test_configured_state_renders_all_unknown_diagnostic_cards(): void {
+		$this->grant_run_diagnostics();
+		$this->configure_provider();
+
+		$output = $this->render_and_capture();
+
+		// 7 cards: SPF, MX, DKIM, DMARC, SMTP/TLS, reverse DNS, Health Score (all unknown when no data)
+		$this->assertSame( 7, substr_count( $output, 'class="scalyn-card scalyn-diagnostic-card"' ) );
+		// Seven detail cards plus three category summaries remain unknown.
+		$this->assertSame( 10, substr_count( $output, 'scalyn-badge--unknown' ) );
+		$this->assertStringContainsString( 'SPF Record', $output );
+		$this->assertStringContainsString( 'MX Records', $output );
+		$this->assertStringContainsString( 'DKIM Records', $output );
+		$this->assertStringContainsString( 'DMARC Policy', $output );
+		$this->assertStringContainsString( 'SMTP/TLS Configuration', $output );
+		$this->assertStringContainsString( 'Overall Email Health', $output );
+		$this->assertStringNotContainsString( 'Configure a mail provider first', $output );
+	}
+
+	public function test_configured_state_connects_each_card_to_its_heading(): void {
+		$this->grant_run_diagnostics();
+		$this->configure_provider();
+
+		$output = $this->render_and_capture();
+		$ids    = array( 'spf', 'mx', 'dkim', 'dmarc', 'smtp-tls' );
+
+		foreach ( $ids as $id ) {
+			$heading_id = 'scalyn-diagnostics-' . $id . '-heading';
+			$this->assertStringContainsString( 'aria-labelledby="' . $heading_id . '"', $output );
+			// Card headings are now h3 (not h2) for proper heading hierarchy.
+			$this->assertStringContainsString( '<h3 id="' . $heading_id . '">', $output );
+		}
+
+		// Health card uses a separate id to avoid duplicate (section has -section-, card has -card-).
+		$this->assertStringContainsString( 'aria-labelledby="scalyn-diagnostics-health-section-heading"', $output );
+		$this->assertStringContainsString( '<h3 id="scalyn-diagnostics-health-card-heading">', $output );
+	}
+
+	public function test_configured_state_enables_diagnostics_action_when_endpoint_available(): void {
+		$this->grant_run_diagnostics();
+		$this->configure_provider();
+
+		$output = $this->render_and_capture();
+
+		$this->assertStringContainsString( 'Run Diagnostics Now', $output );
+		$this->assertStringContainsString( 'scalyn-panel-heading scalyn-diagnostics-run-toolbar', $output );
+		$this->assertLessThan( strpos( $output, 'Evidence freshness and coverage' ), strpos( $output, 'scalyn-diagnostics-health-card-heading' ) );
+		$this->assertLessThan( strpos( $output, 'id="scalyn-panel-deliverability-score"' ), strpos( $output, 'Evidence freshness and coverage' ) );
+		// Button should now be enabled with the REST endpoint URL.
+		$this->assertStringContainsString( 'data-endpoint="http://example.com/wp-json/scalyn-mail-relay/v1/diagnostics/run"', $output );
+		$this->assertStringContainsString( '<button type="button" class="button button-primary" id="scalyn-run-diagnostics"', $output );
+		$this->assertStringNotContainsString( 'href="http://example.com/wp-json/scalyn-mail-relay/v1/diagnostics/run"', $output );
+		$this->assertStringContainsString( 'button button-primary', $output );
+		// Health score displays as a badge (from StatusBadge), not as duplicate large text.
+		$this->assertStringContainsString( 'Unknown', $output );
+		$this->assertStringContainsString( 'Run diagnostics to generate', $output );
+	}
+
+	/**
+	 * B2 Tests: Diagnostics Findings/Remediation UI
+	 *
+	 * Tests for wiring real diagnostic results to the UI.
+	 */
+	public function test_organize_diagnostics_groups_results_by_check_type(): void {
+		$this->grant_run_diagnostics();
+		$this->configure_provider();
+		$this->boot_plugin();
+
+		$page = new DiagnosticsPage();
+
+		// Use reflection to test private method.
+		$reflection = new ReflectionMethod( $page, 'organize_diagnostics' );
+
+		$raw_results = array(
+			array(
+				'check_name'     => 'spf_record',
+				'result_message' => 'SPF OK',
+			),
+			array(
+				'check_name'     => 'mx_record',
+				'result_message' => 'MX OK',
+			),
+			array(
+				'check_name'     => 'dkim_record',
+				'result_message' => 'DKIM OK',
+			),
+			array(
+				'check_name'     => 'dmarc_policy',
+				'result_message' => 'DMARC OK',
+			),
+			array(
+				'check_name'     => 'smtp_tls',
+				'result_message' => 'SMTP/TLS OK',
+			),
+			array(
+				'check_name'     => 'unknown_check',
+				'result_message' => 'Unknown',
+			),
+		);
+
+		$organized = $reflection->invoke( $page, $raw_results );
+
+		$this->assertIsArray( $organized );
+		$this->assertArrayHasKey( 'spf', $organized );
+		$this->assertArrayHasKey( 'mx', $organized );
+		$this->assertArrayHasKey( 'dkim', $organized );
+		$this->assertArrayHasKey( 'dmarc', $organized );
+		$this->assertArrayHasKey( 'smtp_tls', $organized );
+		$this->assertSame( 'SPF OK', $organized['spf']['result_message'] );
+		$this->assertSame( 'MX OK', $organized['mx']['result_message'] );
+		$this->assertSame( 'DKIM OK', $organized['dkim']['result_message'] );
+		$this->assertSame( 'DMARC OK', $organized['dmarc']['result_message'] );
+		$this->assertSame( 'SMTP/TLS OK', $organized['smtp_tls']['result_message'] );
+	}
+
+	public function test_organize_diagnostics_returns_null_for_missing_checks(): void {
+		$this->grant_run_diagnostics();
+		$this->configure_provider();
+		$this->boot_plugin();
+
+		$page       = new DiagnosticsPage();
+		$reflection = new ReflectionMethod( $page, 'organize_diagnostics' );
+
+		$raw_results = array(
+			array(
+				'check_name'     => 'spf_record',
+				'result_message' => 'SPF OK',
+			),
+		);
+
+		$organized = $reflection->invoke( $page, $raw_results );
+
+		$this->assertNull( $organized['mx'] );
+		$this->assertNull( $organized['dkim'] );
+		$this->assertNull( $organized['dmarc'] );
+		$this->assertNull( $organized['smtp_tls'] );
+	}
+
+	public function test_get_ui_status_maps_diagnostic_status_to_ui_status(): void {
+		$this->grant_run_diagnostics();
+		$this->configure_provider();
+		$this->boot_plugin();
+
+		$page       = new DiagnosticsPage();
+		$reflection = new ReflectionMethod( $page, 'get_ui_status' );
+
+		$this->assertSame( 'healthy', $reflection->invoke( $page, 'pass' ) );
+		$this->assertSame( 'warning', $reflection->invoke( $page, 'warn' ) );
+		$this->assertSame( 'critical', $reflection->invoke( $page, 'fail' ) );
+		$this->assertSame( 'warning', $reflection->invoke( $page, 'error' ) );
+		$this->assertSame( 'unknown', $reflection->invoke( $page, 'unknown' ) );
+	}
+
+	public function test_get_severity_class_maps_diagnostic_severity_to_css_class(): void {
+		$this->grant_run_diagnostics();
+		$this->configure_provider();
+		$this->boot_plugin();
+
+		$page       = new DiagnosticsPage();
+		$reflection = new ReflectionMethod( $page, 'get_severity_class' );
+
+		$this->assertSame( 'scalyn-severity-low', $reflection->invoke( $page, 'low' ) );
+		$this->assertSame( 'scalyn-severity-medium', $reflection->invoke( $page, 'medium' ) );
+		$this->assertSame( 'scalyn-severity-high', $reflection->invoke( $page, 'high' ) );
+		$this->assertSame( 'scalyn-severity-critical', $reflection->invoke( $page, 'critical' ) );
+		$this->assertSame( 'scalyn-severity-unknown', $reflection->invoke( $page, 'unknown' ) );
+	}
+
+	public function test_findings_output_is_escaped(): void {
+		$this->grant_run_diagnostics();
+		$this->configure_provider();
+
+		$mock_results = array(
+			array(
+				'check_name'         => 'spf_record',
+				'status'             => 'pass',
+				'result_message'     => 'SPF check passed',
+				'recommended_action' => '',
+				'raw_result'         => wp_json_encode(
+					array(
+						'evidence' => 'v=spf1 include:_spf.google.com ~all',
+						'impact'   => '',
+					)
+				),
+			),
+			array(
+				'check_name'         => 'dkim_record',
+				'status'             => 'fail',
+				'result_message'     => 'DKIM check failed',
+				'recommended_action' => 'Add DKIM record',
+				'raw_result'         => wp_json_encode(
+					array(
+						'evidence' => 'No DKIM record found',
+						'impact'   => 'Emails may be rejected',
+					)
+				),
+			),
+		);
+
+		$this->set_mock_diagnostic_data( $mock_results );
+		$output = $this->render_and_capture();
+
+		// Verify no unescaped HTML or script tags appear.
+		$this->assertStringNotContainsString( '<script', $output );
+		// All findings should be rendered with proper escaping.
+		$this->assertStringContainsString( 'scalyn-finding__message', $output );
+		$this->assertStringContainsString( 'scalyn-finding__evidence', $output );
+		$this->assertStringContainsString( 'scalyn-finding__action', $output );
+	}
+
+	public function test_health_score_displays_with_backend_provided_value(): void {
+		$this->grant_run_diagnostics();
+		$this->configure_provider();
+
+		$mock_results = array(
+			array(
+				'check_name'         => 'spf_record',
+				'status'             => 'pass',
+				'result_message'     => 'SPF OK',
+				'recommended_action' => '',
+				'raw_result'         => '{"evidence":"test","impact":""}',
+			),
+		);
+
+		$this->set_mock_diagnostic_data( $mock_results );
+		$output = $this->render_and_capture();
+
+		// When data exists, health score is displayed in the StatusBadge (e.g., "81/100").
+		// The duplicate large-text display was removed to avoid redundancy (issue #19).
+		$this->assertStringContainsString( 'Configuration Score', $output );
+		$this->assertStringContainsString( 'scalyn-badge', $output );
+	}
+
+	/**
+	 * Regression guard for the QA report: five Unknown cards next to "100/100"
+	 * with copy claiming the score derives from those checks. The card must
+	 * now show which components had evidence and mark the rest "Not evaluated".
+	 */
+	public function test_health_card_explains_score_provenance_when_checks_are_unknown(): void {
+		$this->grant_run_diagnostics();
+		$this->configure_provider();
+		$this->set_mock_health_row(
+			array(
+				'overall_score'  => 100,
+				'dns_score'      => null,
+				'provider_score' => null,
+				'failure_score'  => 100,
+				'summary'        => 'Health score based on: Operational reliability. Security posture and WordPress/system health are not yet evaluated by this version and are excluded, not scored as zero.',
+				'created_at'     => '2026-09-04 10:00:00',
+			)
+		);
+
+		$output = $this->render_and_capture();
+
+		$this->assertStringContainsString( '100/100', $output );
+		$this->assertStringContainsString( 'scalyn-badge--healthy', $output );
+		$this->assertStringContainsString( 'Not evaluated', $output );
+		$this->assertStringContainsString( 'Operational reliability', $output );
+		$this->assertStringContainsString( 'Health score based on: Operational reliability.', $output );
+		$this->assertStringContainsString( 'scalyn-health-summary scalyn-finding__action', $output );
+		$this->assertStringContainsString( 'Message authentication and delivery: not verified', $output );
+		$this->assertStringNotContainsString( 'based on the results of all diagnostic checks', $output );
+		// Six checks and three categories remain unknown; only the score has evidence.
+		$this->assertSame( 9, substr_count( $output, 'scalyn-badge--unknown' ) );
+		$this->assertSame( 1, substr_count( $output, 'scalyn-badge--healthy' ) );
+	}
+
+	public function test_health_card_uses_same_thresholds_as_dashboard(): void {
+		$this->grant_run_diagnostics();
+		$this->configure_provider();
+		$this->set_mock_health_row(
+			array(
+				'overall_score'  => 68,
+				'dns_score'      => 68,
+				'provider_score' => null,
+				'failure_score'  => null,
+				'summary'        => 'Health score based on: DNS & authentication.',
+			)
+		);
+
+		$output = $this->render_and_capture();
+
+		$this->assertStringContainsString( '68/100', $output );
+		$this->assertStringContainsString( 'scalyn-badge--warning', $output );
+	}
+}

@@ -11,21 +11,41 @@ use Scalyn\MailRelay\Database\Migrator;
 
 defined( 'ABSPATH' ) || exit;
 
+/**
+ * Handles plugin activation, deactivation and environment assertion.
+ *
+ * Activation migrates, grants capabilities and schedules hourly retention.
+ * Deactivation stops owned scheduled work and preserves data.
+ * ScheduledHooks also supplies the uninstall hook list.
+ */
 final class Lifecycle {
+
+	/**
+	 * Runs on plugin activation.
+	 */
 	public static function activate(): void {
 		self::assert_environment();
 		Migrator::migrate();
 		self::grant_capabilities();
-		self::schedule_events();
+		ScheduledHooks::clear();
+		RetentionService::ensure_scheduled();
+		DiagnosticSchedule::reconcile();
+		\Scalyn\MailRelay\Alerts\AlertService::ensure_scheduled();
+		\Scalyn\MailRelay\Recovery\RecoveryService::ensure_scheduled();
 		update_option( 'scalyn_mail_relay_version', SCALYN_MAIL_RELAY_VERSION, false );
 	}
 
+	/**
+	 * Runs on plugin deactivation. Preserves all data.
+	 */
 	public static function deactivate(): void {
-		foreach ( self::cron_hooks() as $hook ) {
-			wp_clear_scheduled_hook( $hook );
-		}
+		ScheduledHooks::clear();
 	}
 
+	/**
+	 * Verifies minimum PHP and WordPress version requirements.
+	 * Calls wp_die() if requirements are not met.
+	 */
 	private static function assert_environment(): void {
 		global $wp_version;
 
@@ -38,6 +58,9 @@ final class Lifecycle {
 		}
 	}
 
+	/**
+	 * Adds all plugin capabilities to the Administrator role.
+	 */
 	private static function grant_capabilities(): void {
 		$role = get_role( 'administrator' );
 		if ( ! $role ) {
@@ -47,24 +70,5 @@ final class Lifecycle {
 		foreach ( Capabilities::all() as $capability ) {
 			$role->add_cap( $capability );
 		}
-	}
-
-	private static function schedule_events(): void {
-		if ( ! wp_next_scheduled( 'scalyn_mail_relay_cleanup_logs' ) ) {
-			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'scalyn_mail_relay_cleanup_logs' );
-		}
-
-		if ( ! wp_next_scheduled( 'scalyn_mail_relay_run_daily_diagnostics' ) ) {
-			wp_schedule_event( time() + ( 2 * HOUR_IN_SECONDS ), 'daily', 'scalyn_mail_relay_run_daily_diagnostics' );
-		}
-	}
-
-	private static function cron_hooks(): array {
-		return array(
-			'scalyn_mail_relay_cleanup_logs',
-			'scalyn_mail_relay_run_daily_diagnostics',
-			'scalyn_mail_relay_generate_health_snapshot',
-			'scalyn_mail_relay_send_alerts',
-		);
 	}
 }

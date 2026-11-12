@@ -1,11 +1,85 @@
 # Uninstall Policy
 
-Default behavior: keep all data.
+## Default: retain data
 
-Optional advanced setting:
+Deactivation and uninstall stop all plugin-owned scheduled work. Unless deletion
+was explicitly enabled, settings, credentials, custom tables, mail history,
+diagnostics, health snapshots, cleanup/execution status and capabilities remain available
+after reinstalling. Uninstall does not run a final retention cleanup.
 
-`Delete all Scalyn Mail Relay data on uninstall`
+## Explicit deletion
 
-When enabled, uninstall removes settings, custom tables, logs, timeline events, diagnostics, health scores, alerts, audit logs, cron jobs, cache and transients.
+Open Mail Relay → Settings with the manage-settings capability. Select
+“Delete all plugin data when the plugin is uninstalled”, separately confirm the
+permanent-deletion consequence, and save. The form requires a valid WordPress
+nonce. Enabling the policy does not delete data immediately; uninstall triggers
+it later. Clearing the policy and saving disables deletion.
 
-This option must require explicit administrator confirmation.
+Only boolean `true` in `advanced.delete_data_on_uninstall` enables deletion.
+Missing values, false, numbers and strings (including `'true'` and `'1'`) retain
+data. Existing boolean opt-ins remain valid. Programmatic saves through
+`SettingsRepository` require `confirm_delete_data => true` when enabling the
+policy; confirmation itself is not persisted. Avoid printing the full settings
+option because it contains transport credentials.
+
+When enabled, uninstall removes only this site's owned data:
+
+- Tables: `scalyn_mail_logs`, `scalyn_mail_timeline`, `scalyn_diagnostics`,
+  `scalyn_health_scores`, `scalyn_alerts`, `scalyn_alert_notifications`, `scalyn_audit_logs`.
+- Options: `scalyn_mail_relay_settings`, `scalyn_mail_relay_db_version`,
+  `scalyn_mail_relay_version`, `scalyn_mail_relay_retention_status`,
+  `scalyn_mail_relay_diagnostic_run_status`, `scalyn_mail_relay_alert_status`.
+- Plugin capabilities from all roles, current/historical owned cron events,
+  `scalyn_mail_relay_health_cache` and `scalyn_mail_relay_diagnostics_cache`.
+
+Unrelated plugin data and capabilities remain. Permanent deletion is recoverable
+only from a backup. Deactivation never deletes operational data, even when the
+uninstall policy is enabled.
+
+## Separate credential-key artifact (QA4)
+
+The automatic key directory `wp-content/scalyn-mail-relay-private/` is outside
+the plugin directory. It is retained on deactivation, replacement and both
+uninstall modes. Explicit data deletion removes the current site's nonsecret
+`scalyn_mail_relay_local_key_state` database marker, not the key file. This
+intentional exception preserves access to retained encrypted backups. A reinstall
+can use the retained valid private key; it never overwrites it. Do not remove it
+until encrypted records and backups no longer need it. Keep encrypted backups of
+the database and key, and restrict access: possession of both defeats the
+protection against a database-only disclosure. Managed external keys/constants
+also remain the operator's responsibility. See ADR 0042.
+
+The historical table/option examples above are not the complete current schema.
+The authoritative bounded owned-data list is in `uninstall.php`, including
+recovery, submission, connection/delivery and AI tables, their settings and
+owned locks. Unrelated site data is not selected for deletion.
+
+## Retention versus uninstall
+
+Hourly retention removes expired operational history while the plugin is active;
+uninstall policy controls all owned data when the plugin is removed. Retention
+defaults to 30 days and accepts 1–3650 whole days in Settings. Reducing the
+period makes existing older history eligible for the next tick. Increasing it
+cannot recover removed data. WP-Cron requires traffic or a server scheduler.
+
+Diagnostic execution status is bounded control metadata, not history: its five
+slots are replaced by later runs and are not expired by the history cutoff.
+Pointers can outlive their diagnostic evidence; they do not retain that evidence.
+
+The five-minute alert tick removes up to 100 resolved incidents and their complete
+notification records together, measured from UTC resolution time using the same
+retention period. Active incidents remain until observed recovery. The bounded
+last alert-execution status is control metadata, not expiring history. Webhook
+constants in server configuration are not plugin-owned and are never removed by
+uninstall; remove those manually when retiring the integration.
+
+## Scope and verification
+
+Single-site only. Multisite lifecycle is not supported. The uninstall script
+operates on the current site's table prefix and does not sweep a network.
+
+Automated `UninstallTest` covers retained and explicitly destructive modes,
+strict flag handling, owned option removal and unrelated-state preservation.
+See [Milestone 2 evidence](qa/2026-09-21-milestone-2-completion.md),
+[ADR-0005](adr/0005-retention-execution-and-controls.md) and the
+[release checklist](RELEASE-CHECKLIST.md).

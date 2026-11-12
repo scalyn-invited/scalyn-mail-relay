@@ -8,18 +8,83 @@
 namespace Scalyn\MailRelay\Core;
 
 use Scalyn\MailRelay\Admin\AdminMenu;
+use Scalyn\MailRelay\Audit\AuditRepository;
+use Scalyn\MailRelay\Audit\AuditRecorder;
+use Scalyn\MailRelay\Database\DiagnosticRepository;
+use Scalyn\MailRelay\Database\DiagnosticRetentionRepository;
+use Scalyn\MailRelay\Database\HealthScoreRepository;
+use Scalyn\MailRelay\Database\RetentionStateRepository;
+use Scalyn\MailRelay\Diagnostics\DiagnosticCheckRegistry;
+use Scalyn\MailRelay\Diagnostics\DiagnosticContextBuilder;
+use Scalyn\MailRelay\Diagnostics\DiagnosticRunner;
+use Scalyn\MailRelay\Diagnostics\HealthScorer;
+use Scalyn\MailRelay\Diagnostics\Checks\DkimCheck;
+use Scalyn\MailRelay\Diagnostics\Checks\DmarcCheck;
+use Scalyn\MailRelay\Diagnostics\Checks\MxCheck;
+use Scalyn\MailRelay\Diagnostics\Checks\SpfCheck;
+use Scalyn\MailRelay\Providers\Mail\SmtpTlsCheck;
+use Scalyn\MailRelay\Logging\MailEventSubscriber;
+use Scalyn\MailRelay\Logging\MailLogRepository;
+use Scalyn\MailRelay\Logging\MailRetentionRepository;
+use Scalyn\MailRelay\Logging\TimelineRepository;
+use Scalyn\MailRelay\Mail\FailureClassifier;
+use Scalyn\MailRelay\Mail\MailDispatcher;
+use Scalyn\MailRelay\Mail\WordPressMailBridge;
+use Scalyn\MailRelay\Rest\DiagnosticsRunEndpoint;
+use Scalyn\MailRelay\Rest\PostmarkWebhookEndpoint;
+use Scalyn\MailRelay\Database\DeliveryAttemptRepository;
+use Scalyn\MailRelay\Database\DeliveryCoverageRepository;
+use Scalyn\MailRelay\Database\DeliveryEventRepository;
+use Scalyn\MailRelay\Database\DeliveryKeyRepository;
+use Scalyn\MailRelay\Database\DeliveryRetentionRepository;
+use Scalyn\MailRelay\Database\WebhookRateLimitRepository;
+use Scalyn\MailRelay\Delivery\DeliveryCoverage;
+use Scalyn\MailRelay\Delivery\DeliveryTracker;
+use Scalyn\MailRelay\Providers\Postmark\PostmarkProvider;
+use Scalyn\MailRelay\Health\ProviderHealthAssessment;
 
 defined( 'ABSPATH' ) || exit;
 
+/**
+ * Plugin singleton. Bootstraps the service container and registers WordPress hooks.
+ *
+ * Entry point: scalyn-mail-relay.php fires Plugin::instance()->boot() on plugins_loaded.
+ * The scalyn_mail_relay_booted action is fired after all services are registered,
+ * giving other modules and third-party code an opportunity to extend the container.
+ */
 final class Plugin {
+
+	/**
+	 * Singleton instance.
+	 *
+	 * @var Plugin|null
+	 */
 	private static ?Plugin $instance = null;
+
+	/**
+	 * The plugin service container.
+	 *
+	 * @var Container
+	 */
 	private Container $container;
+
+	/**
+	 * Whether boot() has already been called.
+	 *
+	 * @var bool
+	 */
 	private bool $booted = false;
 
+	/**
+	 * Private constructor — use instance() to obtain the singleton.
+	 */
 	private function __construct() {
 		$this->container = new Container();
 	}
 
+	/**
+	 * Returns the singleton plugin instance, creating it if necessary.
+	 */
 	public static function instance(): Plugin {
 		if ( null === self::$instance ) {
 			self::$instance = new self();
@@ -27,28 +92,221 @@ final class Plugin {
 		return self::$instance;
 	}
 
+	/**
+	 * Boots the plugin: registers services, hooks, and fires scalyn_mail_relay_booted.
+	 * Subsequent calls are no-ops.
+	 */
 	public function boot(): void {
 		if ( $this->booted ) {
 			return;
 		}
 
 		$this->register_services();
+		$this->populate_diagnostic_checks();
 		$this->register_hooks();
 		$this->booted = true;
 
 		do_action( 'scalyn_mail_relay_booted', $this->container );
 	}
 
+	/**
+	 * Returns the plugin service container.
+	 */
 	public function container(): Container {
 		return $this->container;
 	}
 
+	/**
+	 * Registers core services in the container.
+	 */
 	private function register_services(): void {
+		$this->container->set( \Scalyn\MailRelay\AI\AiSettings::class, static fn( Container $c ) => new \Scalyn\MailRelay\AI\AiSettings( $c->get( CredentialCipher::class ) ) );
+		$this->container->set( \Scalyn\MailRelay\AI\AiRepository::class, static fn( Container $c ) => new \Scalyn\MailRelay\AI\AiRepository( $c->get( CredentialCipher::class ) ) );
+		$this->container->set( \Scalyn\MailRelay\AI\OpenAiAdapter::class, static fn( Container $c ) => new \Scalyn\MailRelay\AI\OpenAiAdapter( $c->get( \Scalyn\MailRelay\AI\AiSettings::class ) ) );
+		$this->container->set( \Scalyn\MailRelay\AI\AiAdapters::class, static fn( Container $c ) => new \Scalyn\MailRelay\AI\AiAdapters( $c->get( \Scalyn\MailRelay\AI\AiSettings::class ), $c->get( \Scalyn\MailRelay\AI\OpenAiAdapter::class ) ) );
+		$this->container->set( \Scalyn\MailRelay\AI\AiEvidence::class, static fn( Container $c ) => new \Scalyn\MailRelay\AI\AiEvidence( $c->get( SettingsRepository::class ), $c->get( \Scalyn\MailRelay\Diagnostics\CurrentDiagnostics::class ), $c->get( \Scalyn\MailRelay\Logging\MailLogRepository::class ), $c->get( \Scalyn\MailRelay\Database\RecoveryQueueRepository::class ) ) );
+		$this->container->set( \Scalyn\MailRelay\AI\AiService::class, static fn( Container $c ) => new \Scalyn\MailRelay\AI\AiService( $c->get( \Scalyn\MailRelay\AI\AiSettings::class ), $c->get( \Scalyn\MailRelay\AI\AiRepository::class ), $c->get( \Scalyn\MailRelay\AI\AiAdapters::class ), $c->get( \Scalyn\MailRelay\AI\AiEvidence::class ) ) );
+		$this->container->set( \Scalyn\MailRelay\Rest\AiEndpoint::class, static fn( Container $c ) => new \Scalyn\MailRelay\Rest\AiEndpoint( $c->get( \Scalyn\MailRelay\AI\AiRepository::class ), $c->get( \Scalyn\MailRelay\AI\AiService::class ), $c->get( \Scalyn\MailRelay\AI\AiEvidence::class ), $c->get( SettingsRepository::class ), $c->get( \Scalyn\MailRelay\Diagnostics\DiagnosticRunService::class ) ) );
+		$this->container->set( \Scalyn\MailRelay\Rest\AiMcpEndpoint::class, static fn( Container $c ) => new \Scalyn\MailRelay\Rest\AiMcpEndpoint( $c->get( \Scalyn\MailRelay\AI\AiSettings::class ), $c->get( \Scalyn\MailRelay\AI\AiEvidence::class ), $c->get( \Scalyn\MailRelay\AI\AiRepository::class ) ) );
+		$this->container->set( \Scalyn\MailRelay\Agency\AgencyRepository::class, static fn() => new \Scalyn\MailRelay\Agency\AgencyRepository() );
+		$this->container->set( \Scalyn\MailRelay\Agency\ManagedAccess::class, static fn() => new \Scalyn\MailRelay\Agency\ManagedAccess() );
+		$this->container->set( \Scalyn\MailRelay\Alerts\AlertRepository::class, static fn(): \Scalyn\MailRelay\Alerts\AlertRepository => new \Scalyn\MailRelay\Alerts\AlertRepository() );
+		$this->container->set( \Scalyn\MailRelay\Alerts\ObservationRepository::class, static fn(): \Scalyn\MailRelay\Alerts\ObservationRepository => new \Scalyn\MailRelay\Alerts\ObservationRepository() );
+		$this->container->set( \Scalyn\MailRelay\Alerts\WebhookChannel::class, static fn(): \Scalyn\MailRelay\Alerts\WebhookChannel => new \Scalyn\MailRelay\Alerts\WebhookChannel() );
+		$this->container->set( \Scalyn\MailRelay\Alerts\AlertService::class, static fn( Container $c ): \Scalyn\MailRelay\Alerts\AlertService => new \Scalyn\MailRelay\Alerts\AlertService( $c->get( \Scalyn\MailRelay\Alerts\AlertRepository::class ), $c->get( \Scalyn\MailRelay\Alerts\ObservationRepository::class ), $c->get( \Scalyn\MailRelay\Alerts\WebhookChannel::class ) ) );
+		$this->container->set( AuditRepository::class, static fn(): AuditRepository => new AuditRepository() );
+		$this->container->set( AuditRecorder::class, static fn( Container $c ): AuditRecorder => new AuditRecorder( $c->get( AuditRepository::class ) ) );
 		$this->container->set( AdminMenu::class, static fn(): AdminMenu => new AdminMenu() );
+		$this->container->set( CredentialCipher::class, static fn(): CredentialCipher => new CredentialCipher() );
+		$this->container->set( PostmarkWebhookSettings::class, static fn( Container $c ): PostmarkWebhookSettings => new PostmarkWebhookSettings( $c->get( CredentialCipher::class ), $c->get( DeliveryKeyRepository::class ), $c->get( SettingsRepository::class ) ) );
+		$this->container->set( DeliveryAttemptRepository::class, static fn(): DeliveryAttemptRepository => new DeliveryAttemptRepository() );
+		$this->container->set( DeliveryEventRepository::class, static fn(): DeliveryEventRepository => new DeliveryEventRepository() );
+		$this->container->set( DeliveryCoverageRepository::class, static fn(): DeliveryCoverageRepository => new DeliveryCoverageRepository() );
+		$this->container->set( WebhookRateLimitRepository::class, static fn(): WebhookRateLimitRepository => new WebhookRateLimitRepository() );
+		foreach ( array( 'smtp2go', 'brevo' ) as $provider ) {
+			$this->container->set( ApiWebhookSettings::class . ':' . $provider, static fn( Container $c ): ApiWebhookSettings => new ApiWebhookSettings( $c->get( CredentialCipher::class ), $provider, $c->get( DeliveryKeyRepository::class ), $c->get( SettingsRepository::class ) ) );
+			$this->container->set( \Scalyn\MailRelay\Rest\ApiWebhookEndpoint::class . ':' . $provider, static fn( Container $c ): \Scalyn\MailRelay\Rest\ApiWebhookEndpoint => new \Scalyn\MailRelay\Rest\ApiWebhookEndpoint( $c->get( ApiWebhookSettings::class . ':' . $provider ), $c->get( SettingsRepository::class ), $c->get( WebhookRateLimitRepository::class ), $c->get( DeliveryAttemptRepository::class ), $c->get( DeliveryKeyRepository::class ), $c->get( DeliveryEventRepository::class ) ) );
+		}
+		$this->container->set(
+			DeliveryTracker::class,
+			static fn( Container $c ): DeliveryTracker => new DeliveryTracker(
+				$c->get( PostmarkWebhookSettings::class ),
+				$c->get( DeliveryKeyRepository::class ),
+				$c->get( DeliveryAttemptRepository::class ),
+				new PostmarkProvider(),
+				array(
+					'smtp2go' => $c->get( ApiWebhookSettings::class . ':smtp2go' ),
+					'brevo'   => $c->get( ApiWebhookSettings::class . ':brevo' ),
+				)
+			)
+		);
+		$this->container->set(
+			DeliveryCoverage::class,
+			static fn( Container $c ): DeliveryCoverage => new DeliveryCoverage(
+				$c->get( DeliveryCoverageRepository::class ),
+				$c->get( PostmarkWebhookSettings::class ),
+				array(
+					'smtp2go' => $c->get( ApiWebhookSettings::class . ':smtp2go' ),
+					'brevo'   => $c->get( ApiWebhookSettings::class . ':brevo' ),
+				)
+			)
+		);
+		$this->container->set( PostmarkWebhookEndpoint::class, static fn( Container $c ): PostmarkWebhookEndpoint => new PostmarkWebhookEndpoint( $c->get( PostmarkWebhookSettings::class ), $c->get( SettingsRepository::class ), $c->get( WebhookRateLimitRepository::class ), $c->get( DeliveryAttemptRepository::class ), $c->get( DeliveryKeyRepository::class ), $c->get( DeliveryEventRepository::class ) ) );
+		$this->container->set( SettingsRepository::class, static fn( Container $c ): SettingsRepository => new SettingsRepository( $c->get( CredentialCipher::class ) ) );
+		$this->container->set( ProviderRegistry::class, static fn(): ProviderRegistry => new ProviderRegistry() );
+		$this->container->set( \Scalyn\MailRelay\Database\SubmissionAttemptRepository::class, static fn() => new \Scalyn\MailRelay\Database\SubmissionAttemptRepository() );
+		$this->container->set( \Scalyn\MailRelay\Database\ConnectionEvidenceRepository::class, static fn(): \Scalyn\MailRelay\Database\ConnectionEvidenceRepository => new \Scalyn\MailRelay\Database\ConnectionEvidenceRepository() );
+		$this->container->set( ConnectionVerification::class, static fn( Container $c ): ConnectionVerification => new ConnectionVerification( $c->get( SettingsRepository::class ), $c->get( ProviderRegistry::class ), $c->get( \Scalyn\MailRelay\Database\ConnectionEvidenceRepository::class ) ) );
+		$this->container->set(
+			MailDispatcher::class,
+			static fn( Container $c ): MailDispatcher => new MailDispatcher(
+				$c->get( ProviderRegistry::class ),
+				$c->get( SettingsRepository::class ),
+				$c->get( DeliveryTracker::class ),
+				$c->get( \Scalyn\MailRelay\Database\SubmissionAttemptRepository::class )
+			)
+		);
+		$this->container->set( \Scalyn\MailRelay\Database\RecoveryQueueRepository::class, static fn() => new \Scalyn\MailRelay\Database\RecoveryQueueRepository() );
+		$this->container->set( \Scalyn\MailRelay\Recovery\RecoveryPolicyRepository::class, static fn() => new \Scalyn\MailRelay\Recovery\RecoveryPolicyRepository() );
+		$this->container->set( \Scalyn\MailRelay\Recovery\RecoveryPayload::class, static fn( Container $c ) => new \Scalyn\MailRelay\Recovery\RecoveryPayload( $c->get( CredentialCipher::class ) ) );
+		$this->container->set( \Scalyn\MailRelay\Recovery\RecoveryService::class, static fn( Container $c ) => new \Scalyn\MailRelay\Recovery\RecoveryService( $c->get( \Scalyn\MailRelay\Database\RecoveryQueueRepository::class ), $c->get( \Scalyn\MailRelay\Recovery\RecoveryPolicyRepository::class ), $c->get( \Scalyn\MailRelay\Recovery\RecoveryPayload::class ), $c->get( MailDispatcher::class ), $c->get( SettingsRepository::class ) ) );
+		$this->container->set( WordPressMailBridge::class, static fn( Container $c ): WordPressMailBridge => new WordPressMailBridge( $c->get( SettingsRepository::class ), $c->get( MailDispatcher::class ), $c->get( \Scalyn\MailRelay\Recovery\RecoveryService::class ) ) );
+
+		$this->container->set( MailLogRepository::class, static fn(): MailLogRepository => new MailLogRepository() );
+		$this->container->set( \Scalyn\MailRelay\Database\ProviderDeliveryRepository::class, static fn() => new \Scalyn\MailRelay\Database\ProviderDeliveryRepository() );
+		$this->container->set(
+			\Scalyn\MailRelay\Health\ProviderDeliveryEvidence::class,
+			static fn( Container $c ) => new \Scalyn\MailRelay\Health\ProviderDeliveryEvidence(
+				$c->get( SettingsRepository::class ),
+				$c->get( \Scalyn\MailRelay\Database\ProviderDeliveryRepository::class ),
+				array(
+					'postmark' => $c->get( PostmarkWebhookSettings::class ),
+					'smtp2go'  => $c->get( ApiWebhookSettings::class . ':smtp2go' ),
+					'brevo'    => $c->get( ApiWebhookSettings::class . ':brevo' ),
+				)
+			)
+		);
+		$this->container->set( ProviderHealthAssessment::class, static fn( Container $c ): ProviderHealthAssessment => new ProviderHealthAssessment( $c->get( SettingsRepository::class ), $c->get( ConnectionVerification::class ), $c->get( MailLogRepository::class ), $c->get( \Scalyn\MailRelay\Health\ProviderDeliveryEvidence::class ) ) );
+		$this->container->set( MailRetentionRepository::class, static fn(): MailRetentionRepository => new MailRetentionRepository() );
+		$this->container->set( DeliveryRetentionRepository::class, static fn(): DeliveryRetentionRepository => new DeliveryRetentionRepository() );
+		$this->container->set( DeliveryKeyRepository::class, static fn( Container $c ): DeliveryKeyRepository => new DeliveryKeyRepository( $c->get( CredentialCipher::class ) ) );
+		$this->container->set( TimelineRepository::class, static fn(): TimelineRepository => new TimelineRepository() );
+		$this->container->set( FailureClassifier::class, static fn(): FailureClassifier => new FailureClassifier() );
+		$this->container->set(
+			MailEventSubscriber::class,
+			static fn( Container $c ): MailEventSubscriber => new MailEventSubscriber(
+				$c->get( MailLogRepository::class ),
+				$c->get( TimelineRepository::class )
+			)
+		);
+
+		$this->container->set( DiagnosticCheckRegistry::class, static fn(): DiagnosticCheckRegistry => new DiagnosticCheckRegistry() );
+		$this->container->set( DiagnosticRunner::class, static fn(): DiagnosticRunner => new DiagnosticRunner() );
+		$this->container->set( \Scalyn\MailRelay\Database\DiagnosticRunStateRepository::class, static fn(): \Scalyn\MailRelay\Database\DiagnosticRunStateRepository => new \Scalyn\MailRelay\Database\DiagnosticRunStateRepository() );
+		$this->container->set( DiagnosticSchedule::class, static fn(): DiagnosticSchedule => new DiagnosticSchedule() );
+		$this->container->set( \Scalyn\MailRelay\Database\DiagnosticRunLock::class, static fn(): \Scalyn\MailRelay\Database\DiagnosticRunLock => new \Scalyn\MailRelay\Database\DiagnosticRunLock() );
+		$this->container->set( \Scalyn\MailRelay\Diagnostics\DiagnosticRunService::class, static fn( Container $c ): \Scalyn\MailRelay\Diagnostics\DiagnosticRunService => new \Scalyn\MailRelay\Diagnostics\DiagnosticRunService( $c, $c->get( \Scalyn\MailRelay\Database\DiagnosticRunLock::class ) ) );
+		$this->container->set( DiagnosticContextBuilder::class, static fn(): DiagnosticContextBuilder => new DiagnosticContextBuilder() );
+		$this->container->set( DiagnosticRepository::class, static fn(): DiagnosticRepository => new DiagnosticRepository() );
+		$this->container->set( DiagnosticRetentionRepository::class, static fn(): DiagnosticRetentionRepository => new DiagnosticRetentionRepository() );
+		$this->container->set( RetentionStateRepository::class, static fn(): RetentionStateRepository => new RetentionStateRepository() );
+		$this->container->set(
+			RetentionService::class,
+			static fn( Container $c ): RetentionService => new RetentionService(
+				$c->get( SettingsRepository::class ),
+				$c->get( MailRetentionRepository::class ),
+				$c->get( DiagnosticRetentionRepository::class ),
+				$c->get( RetentionStateRepository::class ),
+				$c->get( AuditRepository::class ),
+				$c->get( DeliveryRetentionRepository::class ),
+				$c->get( DeliveryKeyRepository::class )
+			)
+		);
+		$this->container->set( HealthScorer::class, static fn(): HealthScorer => new HealthScorer() );
+		$this->container->set( \Scalyn\MailRelay\Database\DeliverabilityRepository::class, static fn() => new \Scalyn\MailRelay\Database\DeliverabilityRepository() );
+		$this->container->set( \Scalyn\MailRelay\Diagnostics\DeliverabilityAssessment::class, static fn( Container $c ) => new \Scalyn\MailRelay\Diagnostics\DeliverabilityAssessment( $c->get( SettingsRepository::class ), $c->get( \Scalyn\MailRelay\Diagnostics\CurrentDiagnostics::class ), $c->get( \Scalyn\MailRelay\Database\DeliverabilityRepository::class ), $c->get( \Scalyn\MailRelay\Health\ProviderDeliveryEvidence::class ) ) );
+		$this->container->set( HealthScoreRepository::class, static fn(): HealthScoreRepository => new HealthScoreRepository() );
+		$this->container->set( \Scalyn\MailRelay\Diagnostics\CurrentDiagnostics::class, static fn( Container $c ): \Scalyn\MailRelay\Diagnostics\CurrentDiagnostics => new \Scalyn\MailRelay\Diagnostics\CurrentDiagnostics( $c->get( DiagnosticRepository::class ), $c->get( HealthScoreRepository::class ), $c->get( SettingsRepository::class ), $c->get( DiagnosticContextBuilder::class ) ) );
+		$this->container->set( \Scalyn\MailRelay\Diagnostics\RecommendationEngine::class, static fn(): \Scalyn\MailRelay\Diagnostics\RecommendationEngine => new \Scalyn\MailRelay\Diagnostics\RecommendationEngine() );
+		$this->container->set( \Scalyn\MailRelay\Database\ReportSnapshotRepository::class, static fn( Container $c ): \Scalyn\MailRelay\Database\ReportSnapshotRepository => new \Scalyn\MailRelay\Database\ReportSnapshotRepository( $c->get( MailLogRepository::class ), $c->get( HealthScoreRepository::class ), $c->get( DiagnosticRepository::class ), $c->get( \Scalyn\MailRelay\Diagnostics\RecommendationEngine::class ) ) );
+		$this->container->set( \Scalyn\MailRelay\Database\DiagnosticPublicationRepository::class, static fn( Container $c ): \Scalyn\MailRelay\Database\DiagnosticPublicationRepository => new \Scalyn\MailRelay\Database\DiagnosticPublicationRepository( $c->get( DiagnosticRepository::class ), $c->get( HealthScoreRepository::class ), $c->get( HealthScorer::class ), $c->get( MailLogRepository::class ) ) );
+		$this->container->set( DiagnosticsRunEndpoint::class, static fn(): DiagnosticsRunEndpoint => new DiagnosticsRunEndpoint() );
+
+		// Register core diagnostic checks.
+		$this->container->set( SpfCheck::class, static fn(): SpfCheck => new SpfCheck() );
+		$this->container->set( MxCheck::class, static fn(): MxCheck => new MxCheck() );
+		$this->container->set( DkimCheck::class, static fn(): DkimCheck => new DkimCheck() );
+		$this->container->set( DmarcCheck::class, static fn(): DmarcCheck => new DmarcCheck() );
+		$this->container->set( SmtpTlsCheck::class, static fn(): SmtpTlsCheck => new SmtpTlsCheck() );
+		$this->container->set( \Scalyn\MailRelay\Diagnostics\Checks\ReverseDnsCheck::class, static fn(): \Scalyn\MailRelay\Diagnostics\Checks\ReverseDnsCheck => new \Scalyn\MailRelay\Diagnostics\Checks\ReverseDnsCheck() );
 	}
 
+	/**
+	 * Populates the diagnostic check registry with registered checks.
+	 * Called during boot after all services are registered but before hooks.
+	 */
+	private function populate_diagnostic_checks(): void {
+		$registry = $this->container->get( DiagnosticCheckRegistry::class );
+		$registry->register( $this->container->get( SpfCheck::class ) );
+		$registry->register( $this->container->get( MxCheck::class ) );
+		$registry->register( $this->container->get( DkimCheck::class ) );
+		$registry->register( $this->container->get( DmarcCheck::class ) );
+		$registry->register( $this->container->get( SmtpTlsCheck::class ) );
+		$registry->register( $this->container->get( \Scalyn\MailRelay\Diagnostics\Checks\ReverseDnsCheck::class ) );
+	}
+
+	/**
+	 * Registers WordPress action and filter hooks.
+	 */
 	private function register_hooks(): void {
+		$ai_container = $this->container;
+		add_action( 'rest_api_init', static fn() => $ai_container->get( \Scalyn\MailRelay\Rest\AiEndpoint::class )->register() );
+		add_action( 'rest_api_init', static fn() => $ai_container->get( \Scalyn\MailRelay\Rest\AiMcpEndpoint::class )->route() );
+		add_action( 'application_password_did_authenticate', static fn( $user ) => $ai_container->get( \Scalyn\MailRelay\Rest\AiMcpEndpoint::class )->authenticated( $user ), 10, 1 );
+		add_filter( 'rest_pre_serve_request', static fn( $served, $result, $request, $server ) => '/' . SCALYN_MAIL_RELAY_REST_NAMESPACE . '/ai/mcp' === $request->get_route() ? $ai_container->get( \Scalyn\MailRelay\Rest\AiMcpEndpoint::class )->serve_notification( $served, $result, $request, $server ) : $served, 10, 4 );
+		add_action( ScheduledHooks::CLEANUP, static fn() => $ai_container->get( \Scalyn\MailRelay\AI\AiRepository::class )->cleanup() );
+		$this->container->get( \Scalyn\MailRelay\Agency\ManagedAccess::class )->register();
 		load_plugin_textdomain( 'scalyn-mail-relay', false, dirname( plugin_basename( SCALYN_MAIL_RELAY_FILE ) ) . '/languages' );
+
+		// Mail logging hooks run on every request (not only admin) because mail
+		// can be dispatched from frontend, REST, WP-CLI, and cron contexts.
+		$this->container->get( MailEventSubscriber::class )->register();
+		$this->container->get( WordPressMailBridge::class )->register();
+		$this->container->get( \Scalyn\MailRelay\Recovery\RecoveryService::class )->register();
+		$this->container->get( AuditRecorder::class )->register();
+		$this->container->get( RetentionService::class )->register();
+		$this->container->get( DiagnosticSchedule::class )->register();
+		$this->container->get( \Scalyn\MailRelay\Alerts\AlertService::class )->register();
+		add_action( 'admin_init', array( \Scalyn\MailRelay\Database\Migrator::class, 'maybe_upgrade' ) );
+
+		// Register REST endpoints.
+		add_action( 'rest_api_init', array( $this->container->get( DiagnosticsRunEndpoint::class ), 'register' ) );
+		$container = $this->container;
+		add_action( 'rest_api_init', static fn() => $container->get( PostmarkWebhookEndpoint::class )->register() );
+		foreach ( array( 'smtp2go', 'brevo' ) as $provider ) {
+			add_action( 'rest_api_init', static fn() => $container->get( \Scalyn\MailRelay\Rest\ApiWebhookEndpoint::class . ':' . $provider )->register() );
+		}
+		add_filter( 'application_password_is_api_request', array( PostmarkWebhookEndpoint::class, 'exclude_application_passwords' ) );
 
 		if ( is_admin() ) {
 			$this->container->get( AdminMenu::class )->register();

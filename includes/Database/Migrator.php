@@ -9,7 +9,19 @@ namespace Scalyn\MailRelay\Database;
 
 defined( 'ABSPATH' ) || exit;
 
+/**
+ * Handles database schema creation and versioned upgrades via dbDelta().
+ *
+ * Ownership: Yaj / Database. Kim may add new migration version gates here
+ * when a schema change requires it.
+ */
 final class Migrator {
+
+	/**
+	 * Runs outstanding migrations if the installed DB version is behind the target.
+	 *
+	 * @throws \RuntimeException When schema or version persistence fails.
+	 */
 	public static function migrate(): void {
 		$installed = (string) get_option( 'scalyn_mail_relay_db_version', '0.0.0' );
 
@@ -17,10 +29,172 @@ final class Migrator {
 			return;
 		}
 
-		self::create_foundation_tables();
+		if ( version_compare( $installed, '0.1.0', '<' ) ) {
+			self::create_foundation_tables();
+		}
+		if ( version_compare( $installed, '0.2.0', '<' ) ) {
+			self::create_alert_notifications();
+		}
+		if ( version_compare( $installed, '0.3.0', '<' ) ) {
+			self::add_optional_mail_metadata();
+		}
+		if ( version_compare( $installed, '0.4.0', '<' ) ) {
+			self::add_diagnostic_scope();
+		}
+		if ( version_compare( $installed, '0.5.0', '<' ) ) {
+			DeliveryEvidenceSchema::migrate();
+		}
+		if ( version_compare( $installed, '0.6.0', '<' ) ) {
+			DeliveryEvidenceSchema::migrate_key_retirement();
+		}
+		if ( version_compare( $installed, '0.7.0', '<' ) ) {
+			TransactionalTablesSchema::migrate();
+		}
+		if ( version_compare( $installed, '0.8.0', '<' ) ) {
+			MailConfigurationSchema::migrate();
+		}
+		if ( version_compare( $installed, '0.9.0', '<' ) ) {
+			ConnectionEvidenceSchema::migrate();
+		}
+		if ( version_compare( $installed, '0.10.0', '<' ) ) {
+			FailureCategorySchema::migrate();
+		}
+		if ( version_compare( $installed, '0.11.0', '<' ) ) {
+			DeliverabilitySchema::migrate();
+		}
+		if ( version_compare( $installed, '0.12.0', '<' ) ) {
+			SubmissionAttemptSchema::migrate();
+		}
+		if ( version_compare( $installed, '0.13.0', '<' ) ) {
+			RecoveryQueueSchema::migrate();
+		}
+		if ( version_compare( $installed, '0.14.0', '<' ) ) {
+			AiSchema::migrate();
+		}
+		if ( version_compare( $installed, '0.15.0', '<' ) ) {
+			AlertEngineSchema::migrate();
+		}
 		update_option( 'scalyn_mail_relay_db_version', SCALYN_MAIL_RELAY_DB_VERSION, false );
+		if ( SCALYN_MAIL_RELAY_DB_VERSION !== get_option( 'scalyn_mail_relay_db_version' ) ) {
+			throw new \RuntimeException( 'Database version could not be saved.' );
+		}
 	}
 
+	/** Adds indexed configuration attribution without relabelling old evidence.
+	 *
+	 * @throws \RuntimeException When the additive migration cannot be verified.
+	 */
+	private static function add_diagnostic_scope(): void {
+		global $wpdb;
+		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		$table = $wpdb->prefix . 'scalyn_diagnostics';
+		dbDelta(
+			"CREATE TABLE {$table} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			configuration_id char(36) NULL,
+			provider_id varchar(100) NULL,
+			sending_domain varchar(253) NULL,
+			PRIMARY KEY  (id),
+			KEY configuration_created (configuration_id,created_at,id)
+		) {$wpdb->get_charset_collate()};"
+		);
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Verify additive migration before advancing version.
+		$columns = $wpdb->get_col( $wpdb->prepare( 'SHOW COLUMNS FROM %i', $table ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Verify the scoped read index.
+		$index = $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i WHERE Key_name = %s', $table, 'configuration_created' ), ARRAY_A );
+		if ( array_diff( array( 'configuration_id', 'provider_id', 'sending_domain' ), $columns ?? array() ) || count( $index ?? array() ) !== 3 ) {
+			throw new \RuntimeException( 'Diagnostic scope migration failed.' );
+		}
+	}
+
+	/**
+	 * Adds opt-in metadata to the retained mail aggregate; existing rows stay NULL.
+	 *
+	 * @throws \RuntimeException When required columns cannot be verified.
+	 */
+	private static function add_optional_mail_metadata(): void {
+		global $wpdb;
+		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		$table = $wpdb->prefix . 'scalyn_mail_logs';
+		dbDelta(
+			"CREATE TABLE {$table} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			logged_recipients text NULL,
+			logged_subject varchar(255) NULL,
+			PRIMARY KEY  (id)
+		) {$wpdb->get_charset_collate()};"
+		);
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Verify additive migration before advancing version.
+		$columns = $wpdb->get_col( $wpdb->prepare( 'SHOW COLUMNS FROM %i', $table ) );
+		if ( array_diff( array( 'logged_recipients', 'logged_subject' ), $columns ?? array() ) ) {
+			throw new \RuntimeException( 'Mail metadata migration failed.' );
+		}
+	}
+
+	/** Upgrades from an authenticated settings administrator request. */
+	public static function maybe_upgrade(): void {
+		if ( ! current_user_can( \Scalyn\MailRelay\Core\Capabilities::MANAGE_SETTINGS ) ) {
+			return;
+		}
+		try {
+			self::migrate();
+		} catch ( \Throwable $error ) {
+			add_action(
+				'admin_notices',
+				static function (): void {
+					echo '<div class="notice notice-error"><p>' . esc_html__( 'Mail Relay database upgrade could not complete. Check database permissions and retry.', 'scalyn-mail-relay' ) . '</p></div>';
+				}
+			);
+		}
+	}
+
+	/** Adds the bounded notification outbox with idempotent dbDelta.
+	 *
+	 * @throws \RuntimeException When the new table is unavailable.
+	 */
+	private static function create_alert_notifications(): void {
+		global $wpdb;
+		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		$table   = $wpdb->prefix . 'scalyn_alert_notifications';
+		$collate = $wpdb->get_charset_collate();
+		dbDelta(
+			"CREATE TABLE {$table} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			notification_uuid char(36) NOT NULL,
+			alert_uuid char(36) NOT NULL,
+			event varchar(20) NOT NULL,
+			status varchar(20) NOT NULL,
+			attempts smallint unsigned NOT NULL DEFAULT 0,
+			response_code smallint unsigned NOT NULL DEFAULT 0,
+			next_attempt_at datetime NOT NULL,
+			last_attempt_at datetime NULL,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY notification_uuid (notification_uuid),
+			UNIQUE KEY alert_event (alert_uuid,event),
+			KEY due_status (status,next_attempt_at)
+		) ENGINE=InnoDB {$collate};"
+		);
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Verify migration before advancing the version.
+		if ( $table !== $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) ) {
+			throw new \RuntimeException( 'Alert migration failed.' );
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Verify required columns before advancing the schema version.
+		$columns = $wpdb->get_col( $wpdb->prepare( 'SHOW COLUMNS FROM %i', $table ) );
+		if ( array_diff( array( 'id', 'notification_uuid', 'alert_uuid', 'event', 'status', 'attempts', 'response_code', 'next_attempt_at', 'last_attempt_at', 'created_at' ), $columns ?? array() ) ) {
+			throw new \RuntimeException( 'Alert migration failed.' );
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Verify uniqueness required for outbox idempotency.
+		$indexes = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=%s AND NON_UNIQUE=0 AND INDEX_NAME IN ('PRIMARY','notification_uuid','alert_event')", $table ) );
+		if ( 3 !== (int) $indexes ) {
+			throw new \RuntimeException( 'Alert migration failed.' );
+		}
+	}
+
+	/**
+	 * Creates the full set of foundation tables using dbDelta().
+	 * dbDelta() is safe to run on existing tables — it only adds missing structures.
+	 */
 	private static function create_foundation_tables(): void {
 		global $wpdb;
 
@@ -28,7 +202,7 @@ final class Migrator {
 		$charset_collate = $wpdb->get_charset_collate();
 		$prefix          = $wpdb->prefix;
 
-		$sql = array();
+		$sql   = array();
 		$sql[] = "CREATE TABLE {$prefix}scalyn_mail_logs (
 			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
 			message_uuid char(36) NOT NULL,
@@ -113,7 +287,7 @@ final class Migrator {
 			UNIQUE KEY alert_uuid (alert_uuid),
 			KEY status_created (status, created_at),
 			KEY severity_created (severity, created_at)
-		) {$charset_collate};";
+		) ENGINE=InnoDB {$charset_collate};";
 
 		$sql[] = "CREATE TABLE {$prefix}scalyn_audit_logs (
 			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
