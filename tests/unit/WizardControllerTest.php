@@ -835,23 +835,31 @@ final class WizardControllerTest extends TestCase {
 	}
 
 	/**
-	 * When save() returns false (database write failure, not a storage exception),
-	 * the generic error message fires. The Windows-specific guidance must not appear
-	 * for a non-exception failure.
+	 * On Windows without SCALYN_MAIL_RELAY_ENCRYPTION_KEY, a RuntimeException
+	 * that is NOT the credential-storage failure must still show the generic
+	 * error. A write-lock collision causes persist() to throw its own
+	 * RuntimeException; the narrowed condition must not fire Windows guidance.
 	 */
-	public function test_step3_save_returning_false_shows_generic_error_not_windows_guidance(): void {
-		$GLOBALS['_test_wp_option_write_failures'][ SettingsRepository::OPTION_KEY ] = true;
+	public function test_step3_non_credential_storage_exception_shows_generic_error_on_windows(): void {
+		if ( 'Windows' !== PHP_OS_FAMILY ) {
+			$this->markTestSkipped( 'Pairs with the Windows credential-storage test.' );
+		}
+		// Pre-set the write lock so add_option() returns false → persist() throws
+		// "Settings are being updated." — a RuntimeException whose message does NOT
+		// contain "Secure credential storage is unavailable".
+		// The setUp() v1 cipher is used: sanitize() succeeds so persist() is reached.
+		$GLOBALS['_test_wp_options'][ SettingsRepository::OPTION_KEY . '_write_lock' ] = 'taken';
+
+		$this->post_step( 3, array( 'smtp' => $this->valid_smtp_post() ) );
+
 		try {
-			$this->post_step( 3, array( 'smtp' => $this->valid_smtp_post() ) );
-			try {
-				( new WizardController() )->handle();
-				$this->fail( 'Expected wp_die with generic error.' );
-			} catch ( \RuntimeException $error ) {
-				$this->assertStringContainsString( 'Check server encryption', $error->getMessage() );
-				$this->assertStringNotContainsString( 'SCALYN_MAIL_RELAY_ENCRYPTION_KEY', $error->getMessage() );
-			}
-		} finally {
-			unset( $GLOBALS['_test_wp_option_write_failures'][ SettingsRepository::OPTION_KEY ] );
+			( new WizardController() )->handle();
+			$this->fail( 'Expected wp_die with generic error.' );
+		} catch ( \RuntimeException $error ) {
+			$this->assertSame( 'Windows', PHP_OS_FAMILY );
+			$this->assertFalse( defined( 'SCALYN_MAIL_RELAY_ENCRYPTION_KEY' ) );
+			$this->assertStringContainsString( 'Check server encryption', $error->getMessage() );
+			$this->assertStringNotContainsString( 'SCALYN_MAIL_RELAY_ENCRYPTION_KEY', $error->getMessage() );
 		}
 	}
 }
