@@ -216,6 +216,14 @@ final class WizardController {
 		try {
 			$saved = $settings->save( array( 'smtp' => $smtp_post ) );
 		} catch ( \Throwable $error ) {
+			if ( 'Windows' === PHP_OS_FAMILY && ! defined( 'SCALYN_MAIL_RELAY_ENCRYPTION_KEY' ) ) {
+				wp_die(
+					esc_html__(
+						'SMTP settings could not be saved. Automatic credential storage is not supported on Windows. Add SCALYN_MAIL_RELAY_ENCRYPTION_KEY to wp-config.php to protect credentials. No mail was sent.',
+						'scalyn-mail-relay'
+					)
+				);
+			}
 			$saved = false;
 		}
 		if ( ! $saved ) {

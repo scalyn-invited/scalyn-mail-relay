@@ -799,4 +799,59 @@ final class WizardControllerTest extends TestCase {
 		$this->assertFalse( ( new SettingsRepository( $this->cipher ) )->is_provider_verified() );
 		$this->assertFalse( ( new SettingsRepository( $this->cipher ) )->has_accepted_test_email() );
 	}
+
+	// -------------------------------------------------------------------------
+	// Step 3 — Windows credential storage error (F-10 mitigation)
+	// -------------------------------------------------------------------------
+
+	/**
+	 * On Windows without SCALYN_MAIL_RELAY_ENCRYPTION_KEY, a save() exception
+	 * must surface an actionable message directing the administrator to define
+	 * the key in wp-config.php. Settings must not be changed.
+	 */
+	public function test_step3_windows_save_exception_without_configured_key_shows_actionable_error(): void {
+		if ( 'Windows' !== PHP_OS_FAMILY ) {
+			$this->markTestSkipped( 'Windows-specific credential storage failure path.' );
+		}
+		// v2 path: CredentialCipher with no encoded_key and no SCALYN_MAIL_RELAY_ENCRYPTION_KEY
+		// → LocalCredentialKeyStore::initialize_for_write() → can_initialize() returns false on
+		// Windows (effective_owner() has no Windows branch) → fail() throws RuntimeException.
+		$container = Plugin::instance()->container();
+		$container->set( SettingsRepository::class, static fn() => new SettingsRepository( new CredentialCipher() ) );
+
+		$this->post_step( 3, array( 'smtp' => $this->valid_smtp_post() ) );
+
+		try {
+			( new WizardController() )->handle();
+			$this->fail( 'Expected wp_die with Windows actionable error.' );
+		} catch ( \RuntimeException $error ) {
+			$this->assertSame( 'Windows', PHP_OS_FAMILY );
+			$this->assertFalse( defined( 'SCALYN_MAIL_RELAY_ENCRYPTION_KEY' ) );
+			$this->assertStringContainsString( 'SCALYN_MAIL_RELAY_ENCRYPTION_KEY', $error->getMessage() );
+			$this->assertStringContainsString( 'wp-config.php', $error->getMessage() );
+			$this->assertStringContainsString( 'Windows', $error->getMessage() );
+			$this->assertStringNotContainsString( 'Check server encryption', $error->getMessage() );
+		}
+	}
+
+	/**
+	 * When save() returns false (database write failure, not a storage exception),
+	 * the generic error message fires. The Windows-specific guidance must not appear
+	 * for a non-exception failure.
+	 */
+	public function test_step3_save_returning_false_shows_generic_error_not_windows_guidance(): void {
+		$GLOBALS['_test_wp_option_write_failures'][ SettingsRepository::OPTION_KEY ] = true;
+		try {
+			$this->post_step( 3, array( 'smtp' => $this->valid_smtp_post() ) );
+			try {
+				( new WizardController() )->handle();
+				$this->fail( 'Expected wp_die with generic error.' );
+			} catch ( \RuntimeException $error ) {
+				$this->assertStringContainsString( 'Check server encryption', $error->getMessage() );
+				$this->assertStringNotContainsString( 'SCALYN_MAIL_RELAY_ENCRYPTION_KEY', $error->getMessage() );
+			}
+		} finally {
+			unset( $GLOBALS['_test_wp_option_write_failures'][ SettingsRepository::OPTION_KEY ] );
+		}
+	}
 }
