@@ -58,7 +58,7 @@ final class RecoveryService {
 	public static function schedules( array $schedules ): array {
 		$schedules['scalyn_minute'] = array(
 			'interval' => 60,
-			'display'  => __( 'Mail Relay recovery and expiry', 'scalyn-mail-relay' ),
+			'display'  => 'Mail Relay recovery and expiry',
 		);
 		return $schedules;
 	}

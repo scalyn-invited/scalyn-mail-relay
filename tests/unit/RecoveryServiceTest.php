@@ -151,4 +151,10 @@ final class RecoveryServiceTest extends TestCase {
 		$policy->save(true,true,'',$this->settings,$this->cipher);$this->assertTrue($policy->policy()['enabled']);
 		$this->expectException(RuntimeException::class);$policy->save(false,false,'',$this->settings,$this->cipher);
 	}
+	public function test_schedules_registers_scalyn_minute_with_correct_interval_and_plain_display():void {
+		$result = RecoveryService::schedules([]);
+		$this->assertArrayHasKey('scalyn_minute',$result);
+		$this->assertSame(60,$result['scalyn_minute']['interval']);
+		$this->assertSame('Mail Relay recovery and expiry',$result['scalyn_minute']['display']);
+	}
 }
