@@ -74,6 +74,9 @@ final class Migrator {
 		if ( version_compare( $installed, '0.15.0', '<' ) ) {
 			AlertEngineSchema::migrate();
 		}
+		if ( version_compare( $installed, '0.16.0', '<' ) ) {
+			AuditLogSchema::migrate();
+		}
 		update_option( 'scalyn_mail_relay_db_version', SCALYN_MAIL_RELAY_DB_VERSION, false );
 		if ( SCALYN_MAIL_RELAY_DB_VERSION !== get_option( 'scalyn_mail_relay_db_version' ) ) {
 			throw new \RuntimeException( 'Database version could not be saved.' );
@@ -302,7 +305,7 @@ final class Migrator {
 			PRIMARY KEY  (id),
 			KEY user_created (user_id, created_at),
 			KEY action_created (action, created_at)
-		) {$charset_collate};";
+		) ENGINE=InnoDB {$charset_collate};";
 
 		foreach ( $sql as $statement ) {
 			dbDelta( $statement );

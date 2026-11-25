@@ -10,7 +10,7 @@ final class TransactionalTablesSchemaTest extends TestCase {
 		$GLOBALS['_test_wp_options']=['scalyn_mail_relay_db_version'=>'0.6.0'];
 		$GLOBALS['wpdb']=new class extends DeliverySchemaWpdbStub {
 			public string $last_error='';
-			public array $engines=['wp_scalyn_diagnostics'=>'MyISAM','wp_scalyn_health_scores'=>'MyISAM','wp_scalyn_mail_logs'=>'MyISAM','wp_scalyn_mail_timeline'=>'MyISAM'];
+			public array $engines=['wp_scalyn_diagnostics'=>'MyISAM','wp_scalyn_health_scores'=>'MyISAM','wp_scalyn_mail_logs'=>'MyISAM','wp_scalyn_mail_timeline'=>'MyISAM','wp_scalyn_audit_logs'=>'InnoDB'];
 			public array $altered=[];
 			public ?string $failure=null;
 			public bool $metadataError=false;
