@@ -187,7 +187,13 @@ $wizard_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 							</dl>
 							<div class="scalyn-actions scalyn-provider-actions">
 								<?php if ( $can_configure ) : ?>
-									<a class="button" href="<?php echo esc_url( add_query_arg( 'step', $p['is_active'] ? 3 : 2, $wizard_url ) ); ?>"><?php echo esc_html( $p['is_active'] ? __( 'Configure in wizard', 'scalyn-mail-relay' ) : __( 'Select in wizard', 'scalyn-mail-relay' ) ); ?></a>
+									<?php
+									$provider_url = add_query_arg( 'step', $p['is_active'] ? 3 : 2, $wizard_url );
+									if ( ! $p['is_active'] ) {
+										$provider_url = add_query_arg( 'preselect_provider', $p['id'], $provider_url );
+									}
+									?>
+									<a class="button" href="<?php echo esc_url( $provider_url ); ?>"><?php echo esc_html( $p['is_active'] ? __( 'Configure in wizard', 'scalyn-mail-relay' ) : __( 'Select in wizard', 'scalyn-mail-relay' ) ); ?></a>
 									<?php
 									if ( $p['is_active'] && $p['configured'] ) :
 										?>

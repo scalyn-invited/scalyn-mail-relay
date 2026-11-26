@@ -5,6 +5,12 @@ All notable changes to Scalyn Mail Relay will be documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Select in wizard preselects the chosen provider. Save and Continue applies the selection.
+
 ## [0.1.1] — locally prepared; publication pending
 
 - Carry forward the reviewed QA5 runtime with production version metadata and

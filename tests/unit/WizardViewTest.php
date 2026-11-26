@@ -55,6 +55,19 @@ final class WizardViewTest extends TestCase {
 		return (string) ob_get_clean();
 	}
 
+	public function test_provider_hint_selects_only_registered_providers(): void {
+		$query = $_GET;
+		try {
+			foreach ( array( 'sendgrid', 'unknown', array( 'sendgrid' ), null ) as $hint ) {
+				$_GET['preselect_provider'] = $hint;
+				$expected = 'sendgrid' === $hint ? 'sendgrid' : 'smtp';
+				$this->assertMatchesRegularExpression( '/value="' . $expected . '"\s+checked="checked"/', $this->render_view( 2 ) );
+			}
+		} finally {
+			$_GET = $query;
+		}
+	}
+
 	public function test_smtp_configuration_explains_automatic_storage_and_backup_dependency(): void {
 		$html=$this->render_view(3,'smtp');
 		$this->assertStringContainsString('Saving SMTP login fields uses protected storage', $html);

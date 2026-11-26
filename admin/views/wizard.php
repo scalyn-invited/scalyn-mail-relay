@@ -82,6 +82,9 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 
 			// -----------------------------------------------------------------
 			case 2:
+				// phpcs:ignore WordPress.Security.NonceVerification.Recommended,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Read-only hint validated against registered IDs below.
+				$hint                 = isset( $_GET['preselect_provider'] ) && is_string( $_GET['preselect_provider'] ) ? wp_unslash( $_GET['preselect_provider'] ) : '';
+				$selected_provider_id = isset( $registered_providers[ $hint ] ) ? $hint : $active_provider_id;
 				( new \Scalyn\MailRelay\Admin\Components\ConfigurationList( $settings ) )->render( true );
 				if ( ! empty( $settings->get_configurations() ) ) {
 					break;
@@ -112,7 +115,7 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 										type="radio"
 										name="provider_id"
 										value="<?php echo esc_attr( $provider_key ); ?>"
-										<?php checked( $active_provider_id, $provider_key ); ?>
+										<?php checked( $selected_provider_id, $provider_key ); ?>
 									/>
 									<span>
 										<strong><?php echo esc_html( $provider_label ); ?></strong>
