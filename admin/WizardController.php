@@ -222,7 +222,7 @@ final class WizardController {
 				&& str_contains( $error->getMessage(), 'Secure credential storage is unavailable' ) ) {
 				wp_die(
 					esc_html__(
-						'SMTP settings could not be saved. Automatic credential storage is not supported on Windows. Add SCALYN_MAIL_RELAY_ENCRYPTION_KEY to wp-config.php to protect credentials. No mail was sent.',
+						'SMTP settings could not be saved. Automatic credential storage is not supported on Windows. With PHP OpenSSL enabled, generate a base64-encoded 32-byte random key once offline and define SCALYN_MAIL_RELAY_ENCRYPTION_KEY as a persistent PHP string literal in wp-config.php before wp-settings.php is loaded. Keep a separate protected backup. Never regenerate the key on each request. See https://github.com/scalyn-invited/scalyn-mail-relay/blob/develop/README.md#windows-external-credential-key for instructions. No changes were saved. No mail was sent.',
 						'scalyn-mail-relay'
 					)
 				);
