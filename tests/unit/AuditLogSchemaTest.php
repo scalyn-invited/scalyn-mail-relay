@@ -12,13 +12,17 @@ final class AuditLogSchemaTest extends TestCase {
 			public array $altered = [];
 			public string $fault = '';
 			public int $reads = 0;
+			public array $query_suppression = [];
 			public function get_var(string $query): mixed {
+				$this->query_suppression[] = $this->errors_suppressed;
+				if ('throw' === $this->fault) { throw new RuntimeException('private driver details'); }
 				$call = end($this->prepare_calls);
 				++$this->reads;
 				$this->last_error = ('metadata' === $this->fault || ('post-metadata' === $this->fault && $this->reads > 1)) ? 'private driver details' : '';
 				return $this->engines[$call['args'][0]] ?? null;
 			}
 			public function query(string $query): int|false {
+				$this->query_suppression[] = $this->errors_suppressed;
 				$call = end($this->prepare_calls);
 				$table = $call['args'][0];
 				$this->altered[] = $table;
@@ -77,6 +81,28 @@ final class AuditLogSchemaTest extends TestCase {
 		$audit = array_values(array_filter($GLOBALS['_test_dbdelta_queries'], fn($sql) => str_contains($sql, 'CREATE TABLE wp_scalyn_audit_logs ')));
 		$this->assertCount(1, $audit);
 		$this->assertStringContainsString('ENGINE=InnoDB', $audit[0]);
+	}
+	public function test_queries_are_suppressed_and_the_callers_policy_is_restored(): void {
+		foreach ([false, true] as $suppressed) {
+			foreach (['', 'metadata', 'alter', 'post-metadata', 'throw'] as $fault) {
+				$this->setUp();
+				$db = $GLOBALS['wpdb'];
+				$db->suppress_errors($suppressed);
+				$db->fault = $fault;
+				try {
+					Migrator::migrate();
+					$this->assertSame('', $fault, 'Failure must not advance the schema.');
+				} catch (RuntimeException $error) {
+					$this->assertNotSame('', $fault);
+					$this->assertSame('Audit log engine migration failed.', $error->getMessage());
+					$this->assertNull($error->getPrevious());
+					$this->assertSame('0.15.0', get_option('scalyn_mail_relay_db_version'));
+				}
+				$this->assertNotEmpty($db->query_suppression);
+				$this->assertNotContains(false, $db->query_suppression, 'Every audit query must suppress native driver reporting.');
+				$this->assertSame($suppressed, $db->errors_suppressed, 'Restore the caller policy, including on failure.');
+			}
+		}
 	}
 	public function test_version_write_failure_retries_without_reconverting(): void {
 		$GLOBALS['_test_wp_option_write_failures']['scalyn_mail_relay_db_version'] = true;
