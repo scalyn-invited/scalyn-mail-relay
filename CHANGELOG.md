@@ -5,6 +5,10 @@ All notable changes to Scalyn Mail Relay will be documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- Setup wizard step 2 now opens the provider radio buttons by default, with links to open Saved configurations and return to provider selection.
+
 ## [0.1.1] — locally prepared; publication pending
 
 - Carry forward the reviewed QA5 runtime with production version metadata and

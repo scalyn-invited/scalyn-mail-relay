@@ -40,6 +40,9 @@ final class ConfigurationController {
 			),
 			admin_url( 'admin.php' )
 		);
+		if ( 'scalyn-mail-relay-wizard' === $page && ( ! $ok || 'select' !== $input['operation'] ) ) {
+			$url = add_query_arg( 'view', 'configurations', $url );
+		}
 		wp_safe_redirect( $url . ( 'scalyn-mail-relay-providers' === $page ? '#saved-configurations' : '' ) );
 		exit;
 	}

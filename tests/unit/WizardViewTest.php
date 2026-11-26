@@ -5,7 +5,7 @@ use Scalyn\MailRelay\Core\Capabilities;
 
 /** Presentation regressions; controller tests own state and submission rules. */
 final class WizardViewTest extends TestCase {
-	private function render_view( int $step, string $provider = 'smtp', bool $ready = false, ?array $result = null ): string {
+	private function render_view( int $step, string $provider = 'smtp', bool $ready = false, ?array $result = null, bool $named = false ): string {
 		$current_step = $step;
 		$total_steps = 7;
 		$step_labels = array( 1 => 'Welcome', 2 => 'Choose Provider', 3 => 'Configure Provider', 4 => 'Verify Connection', 5 => 'Send Test Email', 6 => 'Health Check', 7 => 'Completion' );
@@ -26,6 +26,9 @@ final class WizardViewTest extends TestCase {
 			$settings=new \Scalyn\MailRelay\Core\SettingsRepository();
 			$cipher=new \Scalyn\MailRelay\Core\CredentialCipher(base64_encode(str_repeat('a',32)));
 			$settings->save(['provider'=>['active'=>$provider]]);
+			if ( $named ) {
+				$settings->configure( 'import' );
+			}
 			if ($ready) { $settings->{'save_'.$provider}(['from_email'=>'sender@example.test','from_name'=>'Sender','key_action'=>'replace','api_key'=>'synthetic_credential_0123456789'],$cipher); }
 			$api_webhook_form=new \Scalyn\MailRelay\Admin\Components\ApiWebhookForm(new \Scalyn\MailRelay\Core\ApiWebhookSettings($cipher,$provider,null,$settings));
 			$smtp2go_form=new \Scalyn\MailRelay\Admin\Components\Smtp2goSettingsForm($settings,$cipher);
@@ -53,6 +56,23 @@ final class WizardViewTest extends TestCase {
 		require SCALYN_MAIL_RELAY_PATH . 'admin/views/wizard.php';
 		$GLOBALS['_test_wp_options'] = $prior_options;
 		return (string) ob_get_clean();
+	}
+
+	public function test_step_two_can_return_to_provider_radios_with_saved_configurations(): void {
+		$query = $_GET;
+		$capabilities = $GLOBALS['_test_current_user_can'] ?? array();
+		$GLOBALS['_test_current_user_can'] = array( Capabilities::MANAGE_SETTINGS => true, 'manage_options' => true );
+		try {
+			$_GET['view'] = 'configurations';
+			$this->assertStringNotContainsString( 'name="provider_id"', $this->render_view( 2, 'brevo', true, null, true ) );
+			unset( $_GET['view'] );
+			$html = $this->render_view( 2, 'brevo', true, null, true );
+			$this->assertStringContainsString( 'name="provider_id"', $html );
+			$this->assertStringNotContainsString( 'id="scalyn-configurations-heading"', $html );
+		} finally {
+			$_GET = $query;
+			$GLOBALS['_test_current_user_can'] = $capabilities;
+		}
 	}
 
 	public function test_smtp_configuration_explains_automatic_storage_and_backup_dependency(): void {

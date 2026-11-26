@@ -17,6 +17,9 @@ $form_fields            = static function () use ( $wizard, $configuration_setti
 ?>
 <section class="scalyn-card scalyn-configurations" aria-labelledby="scalyn-configurations-heading">
 	<h2 id="scalyn-configurations-heading"><?php esc_html_e( 'Saved configurations', 'scalyn-mail-relay' ); ?></h2>
+	<?php if ( $wizard ) : ?>
+		<p><a href="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-wizard&step=2' ) ); ?>"><?php esc_html_e( 'Back to provider selection', 'scalyn-mail-relay' ); ?></a></p>
+	<?php endif; ?>
 	<p><?php esc_html_e( 'Choose a named configuration as the site default. Selection takes effect immediately. Creating or renaming one does not select it. Routing and opt-in recovery are configured separately; saving another configuration does not enable either.', 'scalyn-mail-relay' ); ?></p>
 	<?php
 	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Fixed read-only feedback, never used as evidence of persistence.
