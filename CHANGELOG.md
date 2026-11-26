@@ -9,6 +9,7 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Wizard step 2 opens Saved configurations when a provider needs a new identity or has multiple available identities. The current default stays active until a configuration is selected.
 - Select in wizard preselects the chosen provider. Save and Continue applies the selection.
 - Setup wizard step 2 now opens the provider radio buttons by default, with links to open Saved configurations and return to provider selection.
 
