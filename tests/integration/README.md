@@ -10,6 +10,12 @@ php -n -d extension=/path/to/mysqli.so \
 php -n -d extension=/path/to/mysqli.so \
   tests/integration/alert-engine-real-db.php /path/to/wp-fixture \
   /path/to/disposable/mysql.sock fresh
+php -n -d extension=/path/to/mysqli.so \
+  tests/integration/alert-engine-real-db.php /path/to/wp-fixture \
+  /path/to/disposable/mysql.sock audit-upgrade
+php -n -d extension=/path/to/mysqli.so \
+  tests/integration/alert-engine-real-db.php /path/to/wp-fixture \
+  /path/to/disposable/mysql.sock audit-denied
 ```
 
 An optional fourth argument, `PLUGIN_ROOT`, selects a trusted local candidate
@@ -40,14 +46,76 @@ The runner uses actual wpdb and dbDelta, with minimal hook helpers from the unit
 fixtures and a small database-backed option adapter (no WordPress option cache).
 It is not a full WordPress installation or a Plugins UI installation test.
 
-Both scenarios force the session default engine to MyISAM. Upgrade synthesizes
-foundation/outbox tables, explicitly makes alerts MyISAM, inserts one synthetic
-incident, and sets installed version 0.14.0. Checks cover the pre-repair exclusion
-failure, post-repair engines, row/index preservation, version advancement,
-unrelated table preservation, local no-op exclusion completion, idempotence,
-missing-table failure without advancement and retry. Fresh additionally verifies
-explicit InnoDB before the new repair runs and executes the full migration chain.
-No mail, provider call, cron tick, channel enablement or recovery is invoked.
+Both alert scenarios force the session default engine to MyISAM. For acceptance
+under a server-wide MyISAM default, also start the **new disposable** server with
+`--default-storage-engine=MyISAM` and record `@@global.default_storage_engine`.
+Upgrade synthesizes foundation/outbox tables, explicitly makes alerts MyISAM,
+inserts one synthetic incident, and sets installed version 0.14.0. Checks cover
+the pre-repair exclusion failure, post-repair engines, row/index preservation,
+version advancement to `SCALYN_MAIL_RELAY_DB_VERSION` (currently 0.16.0), unrelated
+table preservation, local no-op exclusion completion, idempotence, missing-table
+failure without advancement and retry. Fresh verifies explicit InnoDB for both
+alerts **and audit logs before repair**, despite the MyISAM session default, and
+executes the full migration chain.
+
+The audit scenarios reuse this bootstrap rather than duplicating it. They build
+current tables, **explicitly ALTER the audit table back to MyISAM**, insert three
+synthetic rows and set installed version 0.15.0; they do not mistake current
+InnoDB creation for a legacy fixture. Only the pending audit gate then runs.
+`audit-upgrade` verifies InnoDB conversion, exact ordered row and full column
+preservation, and all `SHOW INDEX` fields except engine-dependent `Cardinality`.
+It checks the expected primary/user/action index names before comparing snapshots.
+The unrelated MyISAM table's engine, DDL, data, columns and indexes must remain
+identical. Installed version must reach the target constant, a current-version
+retry must issue only its version read, and replaying the 0.15 gate on the already
+converted table must preserve it and avoid another ALTER.
+
+`audit-denied` additionally requires permission to create/drop a synthetic
+passwordless `pr80_denied_<random>` account and grant only SELECT/INSERT/UPDATE/
+DELETE on the new dedicated schema (no ALTER privilege). **Use it only in a new
+ephemeral datadir/network namespace, never an existing server.** It exercises
+real MariaDB ALTER permission denial through unmodified `wpdb::query()`, not a
+query shim, in four suppression/display-policy combinations. It checks a generic
+unchained exception, no raw SQL/driver display or PHP error log, restored caller
+error policy, no version advancement, unchanged audit data/schema, and successful
+retry using the fixture administrator. The synthetic account is dropped and its
+absence read back in `finally`; all scenarios also drop/read back their schema.
+WordPress's native mysqli reporting policy is used; this is not a strict-driver
+reporting-mode matrix. Temporary PHP error-log capture is restored after each
+attempt. Server general-query logs, if deliberately enabled for this entirely
+synthetic fixture, are separate from PHP/WordPress error reporting.
+
+Before any schema operations, the outer local runner must prove an empty network
+route table/no non-loopback interfaces, `@@skip_networking=1`, and the exact owned
+socket/datadir. Use `--no-defaults` for bootstrap/server/client commands; never
+reuse a datadir or connect to an existing socket. Keep command/exit records,
+fixture hashes, RED/GREEN output and cleanup evidence. Shut down only the owned
+server and verify its PID and socket are gone. A network-isolated `bwrap` wrapper
+can use `--die-with-parent --unshare-net --unshare-pid --ro-bind / / --tmpfs /tmp
+--bind EVIDENCE EVIDENCE --dev /dev --proc /proc` with its own finite runner and
+short socket path under private `/tmp`. No mail, provider call, cron tick, channel
+enablement or recovery is invoked. This is **wpdb/dbDelta acceptance**, not a full
+WordPress installation or minimum-supported-database-version matrix.
+
+## Audit migration error boundary (offline real wpdb)
+
+`audit-log-errors-wpdb.php` needs only the checksum-pinned WordPress 6.5
+`class-wpdb.php` above: no database, mysqli extension, credentials or WordPress
+installation. An optional second argument selects a trusted local plugin root.
+
+```sh
+php -n tests/integration/audit-log-errors-wpdb.php /path/to/wp-fixture
+```
+
+It checks **28 combinations**: success, already-InnoDB, initial metadata failure,
+ALTER failure, post-ALTER metadata failure, ineffective ALTER and thrown driver
+error, each with suppression and error display independently enabled/disabled.
+Preparation and query outcomes are explicit shims; native `get_var()`,
+`suppress_errors()` and `print_error()` exercise WordPress's result handling and
+error reporting. SQL is never executed. Checks cover generic unchained failure,
+no raw SQL/driver output or PHP error log, error-policy restoration and expected
+ALTER count. This complements, but does not replace, the real permission-denied
+scenario above; it does not prove SQL or an actual MySQL-driver failure.
 
 ## Recovery read failure boundary (offline real wpdb)
 

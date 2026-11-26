@@ -8,7 +8,7 @@ final class AlertEngineSchemaTest extends TestCase {
 		$GLOBALS['_test_wp_options'] = ['scalyn_mail_relay_db_version' => '0.14.0'];
 		$GLOBALS['wpdb'] = new class extends WpdbStub {
 			public string $last_error = '';
-			public array $engines = ['wp_scalyn_alerts' => 'MyISAM', 'wp_scalyn_alert_notifications' => 'InnoDB', 'wp_unrelated' => 'MyISAM'];
+			public array $engines = ['wp_scalyn_alerts' => 'MyISAM', 'wp_scalyn_alert_notifications' => 'InnoDB', 'wp_scalyn_audit_logs' => 'InnoDB', 'wp_unrelated' => 'MyISAM'];
 			public array $altered = [];
 			public string $fault = '';
 			public int $reads = 0;
@@ -56,7 +56,7 @@ final class AlertEngineSchemaTest extends TestCase {
 		$GLOBALS['wpdb']->engines['wp_scalyn_alerts'] = 'InnoDB';
 		Migrator::migrate();
 		$this->assertSame([], $GLOBALS['wpdb']->altered);
-		$this->assertSame('0.15.0', get_option('scalyn_mail_relay_db_version'));
+		$this->assertSame('0.16.0', get_option('scalyn_mail_relay_db_version'));
 	}
 	public function test_failed_version_write_retries_without_reconverting(): void {
 		$GLOBALS['_test_wp_option_write_failures']['scalyn_mail_relay_db_version'] = true;
@@ -68,7 +68,7 @@ final class AlertEngineSchemaTest extends TestCase {
 		} finally { unset($GLOBALS['_test_wp_option_write_failures']['scalyn_mail_relay_db_version']); }
 		Migrator::migrate();
 		$this->assertSame(['wp_scalyn_alerts'], $GLOBALS['wpdb']->altered);
-		$this->assertSame('0.15.0', get_option('scalyn_mail_relay_db_version'));
+		$this->assertSame('0.16.0', get_option('scalyn_mail_relay_db_version'));
 	}
 	public function test_fresh_alert_creation_explicitly_requests_innodb(): void {
 		$GLOBALS['_test_dbdelta_queries'] = [];
@@ -86,7 +86,7 @@ final class AlertEngineSchemaTest extends TestCase {
 		$this->assertSame('InnoDB', $db->engines['wp_scalyn_alerts']);
 		$this->assertSame(['wp_scalyn_alerts'], $db->altered);
 		$this->assertSame('MyISAM', $db->engines['wp_unrelated']);
-		$this->assertSame('0.15.0', get_option('scalyn_mail_relay_db_version'));
+		$this->assertSame('0.16.0', get_option('scalyn_mail_relay_db_version'));
 		Migrator::migrate();
 		$this->assertSame(['wp_scalyn_alerts'], $db->altered);
 	}
