@@ -174,6 +174,69 @@ final class WizardControllerTest extends TestCase {
 		}
 	}
 
+	/** @dataProvider named_provider_submissions */
+	public function test_rendered_provider_submission( bool $active, string $choice, bool $stale, string $destination ): void {
+		$GLOBALS['_test_current_user_can'][ Capabilities::MANAGE_SETTINGS ] = true;
+		$settings = new SettingsRepository( $this->cipher );
+		$settings->configure( 'create', 'smtp', 'Existing SMTP' );
+		$id = $settings->get_configurations()[0]['id'];
+		if ( $active ) {
+			$settings->configure( 'select', $id );
+		}
+		$brevo = new WizardTestProvider();
+		$brevo->id = 'brevo';
+		$this->registry->register( $brevo );
+		$query = $_GET;
+		$_GET = array( 'step' => '2' );
+		ob_start();
+		try {
+			( new \Scalyn\MailRelay\Admin\Pages\WizardPage() )->render();
+			$html = ob_get_contents();
+		} finally {
+			ob_end_clean();
+			$_GET = $query;
+		}
+		$dom = new DOMDocument();
+		@$dom->loadHTML( $html );
+		$xpath = new DOMXPath( $dom );
+		$form = $xpath->query( '//form[.//input[@name="provider_id"]]' )->item(0);
+		$this->assertNotNull( $form );
+		foreach ( $xpath->query( './/input', $form ) as $input ) {
+			if ( 'hidden' === $input->getAttribute('type') || $choice === $input->getAttribute('value') ) {
+				$_POST[$input->getAttribute('name')] = $input->getAttribute('value');
+			}
+		}
+		$this->assertSame( $choice, $_POST['provider_id'] );
+		if ( $stale ) {
+			$settings->configure( 'create', 'brevo', 'Other tab' );
+			$settings->configure( 'select', $settings->get_configurations()[1]['id'] );
+		}
+		$before = get_option( SettingsRepository::OPTION_KEY );
+		try {
+			$this->run_handle();
+			$this->assertFalse( $stale );
+			$this->assertStringContainsString( $destination, (string) $this->get_redirect() );
+		} catch ( RuntimeException $error ) {
+			$this->assertTrue( $stale );
+			$this->assertStringContainsString( 'selected configuration changed', $error->getMessage() );
+		}
+		if ( $stale || 'brevo' === $choice ) {
+			$this->assertSame( $before, get_option( SettingsRepository::OPTION_KEY ) );
+		} else {
+			$this->assertSame( $id, (new SettingsRepository($this->cipher))->get_active_configuration_id() );
+		}
+	}
+
+	public static function named_provider_submissions(): array {
+		return array(
+			'same provider' => array( true, 'smtp', false, 'step=3' ),
+			'new provider' => array( true, 'brevo', false, 'view=configurations&choose_provider=brevo' ),
+			'inactive catalog' => array( false, 'brevo', false, 'view=configurations&choose_provider=brevo' ),
+			'select existing inactive' => array( false, 'smtp', false, 'step=3' ),
+			'stale revision' => array( true, 'smtp', true, '' ),
+		);
+	}
+
 	private function configure_postmark(): WizardTestProvider {
 		$postmark = new WizardTestProvider();
 		$postmark->id = 'postmark';

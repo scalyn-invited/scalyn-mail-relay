@@ -91,7 +91,7 @@ final class ProvidersPageTest extends TestCase {
 		$this->assertStringContainsString('current configuration', $html);
 		$this->assertStringNotContainsString('NEVER_RENDER_THIS', $html);
 		$this->assertStringContainsString('wizard&step=3">Configure in wizard', $html);
-		$this->assertStringContainsString('wizard&step=2">Select in wizard', $html);
+		$this->assertStringContainsString('wizard&step=2&preselect_provider=sendgrid">Select in wizard', $html);
 	}
 	public function test_inactive_cards_do_not_reuse_active_provider_health(): void {
 		$GLOBALS['_test_wp_options'][SettingsRepository::OPTION_KEY] = array('provider'=>array('active'=>'smtp','verified'=>false,'verified_at'=>'2099-01-01T00:00:00+00:00'));

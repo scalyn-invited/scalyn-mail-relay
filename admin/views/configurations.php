@@ -8,7 +8,9 @@
 defined( 'ABSPATH' ) || exit;
 
 $configuration_settings = $this->settings;
-$form_fields            = static function () use ( $wizard, $configuration_settings ): void {
+// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only hint for the create/select form.
+$requested_provider = $wizard && isset( $_GET['choose_provider'] ) && is_string( $_GET['choose_provider'] ) ? sanitize_key( wp_unslash( $_GET['choose_provider'] ) ) : '';
+$form_fields        = static function () use ( $wizard, $configuration_settings ): void {
 	wp_nonce_field( 'scalyn_configuration' );
 	\Scalyn\MailRelay\Admin\ConfigurationGuard::field( $configuration_settings );
 	echo '<input type="hidden" name="action" value="scalyn_configuration" />';
@@ -17,6 +19,12 @@ $form_fields            = static function () use ( $wizard, $configuration_setti
 ?>
 <section class="scalyn-card scalyn-configurations" aria-labelledby="scalyn-configurations-heading">
 	<h2 id="scalyn-configurations-heading"><?php esc_html_e( 'Saved configurations', 'scalyn-mail-relay' ); ?></h2>
+	<?php if ( $wizard ) : ?>
+		<?php if ( '' !== $requested_provider ) : ?>
+			<p role="status"><?php esc_html_e( 'Select a saved configuration for the chosen provider. If none exists, add a configuration below, then select it to continue.', 'scalyn-mail-relay' ); ?></p>
+		<?php endif; ?>
+		<p><a href="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-wizard&step=2' ) ); ?>"><?php esc_html_e( 'Back to provider selection', 'scalyn-mail-relay' ); ?></a></p>
+	<?php endif; ?>
 	<p><?php esc_html_e( 'Choose a named configuration as the site default. Selection takes effect immediately. Creating or renaming one does not select it. Routing and opt-in recovery are configured separately; saving another configuration does not enable either.', 'scalyn-mail-relay' ); ?></p>
 	<?php
 	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Fixed read-only feedback, never used as evidence of persistence.
@@ -67,7 +75,7 @@ $form_fields            = static function () use ( $wizard, $configuration_setti
 				<?php
 				foreach ( \Scalyn\MailRelay\Core\NamedConfigurations::PROVIDERS as $configuration_provider ) :
 					?>
-					<option value="<?php echo esc_attr( $configuration_provider ); ?>"><?php echo esc_html( strtoupper( $configuration_provider ) ); ?></option><?php endforeach; ?></select></p>
+					<option value="<?php echo esc_attr( $configuration_provider ); ?>" <?php selected( $requested_provider, $configuration_provider ); ?>><?php echo esc_html( strtoupper( $configuration_provider ) ); ?></option><?php endforeach; ?></select></p>
 				<button class="button" name="operation" value="create"><?php esc_html_e( 'Create configuration', 'scalyn-mail-relay' ); ?></button>
 			</form>
 		</details>

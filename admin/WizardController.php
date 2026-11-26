@@ -115,7 +115,25 @@ final class WizardController {
 			exit;
 		}
 
-		$this->get_settings()->save( array( 'provider' => array( 'active' => $provider_id ) ) );
+		$settings       = $this->get_settings();
+		$configurations = $settings->get_configurations();
+		if ( ! empty( $configurations ) && $provider_id !== $settings->get_active_provider_id() ) {
+			$matches = array_filter( $configurations, static fn( $item ) => ! $item['archived'] && $provider_id === $item['provider'] );
+			if ( 1 !== count( $matches ) ) {
+				$url = add_query_arg( 'view', 'configurations', $this->step_url( 2 ) );
+				wp_safe_redirect( add_query_arg( 'choose_provider', $provider_id, $url ) );
+				exit;
+			}
+		}
+
+		try {
+			$saved = $settings->save( array( 'provider' => array( 'active' => $provider_id ) ) );
+		} catch ( \RuntimeException | \InvalidArgumentException $error ) {
+			$saved = false;
+		}
+		if ( ! $saved ) {
+			wp_die( esc_html__( 'The provider selection could not be saved. Reopen the setup wizard and try again.', 'scalyn-mail-relay' ) );
+		}
 
 		wp_safe_redirect( $this->step_url( 3 ) );
 		exit;
