@@ -85,8 +85,9 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 				// phpcs:ignore WordPress.Security.NonceVerification.Recommended,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Read-only hint validated against registered IDs below.
 				$hint                 = isset( $_GET['preselect_provider'] ) && is_string( $_GET['preselect_provider'] ) ? wp_unslash( $_GET['preselect_provider'] ) : '';
 				$selected_provider_id = isset( $registered_providers[ $hint ] ) ? $hint : $active_provider_id;
-				( new \Scalyn\MailRelay\Admin\Components\ConfigurationList( $settings ) )->render( true );
-				if ( ! empty( $settings->get_configurations() ) ) {
+				// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only navigation between step 2 views.
+				if ( isset( $_GET['view'] ) && 'configurations' === $_GET['view'] ) {
+					( new \Scalyn\MailRelay\Admin\Components\ConfigurationList( $settings ) )->render( true );
 					break;
 				}
 				if ( \Scalyn\MailRelay\Agency\ManagedAccess::is_locked( 'providers' ) ) {
@@ -94,6 +95,7 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 					break;
 				}
 				?>
+				<p><a href="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-wizard&step=2&view=configurations' ) ); ?>"><?php esc_html_e( 'Saved configurations', 'scalyn-mail-relay' ); ?></a></p>
 				<h2><?php esc_html_e( 'Choose a Mail Provider', 'scalyn-mail-relay' ); ?></h2>
 				<p><?php esc_html_e( 'Select the mail provider you want to use with this site.', 'scalyn-mail-relay' ); ?></p>
 				<p class="description"><?php esc_html_e( 'Saving changes the active provider immediately. Configure its credentials in the next step; email cannot be sent through an unconfigured provider.', 'scalyn-mail-relay' ); ?></p>

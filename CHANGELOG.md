@@ -10,6 +10,7 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Fixed
 
 - Select in wizard preselects the chosen provider. Save and Continue applies the selection.
+- Setup wizard step 2 now opens the provider radio buttons by default, with links to open Saved configurations and return to provider selection.
 
 ## [0.1.1] — locally prepared; publication pending
 

@@ -273,6 +273,7 @@ final class NamedConfigurationsTest extends TestCase {
 		ob_start();
 		try { (new \Scalyn\MailRelay\Admin\Components\ConfigurationList($settings))->render(true); $html=ob_get_contents(); }
 		finally { ob_end_clean(); }
+		$this->assertStringContainsString('admin.php?page=scalyn-mail-relay-wizard&step=2">Back to provider selection</a>', $html);
 		foreach (['Select default and configure','Configure in wizard','Rename','Archive','configuration_revision','Secondary'] as $text) $this->assertStringContainsString($text,$html);
 		foreach (['private_password','private_login','credentials_cipher','v1:'] as $text) $this->assertStringNotContainsString($text,$html);
 	}
