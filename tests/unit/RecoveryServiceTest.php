@@ -151,4 +151,23 @@ final class RecoveryServiceTest extends TestCase {
 		$policy->save(true,true,'',$this->settings,$this->cipher);$this->assertTrue($policy->policy()['enabled']);
 		$this->expectException(RuntimeException::class);$policy->save(false,false,'',$this->settings,$this->cipher);
 	}
+	/** Verifies early cron filtering without loading translations. */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_schedules_registers_scalyn_minute_with_correct_interval_and_plain_display(): void {
+		require __DIR__ . '/../fixtures/recovery-translation-spy.php';
+
+		$existing = array(
+			'hourly' => array(
+				'interval' => 3600,
+				'display'  => 'Existing hourly schedule',
+			),
+		);
+		$result   = RecoveryService::schedules( $existing );
+		$this->assertArrayHasKey( 'scalyn_minute', $result );
+		$this->assertSame( 60, $result['scalyn_minute']['interval'] );
+		$this->assertSame( 'Mail Relay recovery and expiry', $result['scalyn_minute']['display'] );
+		$this->assertSame( $existing['hourly'], $result['hourly'] );
+		$this->assertSame( array(), \Scalyn\MailRelay\Recovery\recovery_translation_calls(), 'Cron schedule registration must not trigger translation before init.' );
+	}
 }
