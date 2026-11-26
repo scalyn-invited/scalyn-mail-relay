@@ -799,4 +799,109 @@ final class WizardControllerTest extends TestCase {
 		$this->assertFalse( ( new SettingsRepository( $this->cipher ) )->is_provider_verified() );
 		$this->assertFalse( ( new SettingsRepository( $this->cipher ) )->has_accepted_test_email() );
 	}
+
+	// -------------------------------------------------------------------------
+	// Step 3 — Windows credential storage error (F-10 mitigation)
+	// -------------------------------------------------------------------------
+
+	/**
+	 * On Windows without SCALYN_MAIL_RELAY_ENCRYPTION_KEY, a save() exception
+	 * must surface an actionable message directing the administrator to define
+	 * the key in wp-config.php. Settings must not be changed.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_step3_simulated_windows_save_exception_without_configured_key_shows_actionable_error(): void {
+		// Test-process namespace constants simulate Windows branches, not Windows filesystem acceptance.
+		require __DIR__ . '/../fixtures/windows-platform.php';
+		$this->assertFalse( \Scalyn\MailRelay\Core\function_exists( 'posix_geteuid' ) );
+		// v2 path: CredentialCipher with no encoded_key and no SCALYN_MAIL_RELAY_ENCRYPTION_KEY
+		// → LocalCredentialKeyStore::initialize_for_write() → can_initialize() returns false on
+		// Windows (effective_owner() has no Windows branch) → fail() throws RuntimeException.
+		$container = Plugin::instance()->container();
+		$store = new \Scalyn\MailRelay\Core\LocalCredentialKeyStore( __DIR__ );
+		$this->assertFalse( $store->can_initialize() );
+		$container->set( SettingsRepository::class, static fn() => new SettingsRepository( new CredentialCipher( null, $store ) ) );
+		$before = array( 'smtp' => array( 'host' => 'unchanged.example.test' ) );
+		$GLOBALS['_test_wp_options'][ SettingsRepository::OPTION_KEY ] = $before;
+
+		$this->post_step( 3, array( 'smtp' => $this->valid_smtp_post() ) );
+
+		try {
+			( new WizardController() )->handle();
+			$this->fail( 'Expected wp_die with Windows actionable error.' );
+		} catch ( \RuntimeException $error ) {
+			$this->assertSame( 'Windows', constant( 'Scalyn\\MailRelay\\Admin\\PHP_OS_FAMILY' ) );
+			$this->assertFalse( defined( 'SCALYN_MAIL_RELAY_ENCRYPTION_KEY' ) );
+			$this->assertStringContainsString( 'SCALYN_MAIL_RELAY_ENCRYPTION_KEY', $error->getMessage() );
+			$this->assertStringContainsString( 'wp-config.php', $error->getMessage() );
+			$this->assertStringContainsString( 'Windows', $error->getMessage() );
+			foreach ( array( 'base64-encoded 32-byte random key', 'once offline', 'literal', 'before wp-settings.php', 'OpenSSL', 'separate protected backup', 'Never regenerate', 'https://github.com/scalyn-invited/scalyn-mail-relay/blob/develop/README.md#windows-external-credential-key' ) as $guidance ) {
+				$this->assertStringContainsString( $guidance, $error->getMessage() );
+			}
+			$this->assertStringNotContainsString( 'secret123', $error->getMessage() );
+			$this->assertStringNotContainsString( 'user@example.com', $error->getMessage() );
+			$this->assertSame( $before, get_option( SettingsRepository::OPTION_KEY ) );
+			$this->assertFalse( $this->provider->send_called );
+			$this->assertNull( $this->get_redirect() );
+			$this->assertStringNotContainsString( 'Check server encryption', $error->getMessage() );
+		}
+	}
+
+	/** Synthetic configured external key: Windows branches do not prevent protected saves. */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_step3_simulated_windows_with_configured_synthetic_key_saves_without_sending(): void {
+		require __DIR__ . '/../fixtures/windows-platform.php';
+		define( 'SCALYN_MAIL_RELAY_ENCRYPTION_KEY', base64_encode( str_repeat( 'x', 32 ) ) );
+		Plugin::instance()->container()->set( SettingsRepository::class, static fn() => new SettingsRepository( new CredentialCipher() ) );
+		$this->post_step( 3, array( 'smtp' => $this->valid_smtp_post() ) );
+
+		$this->run_handle();
+
+		$persisted = get_option( SettingsRepository::OPTION_KEY );
+		$this->assertStringStartsWith( 'v1:', $persisted['smtp']['credentials_cipher'] );
+		$this->assertStringNotContainsString( 'secret123', json_encode( $persisted ) );
+		$this->assertSame( 'secret123', ( new SettingsRepository( new CredentialCipher() ) )->get_smtp_config()['password'] );
+		$this->assertStringContainsString( 'step=4', (string) $this->get_redirect() );
+		$this->assertFalse( $this->provider->send_called );
+		$this->assertSame( array(), $this->provider->last_connection_config );
+	}
+
+	/**
+	 * On Windows without SCALYN_MAIL_RELAY_ENCRYPTION_KEY, a RuntimeException
+	 * that is NOT the credential-storage failure must still show the generic
+	 * error. A write-lock collision causes persist() to throw its own
+	 * RuntimeException; the narrowed condition must not fire Windows guidance.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_step3_non_credential_storage_exception_shows_generic_error_on_simulated_windows(): void {
+		// Platform branches are simulated; save() and its write lock are real.
+		require __DIR__ . '/../fixtures/windows-platform.php';
+		$before = array( 'smtp' => array( 'host' => 'unchanged.example.test' ) );
+		$GLOBALS['_test_wp_options'][ SettingsRepository::OPTION_KEY ] = $before;
+		// Pre-set the write lock so add_option() returns false → persist() throws
+		// "Settings are being updated." — a RuntimeException whose message does NOT
+		// contain "Secure credential storage is unavailable".
+		// The setUp() v1 cipher is used: sanitize() succeeds so persist() is reached.
+		$GLOBALS['_test_wp_options'][ SettingsRepository::OPTION_KEY . '_write_lock' ] = 'taken';
+
+		$this->post_step( 3, array( 'smtp' => $this->valid_smtp_post() ) );
+
+		try {
+			( new WizardController() )->handle();
+			$this->fail( 'Expected wp_die with generic error.' );
+		} catch ( \RuntimeException $error ) {
+			$this->assertSame( 'Windows', constant( 'Scalyn\\MailRelay\\Admin\\PHP_OS_FAMILY' ) );
+			$this->assertFalse( defined( 'SCALYN_MAIL_RELAY_ENCRYPTION_KEY' ) );
+			$this->assertStringContainsString( 'Check server encryption', $error->getMessage() );
+			$this->assertStringNotContainsString( 'SCALYN_MAIL_RELAY_ENCRYPTION_KEY', $error->getMessage() );
+			$this->assertStringNotContainsString( 'secret123', $error->getMessage() );
+			$this->assertSame( $before, get_option( SettingsRepository::OPTION_KEY ) );
+			$this->assertSame( 'taken', get_option( SettingsRepository::OPTION_KEY . '_write_lock' ) );
+			$this->assertFalse( $this->provider->send_called );
+			$this->assertNull( $this->get_redirect() );
+		}
+	}
 }

@@ -81,6 +81,42 @@ Custom SMTP is a transport option, not a scheduler fallback. Provider acceptance
 not confirmed inbox delivery, and a high health score does not prove full
 authentication coverage or deliverability.
 
+## Windows external credential key
+
+Automatic local credential-key storage is not supported on Windows. Before saving
+SMTP credentials, an administrator must configure a separately managed key:
+
+1. Enable the **OpenSSL PHP extension in the PHP runtime serving WordPress**.
+2. On a trusted offline computer, generate a key **once**, using a local PHP CLI
+   (Windows Command Prompt or PowerShell):
+
+   ```text
+   php -r "print(base64_encode(random_bytes(32)) . PHP_EOL);"
+   ```
+
+   This prints a base64-encoded 32-byte cryptographically random key. Do not use
+   an online key generator, a password, or the example placeholder below. Treat
+   the output as a secret; do not paste it into chat, tickets or logs.
+3. In `wp-config.php`, replace the placeholder with that output as a **persistent
+   PHP string literal**, before the line that loads `wp-settings.php`:
+
+   ```php
+   define( 'SCALYN_MAIL_RELAY_ENCRYPTION_KEY', 'PASTE_YOUR_GENERATED_BASE64_KEY_HERE' );
+   // Keep the existing WordPress bootstrap below the definition:
+   require_once ABSPATH . 'wp-settings.php';
+   ```
+
+   Do not duplicate the existing bootstrap line. Never put `random_bytes()` or
+   the generation command in `wp-config.php`, a request handler or a scheduled
+   task: regenerating the key on each request makes saved credentials unreadable.
+4. Restrict access to `wp-config.php` and keep a **separate protected backup** of
+   the key, apart from database backups. Restore the same key with the database;
+   losing or changing it makes its encrypted credentials unreadable. Never
+   overwrite an existing key to resolve an error. Existing local `v2` envelopes
+   still require their original local key; this is not a migration or rotation.
+5. Retry the authorized SMTP settings save. A failed save leaves settings
+   unchanged and sends no mail; saving alone does not test or send mail.
+
 ## Historical 0.1.0 limitations
 
 Recorded with rationale in
