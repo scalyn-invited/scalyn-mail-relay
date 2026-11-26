@@ -107,6 +107,7 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 				<?php else : ?>
 					<form method="post" action="<?php echo esc_url( $wizard_base_url ); ?>">
 						<?php wp_nonce_field( 'scalyn_wizard_step2' ); ?>
+						<?php \Scalyn\MailRelay\Admin\ConfigurationGuard::field( $settings ); ?>
 						<input type="hidden" name="wizard_step" value="2" />
 
 						<fieldset class="scalyn-wizard-providers">

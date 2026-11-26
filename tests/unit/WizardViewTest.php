@@ -81,6 +81,7 @@ final class WizardViewTest extends TestCase {
 			unset( $_GET['view'] );
 			$html = $this->render_view( 2, 'brevo', true, null, true );
 			$this->assertStringContainsString( 'name="provider_id"', $html );
+			$this->assertMatchesRegularExpression( '/name="configuration_revision" value="[a-f0-9-]{36}"/', $html );
 			$this->assertStringNotContainsString( 'id="scalyn-configurations-heading"', $html );
 		} finally {
 			$_GET = $query;
