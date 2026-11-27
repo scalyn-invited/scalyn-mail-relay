@@ -32,20 +32,20 @@ defined( 'ABSPATH' ) || exit;
  */
 class GmailProvider implements ProviderInterface {
 
-	private const SEND_URI     = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send';
+	private const SEND_URI      = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send';
 	private const TOKENINFO_URI = 'https://oauth2.googleapis.com/tokeninfo';
 
-	/** @inheritDoc */
+	/** Identifies this provider without registering it. */
 	public function get_id(): string {
 		return 'gmail';
 	}
 
-	/** @inheritDoc */
+	/** Human-readable name. */
 	public function get_label(): string {
 		return 'Gmail / Google Workspace';
 	}
 
-	/** @inheritDoc */
+	/** Advertises only the HTML capability; attachments are not implemented. */
 	public function get_capabilities(): array {
 		return array( 'html' );
 	}
@@ -187,10 +187,12 @@ class GmailProvider implements ProviderInterface {
 			$to_addresses[] = $addr;
 		}
 
-		$crlf      = "\r\n";
-		$from_hdr  = '' !== $from_name
+		$crlf     = "\r\n";
+		$from_hdr = '' !== $from_name
+			// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- RFC 2047 encoded-word for non-ASCII display name.
 			? '=?UTF-8?B?' . base64_encode( $from_name ) . '?= <' . $from_email . '>'
 			: $from_email;
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- RFC 2047 encoded-word for subject header.
 		$subj_hdr  = '=?UTF-8?B?' . base64_encode( $message->subject ) . '?=';
 		$mime_type = 'text/html' === $message->content_type ? 'text/html' : 'text/plain';
 
@@ -202,8 +204,10 @@ class GmailProvider implements ProviderInterface {
 		$headers .= 'Content-Transfer-Encoding: base64' . $crlf;
 		$headers .= 'X-Scalyn-UUID: ' . $message->uuid . $crlf;
 
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- RFC 2045 body encoding.
 		$raw = $headers . $crlf . chunk_split( base64_encode( $message->body ), 76, $crlf );
 
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Gmail API requires base64url-encoded raw message.
 		return rtrim( strtr( base64_encode( $raw ), '+/', '-_' ), '=' );
 	}
 
@@ -221,7 +225,7 @@ class GmailProvider implements ProviderInterface {
 				array(
 					'method'              => 'POST',
 					'timeout'             => 15,
-					'redirection'        => 0,
+					'redirection'         => 0,
 					'sslverify'           => true,
 					'reject_unsafe_urls'  => true,
 					'limit_response_size' => 32768,
@@ -230,7 +234,7 @@ class GmailProvider implements ProviderInterface {
 						'Content-Type'  => 'application/json',
 					),
 					// phpcs:ignore WordPress.WP.AlternativeFunctions -- JSON encoding, no UTF-8 alteration.
-					'body' => json_encode( array( 'raw' => $raw_message ), JSON_THROW_ON_ERROR ),
+					'body'                => json_encode( array( 'raw' => $raw_message ), JSON_THROW_ON_ERROR ),
 				)
 			);
 			$code = is_array( $response ) ? ( (int) ( $response['response']['code'] ?? 0 ) ) : 0;
@@ -241,7 +245,10 @@ class GmailProvider implements ProviderInterface {
 				'data' => is_array( $data ) ? $data : array(),
 			);
 		} catch ( \Throwable $error ) {
-			return array( 'code' => 0, 'data' => array() );
+			return array(
+				'code' => 0,
+				'data' => array(),
+			);
 		}
 	}
 
@@ -262,17 +269,20 @@ class GmailProvider implements ProviderInterface {
 				array(
 					'method'              => 'GET',
 					'timeout'             => 10,
-					'redirection'        => 0,
+					'redirection'         => 0,
 					'sslverify'           => true,
 					'reject_unsafe_urls'  => true,
 					'limit_response_size' => 8192,
 				)
 			);
-			$code = is_array( $response ) ? ( (int) ( $response['response']['code'] ?? 0 ) ) : 0;
-			$body = is_array( $response ) ? ( $response['body'] ?? '' ) : '';
-			$data = is_string( $body ) ? json_decode( $body, true, 4 ) : null;
+			$code     = is_array( $response ) ? ( (int) ( $response['response']['code'] ?? 0 ) ) : 0;
+			$body     = is_array( $response ) ? ( $response['body'] ?? '' ) : '';
+			$data     = is_string( $body ) ? json_decode( $body, true, 4 ) : null;
 			if ( 200 !== $code || ! is_array( $data ) ) {
-				return array( 'valid' => false, 'scope' => '' );
+				return array(
+					'valid' => false,
+					'scope' => '',
+				);
 			}
 			return array(
 				'valid' => ! isset( $data['error'] ),

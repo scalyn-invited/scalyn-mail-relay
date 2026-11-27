@@ -194,7 +194,19 @@ $wizard_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 								<?php if ( $can_configure ) : ?>
 									<?php if ( 'gmail' === $p['id'] && ! $p['is_active'] ) : ?>
 										<a class="button button-primary" href="<?php echo esc_url( add_query_arg( 'configure', 'gmail', admin_url( 'admin.php?page=scalyn-mail-relay-providers' ) ) ); ?>"><?php esc_html_e( 'Configure Gmail', 'scalyn-mail-relay' ); ?></a>
-										<a class="button" href="<?php echo esc_url( add_query_arg( array( 'step' => 2, 'preselect_provider' => 'gmail' ), $wizard_url ) ); ?>"><?php esc_html_e( 'Select in wizard', 'scalyn-mail-relay' ); ?></a>
+										<a class="button" href="
+										<?php
+										echo esc_url(
+											add_query_arg(
+												array(
+													'step' => 2,
+													'preselect_provider' => 'gmail',
+												),
+												$wizard_url
+											)
+										);
+										?>
+																"><?php esc_html_e( 'Select in wizard', 'scalyn-mail-relay' ); ?></a>
 									<?php else : ?>
 										<?php
 										$provider_url = add_query_arg( 'step', $p['is_active'] ? 3 : 2, $wizard_url );

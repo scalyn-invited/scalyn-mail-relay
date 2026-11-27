@@ -697,7 +697,6 @@ final class SettingsRepository {
 	 * @param CredentialCipher $cipher        Credential protection service.
 	 * @return bool Whether the settings were persisted.
 	 * @throws \InvalidArgumentException When client credentials are invalid.
-	 * @throws \RuntimeException When encryption fails.
 	 */
 	public function save_gmail_client( string $client_id, #[\SensitiveParameter] string $client_secret, CredentialCipher $cipher ): bool {
 		\Scalyn\MailRelay\Agency\ManagedAccess::assert_unlocked( 'providers' );
@@ -791,11 +790,14 @@ final class SettingsRepository {
 		$access_cipher  = $cipher->encrypt( $access_token, 'gmail-access' );
 		$refresh_cipher = $cipher->encrypt( $refresh_token, 'gmail-refresh' );
 		$next           = $before;
-		$next['gmail']  = array_merge( $config, array(
-			'access_cipher'  => $access_cipher,
-			'refresh_cipher' => $refresh_cipher,
-			'expires_at'     => $expires_at,
-		) );
+		$next['gmail']  = array_merge(
+			$config,
+			array(
+				'access_cipher'  => $access_cipher,
+				'refresh_cipher' => $refresh_cipher,
+				'expires_at'     => $expires_at,
+			)
+		);
 		if ( 'gmail' === $this->get_active_provider_id() ) {
 			$next['provider']['verified']               = false;
 			$next['provider']['verified_at']            = null;
@@ -827,10 +829,13 @@ final class SettingsRepository {
 		}
 		$before        = $this->data;
 		$next          = $before;
-		$next['gmail'] = array_merge( $this->data['gmail'] ?? array(), array(
-			'from_email' => sanitize_email( $from_email ),
-			'from_name'  => sanitize_text_field( $from_name ),
-		) );
+		$next['gmail'] = array_merge(
+			$this->data['gmail'] ?? array(),
+			array(
+				'from_email' => sanitize_email( $from_email ),
+				'from_name'  => sanitize_text_field( $from_name ),
+			)
+		);
 		if ( 'gmail' === $this->get_active_provider_id() ) {
 			$next['provider']['verified']               = false;
 			$next['provider']['verified_at']            = null;
@@ -860,11 +865,14 @@ final class SettingsRepository {
 		\Scalyn\MailRelay\Agency\ManagedAccess::assert_unlocked( 'providers' );
 		$before        = $this->data;
 		$next          = $before;
-		$next['gmail'] = array_merge( $this->data['gmail'] ?? array(), array(
-			'access_cipher'  => '',
-			'refresh_cipher' => '',
-			'expires_at'     => 0,
-		) );
+		$next['gmail'] = array_merge(
+			$this->data['gmail'] ?? array(),
+			array(
+				'access_cipher'  => '',
+				'refresh_cipher' => '',
+				'expires_at'     => 0,
+			)
+		);
 		if ( 'gmail' === $this->get_active_provider_id() ) {
 			$next['provider']['verified']               = false;
 			$next['provider']['verified_at']            = null;

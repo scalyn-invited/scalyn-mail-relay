@@ -109,10 +109,13 @@ final class GmailSettingsForm {
 	 */
 	public function render( bool $in_wizard = false ): void {
 		$this->handle();
-		$can_manage           = current_user_can( Capabilities::MANAGE_MAIL )
+		$can_manage = current_user_can( Capabilities::MANAGE_MAIL )
 			&& ! \Scalyn\MailRelay\Agency\ManagedAccess::is_locked( 'providers' );
-		$notice               = $this->notice;
-		$saved                = $this->saved;
+		$notice     = $this->notice;
+		$saved      = $this->saved;
+		if ( $in_wizard && $this->saved ) {
+			$notice = __( 'Gmail sender saved. Continue to connection verification.', 'scalyn-mail-relay' );
+		}
 		$encryption_available = $this->cipher->is_available() || $this->cipher->can_initialize();
 		$config               = $this->settings->get_gmail_settings();
 		$redirect_uri         = $this->get_redirect_uri();
@@ -172,9 +175,9 @@ final class GmailSettingsForm {
 	 * Processes the client credentials form POST.
 	 */
 	private function handle_save_client(): void {
-		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
-		$raw_id     = isset( $_POST['gmail_client_id'] ) ? wp_unslash( $_POST['gmail_client_id'] ) : '';
-		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.NonceVerification.Missing -- Nonce verified via check_admin_referer() in handle() before this method is called.
+		$raw_id = isset( $_POST['gmail_client_id'] ) ? wp_unslash( $_POST['gmail_client_id'] ) : '';
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.NonceVerification.Missing -- Nonce verified via check_admin_referer() in handle() before this method is called.
 		$raw_secret = isset( $_POST['gmail_client_secret'] ) ? wp_unslash( $_POST['gmail_client_secret'] ) : '';
 
 		$client_id     = sanitize_text_field( (string) $raw_id );
@@ -192,7 +195,7 @@ final class GmailSettingsForm {
 
 		try {
 			$this->settings->save_gmail_client( $client_id, $client_secret, $this->cipher );
-			$this->saved  = true;
+			$this->saved = true;
 		} catch ( \Throwable $error ) {
 			$this->notice = __( 'No changes saved. Check the Client ID and Secret formats. The Client ID must end with .apps.googleusercontent.com.', 'scalyn-mail-relay' );
 			return;
@@ -207,10 +210,10 @@ final class GmailSettingsForm {
 	 * Processes the sender (from_email, from_name) form POST.
 	 */
 	private function handle_save_sender(): void {
-		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.NonceVerification.Missing -- Nonce verified via check_admin_referer() in handle() before this method is called.
 		$raw_email = isset( $_POST['gmail_from_email'] ) ? wp_unslash( $_POST['gmail_from_email'] ) : '';
-		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
-		$raw_name  = isset( $_POST['gmail_from_name'] ) ? wp_unslash( $_POST['gmail_from_name'] ) : '';
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.NonceVerification.Missing -- Nonce verified via check_admin_referer() in handle() before this method is called.
+		$raw_name = isset( $_POST['gmail_from_name'] ) ? wp_unslash( $_POST['gmail_from_name'] ) : '';
 
 		try {
 			$this->settings->save_gmail_sender(

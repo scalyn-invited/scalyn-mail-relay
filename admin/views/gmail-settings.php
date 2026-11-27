@@ -21,10 +21,15 @@ defined( 'ABSPATH' ) || exit;
 ?>
 <section class="<?php echo $in_wizard ? 'scalyn-wizard-provider-form' : 'scalyn-card'; ?>" aria-labelledby="scalyn-gmail-heading">
 	<h2 id="scalyn-gmail-heading"><?php echo esc_html( $in_wizard ? __( 'Configure Gmail / Google Workspace', 'scalyn-mail-relay' ) : __( 'Gmail / Google Workspace settings', 'scalyn-mail-relay' ) ); ?></h2>
-	<p><?php echo esc_html( $in_wizard
+	<p>
+	<?php
+	echo esc_html(
+		$in_wizard
 		? __( 'Connect your Google account with the gmail.send scope, then continue to connection verification.', 'scalyn-mail-relay' )
 		: __( 'Connect a Google or Google Workspace account for Gmail-API sending with the gmail.send scope.', 'scalyn-mail-relay' )
-	); ?></p>
+	);
+	?>
+	</p>
 
 	<?php if ( ! $encryption_available ) : ?>
 		<div class="notice notice-error inline">
@@ -83,7 +88,11 @@ defined( 'ABSPATH' ) || exit;
 	<?php if ( $can_manage ) : ?>
 
 		<?php /* ----- Client credentials form ----- */ ?>
-		<form method="post" autocomplete="off"<?php if ( $in_wizard ) : ?> action="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-wizard&step=3' ) ); ?>"<?php endif; ?>>
+		<form method="post" autocomplete="off"
+		<?php
+		if ( $in_wizard ) :
+			?>
+			action="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-wizard&step=3' ) ); ?>"<?php endif; ?>>
 			<?php wp_nonce_field( 'scalyn_gmail_client' ); ?>
 			<?php \Scalyn\MailRelay\Admin\ConfigurationGuard::field( $this->settings ); ?>
 			<input type="hidden" name="scalyn_gmail_client" value="1" />
@@ -110,7 +119,11 @@ defined( 'ABSPATH' ) || exit;
 
 		<?php if ( $config['connected'] ) : ?>
 			<?php /* ----- Sender form ----- */ ?>
-			<form method="post" autocomplete="off"<?php if ( $in_wizard ) : ?> action="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-wizard&step=3' ) ); ?>"<?php endif; ?>>
+			<form method="post" autocomplete="off"
+			<?php
+			if ( $in_wizard ) :
+				?>
+				action="<?php echo esc_url( admin_url( 'admin.php?page=scalyn-mail-relay-wizard&step=3' ) ); ?>"<?php endif; ?>>
 				<?php wp_nonce_field( 'scalyn_gmail_sender' ); ?>
 				<?php \Scalyn\MailRelay\Admin\ConfigurationGuard::field( $this->settings ); ?>
 				<input type="hidden" name="scalyn_gmail_sender" value="1" />

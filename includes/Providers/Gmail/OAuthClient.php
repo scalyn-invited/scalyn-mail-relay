@@ -35,7 +35,9 @@ final class OAuthClient {
 	 * @throws \RuntimeException When the random generator or hash function is unavailable.
 	 */
 	public function generate_pkce(): array {
-		$verifier  = rtrim( strtr( base64_encode( random_bytes( 48 ) ), '+/', '-_' ), '=' );
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- RFC 7636 base64url PKCE code verifier.
+		$verifier = rtrim( strtr( base64_encode( random_bytes( 48 ) ), '+/', '-_' ), '=' );
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- RFC 7636 S256 code challenge.
 		$challenge = rtrim( strtr( base64_encode( hash( 'sha256', $verifier, true ) ), '+/', '-_' ), '=' );
 		return array(
 			'verifier'  => $verifier,
@@ -182,13 +184,13 @@ final class OAuthClient {
 			$response = wp_safe_remote_post(
 				self::TOKEN_URI,
 				array(
-					'timeout'            => 15,
-					'redirection'        => 0,
-					'sslverify'          => true,
-					'reject_unsafe_urls' => true,
+					'timeout'             => 15,
+					'redirection'         => 0,
+					'sslverify'           => true,
+					'reject_unsafe_urls'  => true,
 					'limit_response_size' => 65536,
-					'headers'            => array( 'Content-Type' => 'application/x-www-form-urlencoded' ),
-					'body'               => http_build_query( $body, '', '&', PHP_QUERY_RFC3986 ),
+					'headers'             => array( 'Content-Type' => 'application/x-www-form-urlencoded' ),
+					'body'                => http_build_query( $body, '', '&', PHP_QUERY_RFC3986 ),
 				)
 			);
 		} catch ( \Throwable $error ) {

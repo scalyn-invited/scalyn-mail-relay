@@ -341,6 +341,7 @@ final class AdminMenu {
 	 * Uses a single-use state transient keyed by user ID to prevent CSRF and replay.
 	 * After processing, redirects to the providers page (clean URL).
 	 *
+	 * @throws \RuntimeException When no Gmail client credentials are configured (caught internally).
 	 * @security Tokens and secrets must never appear in redirect URLs or transient values.
 	 */
 	private function handle_gmail_oauth_callback(): void {
@@ -360,38 +361,59 @@ final class AdminMenu {
 			$message = 'access_denied' === $error_param
 				? __( 'Google authorization was denied. No account was connected.', 'scalyn-mail-relay' )
 				: __( 'Google returned an error during authorization. Try reconnecting.', 'scalyn-mail-relay' );
-			set_transient( 'scalyn_gmail_oauth_result_' . get_current_user_id(), array( 'success' => false, 'message' => $message ), 60 );
+			set_transient(
+				'scalyn_gmail_oauth_result_' . get_current_user_id(),
+				array(
+					'success' => false,
+					'message' => $message,
+				),
+				60
+			);
 			wp_safe_redirect( $redirect_to );
 			exit;
 		}
 
-		if ( ! is_array( $stored ) || '' === $received_state || $received_state !== ( $stored['state'] ?? '' ) ) {
-			set_transient( 'scalyn_gmail_oauth_result_' . get_current_user_id(), array( 'success' => false, 'message' => __( 'The OAuth state token is invalid or expired. Please try connecting again.', 'scalyn-mail-relay' ) ), 60 );
+		if ( ! is_array( $stored ) || '' === $received_state || ( $stored['state'] ?? '' ) !== $received_state ) {
+			set_transient(
+				'scalyn_gmail_oauth_result_' . get_current_user_id(),
+				array(
+					'success' => false,
+					'message' => __( 'The OAuth state token is invalid or expired. Please try connecting again.', 'scalyn-mail-relay' ),
+				),
+				60
+			);
 			wp_safe_redirect( $redirect_to );
 			exit;
 		}
 
 		if ( '' === $code ) {
-			set_transient( 'scalyn_gmail_oauth_result_' . get_current_user_id(), array( 'success' => false, 'message' => __( 'No authorization code received from Google. Please try again.', 'scalyn-mail-relay' ) ), 60 );
+			set_transient(
+				'scalyn_gmail_oauth_result_' . get_current_user_id(),
+				array(
+					'success' => false,
+					'message' => __( 'No authorization code received from Google. Please try again.', 'scalyn-mail-relay' ),
+				),
+				60
+			);
 			wp_safe_redirect( $redirect_to );
 			exit;
 		}
 
-		$verifier = (string) ( $stored['verifier'] ?? '' );
+		$verifier  = (string) ( $stored['verifier'] ?? '' );
 		$container = Plugin::instance()->container();
 		$settings  = $container->get( SettingsRepository::class );
 		$cipher    = $container->get( \Scalyn\MailRelay\Core\CredentialCipher::class );
 
 		try {
-			$gmail_config  = $settings->get_gmail_settings();
-			$client_id     = $gmail_config['client_id'];
+			$gmail_config = $settings->get_gmail_settings();
+			$client_id    = $gmail_config['client_id'];
 			if ( '' === $client_id || ! $gmail_config['has_secret'] ) {
 				throw new \RuntimeException( 'No Gmail client credentials saved. Save Client ID and Secret first.' );
 			}
 			// Retrieve the secret for the token exchange (tokens not required yet).
 			$client_secret = $settings->get_gmail_client_secret( $cipher );
-			$redirect_uri = admin_url( 'admin.php?page=scalyn-mail-relay-providers' );
-			$tokens       = ( new \Scalyn\MailRelay\Providers\Gmail\OAuthClient() )->exchange_code(
+			$redirect_uri  = admin_url( 'admin.php?page=scalyn-mail-relay-providers' );
+			$tokens        = ( new \Scalyn\MailRelay\Providers\Gmail\OAuthClient() )->exchange_code(
 				$client_id,
 				$client_secret,
 				$code,

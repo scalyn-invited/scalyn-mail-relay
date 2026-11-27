@@ -59,7 +59,7 @@ final class ProvidersPage {
 			$show_gmail_configure = true;
 			$gmail_form->handle(); // Handle early: may redirect for OAuth initiation before HTML output.
 		}
-		$assessment           = null;
+		$assessment = null;
 		if ( $can_configure ) {
 			try {
 				$assessment = $container->get( ProviderHealthAssessment::class )->current();
