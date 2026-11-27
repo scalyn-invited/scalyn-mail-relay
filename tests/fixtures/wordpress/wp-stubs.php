@@ -657,6 +657,23 @@ if ( ! function_exists( 'wp_safe_redirect' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_redirect' ) ) {
+	/**
+	 * Mirrors wp_safe_redirect: records the URL and throws WpRedirectException.
+	 *
+	 * initiate_oauth() uses wp_redirect (not wp_safe_redirect) because the
+	 * target is an external Google URL that wp_safe_redirect would block.
+	 *
+	 * @param string $location Redirect destination URL.
+	 * @param int    $status   HTTP status code (unused).
+	 * @throws WpRedirectException Always — simulates the post-redirect exit.
+	 */
+	function wp_redirect( string $location, int $status = 302 ): bool {
+		$GLOBALS['_test_wp_redirect'] = $location;
+		throw new WpRedirectException( 'Redirect: ' . $location );
+	}
+}
+
 if ( ! function_exists( 'check_admin_referer' ) ) {
 	/**
 	 * Verifies a nonce. Dies when $GLOBALS['_test_wp_nonce_valid'] is falsy.

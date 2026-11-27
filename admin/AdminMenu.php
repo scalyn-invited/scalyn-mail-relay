@@ -91,7 +91,7 @@ final class AdminMenu {
 			add_action( 'load-' . $wizard_hook, array( $this, 'handle_wizard_post' ) );
 		}
 
-		add_submenu_page(
+		$providers_hook = add_submenu_page(
 			'scalyn-mail-relay',
 			__( 'Providers — Scalyn Mail Relay', 'scalyn-mail-relay' ),
 			__( 'Providers', 'scalyn-mail-relay' ),
@@ -99,6 +99,10 @@ final class AdminMenu {
 			'scalyn-mail-relay-providers',
 			array( $this, 'render_providers' )
 		);
+
+		if ( $providers_hook ) {
+			add_action( 'load-' . $providers_hook, array( $this, 'handle_providers_load' ) );
+		}
 
 		add_submenu_page(
 			'scalyn-mail-relay',
@@ -257,7 +261,174 @@ final class AdminMenu {
 			return;
 		}
 
+		// scalyn_gmail_client POSTs trigger an external OAuth redirect — must run here,
+		// before admin-header.php outputs HTML, so wp_redirect() can send the Location header.
+		$this->handle_gmail_client_post();
+
 		( new WizardController() )->handle();
+	}
+
+	/**
+	 * Handles GET requests on the providers page load hook.
+	 *
+	 * Detects the Gmail OAuth callback (code + state params) and exchanges the
+	 * authorization code for tokens. Stores a result transient and redirects to
+	 * the same page without OAuth params to prevent double-processing on reload.
+	 */
+	public function handle_providers_load(): void {
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.ValidatedSanitizedInput.MissingUnslash
+		$method = $_SERVER['REQUEST_METHOD'] ?? '';
+
+		// scalyn_gmail_client POSTs trigger an external OAuth redirect — must run here,
+		// before admin-header.php outputs HTML, so wp_redirect() can send the Location header.
+		if ( 'POST' === $method ) {
+			$this->handle_gmail_client_post();
+			return;
+		}
+
+		if ( 'GET' !== $method ) {
+			return;
+		}
+
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- State token is used as CSRF protection for OAuth flows.
+		$has_code  = isset( $_GET['code'] ) || isset( $_GET['error'] );
+		$has_state = isset( $_GET['state'] );
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+
+		if ( ! $has_code || ! $has_state ) {
+			return;
+		}
+
+		// Looks like an OAuth callback — ensure the user has permission.
+		if ( ! current_user_can( Capabilities::MANAGE_MAIL ) ) {
+			return;
+		}
+
+		$this->handle_gmail_oauth_callback();
+	}
+
+	/**
+	 * Handles a scalyn_gmail_client POST on a load- hook, before admin output begins.
+	 *
+	 * When the user submits the Gmail client credentials form (from either the Setup Wizard
+	 * or the Providers page configure panel), GmailSettingsForm::handle() saves the
+	 * encrypted credentials and then calls initiate_oauth(), which calls wp_redirect() and
+	 * exits. That redirect MUST happen before admin-header.php outputs HTML; calling it from
+	 * a page-content callback produces a "headers already sent" warning and a blank page.
+	 *
+	 * scalyn_gmail_sender POSTs do not redirect, so they can remain in the render path.
+	 */
+	private function handle_gmail_client_post(): void {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		if ( ! isset( $_POST['scalyn_gmail_client'] ) ) {
+			return;
+		}
+		if ( ! current_user_can( Capabilities::MANAGE_MAIL ) ) {
+			return;
+		}
+		$container = Plugin::instance()->container();
+		$settings  = $container->get( SettingsRepository::class );
+		$cipher    = $container->get( \Scalyn\MailRelay\Core\CredentialCipher::class );
+		( new \Scalyn\MailRelay\Admin\Components\GmailSettingsForm( $settings, $cipher ) )->handle();
+		// If credentials are valid, handle() calls initiate_oauth() → wp_redirect() → exit.
+		// If validation fails (empty fields, cipher unavailable), handle() returns here and
+		// the render-path instance will show the error notice.
+	}
+
+	/**
+	 * Processes the Google OAuth callback: validates state, exchanges code, saves tokens.
+	 *
+	 * Uses a single-use state transient keyed by user ID to prevent CSRF and replay.
+	 * After processing, redirects to the providers page (clean URL).
+	 *
+	 * @security Tokens and secrets must never appear in redirect URLs or transient values.
+	 */
+	private function handle_gmail_oauth_callback(): void {
+		$redirect_to = admin_url( 'admin.php?page=scalyn-mail-relay-providers' );
+
+		// phpcs:disable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.NonceVerification.Recommended
+		$received_state = isset( $_GET['state'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['state'] ) ) : '';
+		$code           = isset( $_GET['code'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['code'] ) ) : '';
+		$error_param    = isset( $_GET['error'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['error'] ) ) : '';
+		// phpcs:enable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.NonceVerification.Recommended
+
+		$transient_key = 'scalyn_gmail_oauth_' . get_current_user_id();
+		$stored        = get_transient( $transient_key );
+		delete_transient( $transient_key ); // Single-use regardless of outcome.
+
+		if ( '' !== $error_param ) {
+			$message = 'access_denied' === $error_param
+				? __( 'Google authorization was denied. No account was connected.', 'scalyn-mail-relay' )
+				: __( 'Google returned an error during authorization. Try reconnecting.', 'scalyn-mail-relay' );
+			set_transient( 'scalyn_gmail_oauth_result_' . get_current_user_id(), array( 'success' => false, 'message' => $message ), 60 );
+			wp_safe_redirect( $redirect_to );
+			exit;
+		}
+
+		if ( ! is_array( $stored ) || '' === $received_state || $received_state !== ( $stored['state'] ?? '' ) ) {
+			set_transient( 'scalyn_gmail_oauth_result_' . get_current_user_id(), array( 'success' => false, 'message' => __( 'The OAuth state token is invalid or expired. Please try connecting again.', 'scalyn-mail-relay' ) ), 60 );
+			wp_safe_redirect( $redirect_to );
+			exit;
+		}
+
+		if ( '' === $code ) {
+			set_transient( 'scalyn_gmail_oauth_result_' . get_current_user_id(), array( 'success' => false, 'message' => __( 'No authorization code received from Google. Please try again.', 'scalyn-mail-relay' ) ), 60 );
+			wp_safe_redirect( $redirect_to );
+			exit;
+		}
+
+		$verifier = (string) ( $stored['verifier'] ?? '' );
+		$container = Plugin::instance()->container();
+		$settings  = $container->get( SettingsRepository::class );
+		$cipher    = $container->get( \Scalyn\MailRelay\Core\CredentialCipher::class );
+
+		try {
+			$gmail_config  = $settings->get_gmail_settings();
+			$client_id     = $gmail_config['client_id'];
+			if ( '' === $client_id || ! $gmail_config['has_secret'] ) {
+				throw new \RuntimeException( 'No Gmail client credentials saved. Save Client ID and Secret first.' );
+			}
+			// Retrieve the secret for the token exchange (tokens not required yet).
+			$client_secret = $settings->get_gmail_client_secret( $cipher );
+			$redirect_uri = admin_url( 'admin.php?page=scalyn-mail-relay-providers' );
+			$tokens       = ( new \Scalyn\MailRelay\Providers\Gmail\OAuthClient() )->exchange_code(
+				$client_id,
+				$client_secret,
+				$code,
+				$redirect_uri,
+				$verifier
+			);
+			$access_token  = $tokens['access_token'];
+			$refresh_token = $tokens['refresh_token'];
+			$expires_at    = time() + (int) $tokens['expires_in'];
+
+			$settings->save_gmail_tokens( $client_secret, $access_token, $refresh_token, $expires_at, $cipher );
+
+			unset( $tokens, $access_token, $refresh_token, $client_secret );
+
+			set_transient(
+				'scalyn_gmail_oauth_result_' . get_current_user_id(),
+				array(
+					'success' => true,
+					'message' => __( 'Google account connected. Set the sender email below and use the Setup Wizard to verify the connection.', 'scalyn-mail-relay' ),
+				),
+				60
+			);
+			// Drop back into the configure panel so the sender form is immediately accessible.
+			$redirect_to = add_query_arg( 'configure', 'gmail', $redirect_to );
+		} catch ( \Throwable $error ) {
+			set_transient(
+				'scalyn_gmail_oauth_result_' . get_current_user_id(),
+				array(
+					'success' => false,
+					'message' => __( 'Google authorization failed. Check the client credentials and redirect URI, then try again.', 'scalyn-mail-relay' ),
+				),
+				60
+			);
+		}
+
+		wp_safe_redirect( $redirect_to );
+		exit;
 	}
 
 	/**

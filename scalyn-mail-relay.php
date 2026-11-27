@@ -50,16 +50,13 @@ add_action(
 add_action(
 	'scalyn_mail_relay_booted',
 	static function ( \Scalyn\MailRelay\Core\Container $container ): void {
-		$container->get( \Scalyn\MailRelay\Core\ProviderRegistry::class )
-			->register( new \Scalyn\MailRelay\Providers\Smtp\SmtpProvider() );
-		$container->get( \Scalyn\MailRelay\Core\ProviderRegistry::class )
-			->register( new \Scalyn\MailRelay\Providers\SendGrid\SendGridProvider() );
-		$container->get( \Scalyn\MailRelay\Core\ProviderRegistry::class )
-			->register( new \Scalyn\MailRelay\Providers\Postmark\PostmarkProvider() );
-		$container->get( \Scalyn\MailRelay\Core\ProviderRegistry::class )
-			->register( new \Scalyn\MailRelay\Providers\Smtp2go\Smtp2goProvider() );
-		$container->get( \Scalyn\MailRelay\Core\ProviderRegistry::class )
-			->register( new \Scalyn\MailRelay\Providers\Brevo\BrevoProvider() );
+		$registry = $container->get( \Scalyn\MailRelay\Core\ProviderRegistry::class );
+		$registry->register( new \Scalyn\MailRelay\Providers\Smtp\SmtpProvider() );
+		$registry->register( new \Scalyn\MailRelay\Providers\SendGrid\SendGridProvider() );
+		$registry->register( new \Scalyn\MailRelay\Providers\Postmark\PostmarkProvider() );
+		$registry->register( new \Scalyn\MailRelay\Providers\Smtp2go\Smtp2goProvider() );
+		$registry->register( new \Scalyn\MailRelay\Providers\Brevo\BrevoProvider() );
+		$registry->register( new \Scalyn\MailRelay\Providers\Gmail\GmailProvider() );
 	}
 );
 

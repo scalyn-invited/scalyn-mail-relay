@@ -131,6 +131,7 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 													'smtp2go' => __( 'Send through the SMTP2GO HTTPS API using an API key and an authorized sender.', 'scalyn-mail-relay' ),
 													'sendgrid' => __( 'Send through the SendGrid API using a Mail Send key and a verified sender.', 'scalyn-mail-relay' ),
 													'postmark' => __( 'Send transactional email through Postmark using a Live Server API token and a verified sender.', 'scalyn-mail-relay' ),
+													'gmail' => __( 'Send through the Gmail API using OAuth 2.0 — no SMTP password required. Supports Gmail and Google Workspace.', 'scalyn-mail-relay' ),
 													default => __( 'Use this registered mail provider for your site.', 'scalyn-mail-relay' ),
 												}
 											);
@@ -160,6 +161,10 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 				}
 				if ( \Scalyn\MailRelay\Agency\ManagedAccess::is_locked( 'smtp' === $active_provider_id ? 'smtp' : 'providers' ) ) {
 					echo '<p role="status">' . esc_html__( 'Provider configuration is managed by your administrator or agency manager.', 'scalyn-mail-relay' ) . '</p>';
+					break;
+				}
+				if ( 'gmail' === $active_provider_id ) {
+					$gmail_form->render( true );
 					break;
 				}
 				if ( 'brevo' === $active_provider_id ) {
@@ -348,7 +353,9 @@ $wizard_base_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 			case 4:
 				?>
 				<h2><?php esc_html_e( 'Verify Connection', 'scalyn-mail-relay' ); ?></h2>
-				<?php if ( 'brevo' === $active_provider_id ) : ?>
+				<?php if ( 'gmail' === $active_provider_id ) : ?>
+					<p><?php esc_html_e( 'Verify the Gmail OAuth token is valid and the gmail.send scope is granted. No email is sent.', 'scalyn-mail-relay' ); ?></p>
+				<?php elseif ( 'brevo' === $active_provider_id ) : ?>
 					<p><?php esc_html_e( 'Check Brevo API account access without sending mail. This does not verify transactional activation, sender authorization, sending allowance or delivery.', 'scalyn-mail-relay' ); ?></p>
 				<?php elseif ( 'smtp2go' === $active_provider_id ) : ?>
 					<p><?php esc_html_e( 'Check API read access without sending mail. Allow /stats/email_cycle on your SMTP2GO key. This does not verify sending permission, sender authorization or delivery.', 'scalyn-mail-relay' ); ?></p>

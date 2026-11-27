@@ -14,6 +14,11 @@ $wizard_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 ?>
 <div class="wrap scalyn-mail-relay scalyn-providers">
 	<h1><?php esc_html_e( 'Providers', 'scalyn-mail-relay' ); ?></h1>
+	<?php if ( is_array( $gmail_oauth_result ) ) : ?>
+		<div class="notice <?php echo $gmail_oauth_result['success'] ? 'notice-success' : 'notice-error'; ?> is-dismissible">
+			<p><?php echo esc_html( $gmail_oauth_result['message'] ); ?></p>
+		</div>
+	<?php endif; ?>
 	<p class="scalyn-lead"><?php esc_html_e( 'Manage how your site sends email. Configure a provider, verify its connection, and send a test.', 'scalyn-mail-relay' ); ?></p>
 	<nav class="scalyn-provider-tabs" id="scalyn-provider-tabs" aria-label="<?php esc_attr_e( 'Providers sections', 'scalyn-mail-relay' ); ?>">
 		<a id="scalyn-tab-providers" href="#providers" data-provider-tab="providers"><?php esc_html_e( 'Providers', 'scalyn-mail-relay' ); ?></a>
@@ -49,7 +54,7 @@ $wizard_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 			<div class="scalyn-provider-tiles">
 				<?php foreach ( $providers as $index => $p ) : ?>
 					<button type="button" class="scalyn-provider-tile" data-active="<?php echo $p['is_active'] ? 'true' : 'false'; ?>" data-provider-index="<?php echo esc_attr( $index ); ?>" data-configured="<?php echo $p['configured'] ? 'configured' : 'unconfigured'; ?>" data-search="<?php echo esc_attr( $p['label'] . ' ' . $p['id'] ); ?>" aria-haspopup="dialog" aria-controls="scalyn-provider-details">
-						<?php if ( in_array( $p['id'], array( 'smtp', 'sendgrid', 'postmark', 'smtp2go', 'brevo' ), true ) ) : ?>
+						<?php if ( in_array( $p['id'], array( 'smtp', 'sendgrid', 'postmark', 'smtp2go', 'brevo', 'gmail' ), true ) ) : ?>
 							<img class="scalyn-provider-logo" src="<?php echo esc_url( SCALYN_MAIL_RELAY_URL . 'assets/images/providers/' . $p['id'] . '.svg' ); ?>" alt="" width="150" height="44" />
 						<?php else : ?>
 							<span class="dashicons dashicons-email-alt" aria-hidden="true"></span>
@@ -67,7 +72,7 @@ $wizard_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 		<div class="scalyn-grid scalyn-provider-grid">
 					<?php foreach ( $providers as $p ) : ?>
 						<section class="scalyn-card scalyn-provider-card">
-							<?php if ( in_array( $p['id'], array( 'smtp', 'sendgrid', 'postmark', 'smtp2go', 'brevo' ), true ) ) : ?>
+							<?php if ( in_array( $p['id'], array( 'smtp', 'sendgrid', 'postmark', 'smtp2go', 'brevo', 'gmail' ), true ) ) : ?>
 								<img class="scalyn-provider-logo" src="<?php echo esc_url( SCALYN_MAIL_RELAY_URL . 'assets/images/providers/' . $p['id'] . '.svg' ); ?>" alt="" width="150" height="44" />
 							<?php endif; ?>
 							<div class="scalyn-panel-heading">
@@ -76,7 +81,7 @@ $wizard_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 									<span class="scalyn-badge scalyn-badge--connected"><?php esc_html_e( 'Active', 'scalyn-mail-relay' ); ?></span>
 								<?php endif; ?>
 							</div>
-							<p class="scalyn-provider-description"><?php echo esc_html( 'smtp' === $p['id'] ? __( 'Connect an existing mail server using your provider’s host and login details.', 'scalyn-mail-relay' ) : ( 'sendgrid' === $p['id'] ? __( 'Send through the SendGrid API with a Mail Send key and an authorized sender.', 'scalyn-mail-relay' ) : ( 'postmark' === $p['id'] ? __( 'Send transactional email through the Postmark API using a Live Server token and a verified sender.', 'scalyn-mail-relay' ) : ( 'smtp2go' === $p['id'] ? __( 'Send through the SMTP2GO HTTPS API using an API key and an authorized sender.', 'scalyn-mail-relay' ) : ( 'brevo' === $p['id'] ? __( 'Send transactional email through the Brevo HTTPS API using an API key and an authorized sender.', 'scalyn-mail-relay' ) : __( 'A registered mail provider extension.', 'scalyn-mail-relay' ) ) ) ) ) ); ?></p>
+							<p class="scalyn-provider-description"><?php echo esc_html( 'smtp' === $p['id'] ? __( 'Connect an existing mail server using your SMTP host, port, and login credentials.', 'scalyn-mail-relay' ) : ( 'sendgrid' === $p['id'] ? __( 'Send through the SendGrid API with a Mail Send key and an authorized sender.', 'scalyn-mail-relay' ) : ( 'postmark' === $p['id'] ? __( 'Send transactional email through the Postmark API using a Live Server token and a verified sender.', 'scalyn-mail-relay' ) : ( 'smtp2go' === $p['id'] ? __( 'Send through the SMTP2GO HTTPS API using an API key and an authorized sender.', 'scalyn-mail-relay' ) : ( 'brevo' === $p['id'] ? __( 'Send transactional email through the Brevo HTTPS API using an API key and an authorized sender.', 'scalyn-mail-relay' ) : ( 'gmail' === $p['id'] ? __( 'Send through the Gmail API using OAuth 2.0 — no SMTP password required. Supports Gmail and Google Workspace accounts.', 'scalyn-mail-relay' ) : __( 'A registered mail provider extension.', 'scalyn-mail-relay' ) ) ) ) ) ) ); ?></p>
 							<p>
 								<?php if ( $p['configured'] ) : ?>
 									<span class="scalyn-badge scalyn-badge--connected"><?php esc_html_e( 'Settings saved', 'scalyn-mail-relay' ); ?></span>
@@ -187,19 +192,26 @@ $wizard_url = admin_url( 'admin.php?page=scalyn-mail-relay-wizard' );
 							</dl>
 							<div class="scalyn-actions scalyn-provider-actions">
 								<?php if ( $can_configure ) : ?>
-									<?php
-									$provider_url = add_query_arg( 'step', $p['is_active'] ? 3 : 2, $wizard_url );
-									if ( ! $p['is_active'] ) {
-										$provider_url = add_query_arg( 'preselect_provider', $p['id'], $provider_url );
-									}
-									?>
-									<a class="button" href="<?php echo esc_url( $provider_url ); ?>"><?php echo esc_html( $p['is_active'] ? __( 'Configure in wizard', 'scalyn-mail-relay' ) : __( 'Select in wizard', 'scalyn-mail-relay' ) ); ?></a>
-									<?php
-									if ( $p['is_active'] && $p['configured'] ) :
+									<?php if ( 'gmail' === $p['id'] && ! $p['is_active'] ) : ?>
+										<a class="button button-primary" href="<?php echo esc_url( add_query_arg( 'configure', 'gmail', admin_url( 'admin.php?page=scalyn-mail-relay-providers' ) ) ); ?>"><?php esc_html_e( 'Configure Gmail', 'scalyn-mail-relay' ); ?></a>
+										<a class="button" href="<?php echo esc_url( add_query_arg( array( 'step' => 2, 'preselect_provider' => 'gmail' ), $wizard_url ) ); ?>"><?php esc_html_e( 'Select in wizard', 'scalyn-mail-relay' ); ?></a>
+									<?php else : ?>
+										<?php
+										$provider_url = add_query_arg( 'step', $p['is_active'] ? 3 : 2, $wizard_url );
+										if ( ! $p['is_active'] ) {
+											$provider_url = add_query_arg( 'preselect_provider', $p['id'], $provider_url );
+										}
 										?>
-										<a class="button" href="<?php echo esc_url( add_query_arg( 'step', 4, $wizard_url ) ); ?>"><?php esc_html_e( 'Verify connection', 'scalyn-mail-relay' ); ?></a><?php endif; ?>
+										<a class="button" href="<?php echo esc_url( $provider_url ); ?>"><?php echo esc_html( $p['is_active'] ? __( 'Configure in wizard', 'scalyn-mail-relay' ) : __( 'Select in wizard', 'scalyn-mail-relay' ) ); ?></a>
+										<?php if ( $p['is_active'] && $p['configured'] ) : ?>
+											<a class="button" href="<?php echo esc_url( add_query_arg( 'step', 4, $wizard_url ) ); ?>"><?php esc_html_e( 'Verify connection', 'scalyn-mail-relay' ); ?></a>
+										<?php endif; ?>
+									<?php endif; ?>
 								<?php endif; ?>
 							</div>
+							<?php if ( $show_gmail_configure && 'gmail' === $p['id'] && ! $p['is_active'] ) : ?>
+								<?php $gmail_form->render(); ?>
+							<?php endif; ?>
 						</section>
 					<?php endforeach; ?>
 		</div>

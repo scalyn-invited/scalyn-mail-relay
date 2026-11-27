@@ -145,7 +145,7 @@ final class CredentialCipher {
 	 */
 	public function decrypt( #[\SensitiveParameter] string $envelope, string $provider = 'sendgrid' ): string {
 		$version = substr( $envelope, 0, 2 );
-		$maximum = 'recovery-payload' === $provider ? 12000000 : ( 'ai-session' === $provider ? 1500000 : ( 'smtp' === $provider ? 8192 : 1024 ) );
+		$maximum = 'recovery-payload' === $provider ? 12000000 : ( 'ai-session' === $provider ? 1500000 : ( 'smtp' === $provider ? 8192 : ( in_array( $provider, array( 'gmail-access', 'gmail-refresh' ), true ) ? 4096 : 1024 ) ) );
 		if ( ! in_array( $version, array( 'v1', 'v2' ), true ) || ':' !== substr( $envelope, 2, 1 ) || strlen( $envelope ) > $maximum ) {
 			throw new \RuntimeException( 'Stored credential is unavailable. Replace or remove it.' );
 		}
@@ -184,6 +184,15 @@ final class CredentialCipher {
 		}
 		if ( in_array( $provider, array( 'postmark-webhook', 'smtp2go-webhook', 'brevo-webhook' ), true ) ) {
 			return 'scalyn:' . str_replace( '-webhook', '', $provider ) . ':webhook-credentials:v1';
+		}
+		if ( 'gmail-secret' === $provider ) {
+			return 'scalyn:gmail:client-secret:v1';
+		}
+		if ( 'gmail-access' === $provider ) {
+			return 'scalyn:gmail:access-token:v1';
+		}
+		if ( 'gmail-refresh' === $provider ) {
+			return 'scalyn:gmail:refresh-token:v1';
 		}
 		if ( ! in_array( $provider, array( 'sendgrid', 'postmark', 'smtp2go', 'brevo' ), true ) ) {
 			throw new \InvalidArgumentException( 'Unsupported credential context.' );

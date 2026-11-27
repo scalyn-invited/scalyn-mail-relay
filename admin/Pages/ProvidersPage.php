@@ -7,7 +7,9 @@
 
 namespace Scalyn\MailRelay\Admin\Pages;
 
+use Scalyn\MailRelay\Admin\Components\GmailSettingsForm;
 use Scalyn\MailRelay\Core\Capabilities;
+use Scalyn\MailRelay\Core\CredentialCipher;
 use Scalyn\MailRelay\Core\Plugin;
 use Scalyn\MailRelay\Core\PostmarkWebhookSettings;
 use Scalyn\MailRelay\Core\ProviderRegistry;
@@ -41,8 +43,23 @@ final class ProvidersPage {
 		$postmark_settings  = $settings->get_postmark_settings();
 		$smtp2go_settings   = $settings->get_smtp2go_settings();
 		$brevo_settings     = $settings->get_brevo_settings();
-		$can_configure      = current_user_can( Capabilities::MANAGE_SETTINGS );
-		$assessment         = null;
+		$gmail_settings     = $settings->get_gmail_settings();
+
+		// Consume the per-user Gmail OAuth result transient (from OAuth callback).
+		$gmail_oauth_result = get_transient( 'scalyn_gmail_oauth_result_' . get_current_user_id() );
+		if ( false !== $gmail_oauth_result ) {
+			delete_transient( 'scalyn_gmail_oauth_result_' . get_current_user_id() );
+		}
+		$can_configure        = current_user_can( Capabilities::MANAGE_SETTINGS );
+		$gmail_form           = null;
+		$show_gmail_configure = false;
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.ValidatedSanitizedInput.MissingUnslash,WordPress.Security.NonceVerification.Recommended -- GET read for routing only; form uses its own nonce.
+		if ( $can_configure && isset( $_GET['configure'] ) && 'gmail' === sanitize_key( wp_unslash( (string) $_GET['configure'] ) ) ) {
+			$gmail_form           = new GmailSettingsForm( $settings, $container->get( CredentialCipher::class ) );
+			$show_gmail_configure = true;
+			$gmail_form->handle(); // Handle early: may redirect for OAuth initiation before HTML output.
+		}
+		$assessment           = null;
 		if ( $can_configure ) {
 			try {
 				$assessment = $container->get( ProviderHealthAssessment::class )->current();
@@ -64,6 +81,7 @@ final class ProvidersPage {
 				'postmark' => $postmark_settings['has_key'] && '' !== $postmark_settings['from_email'],
 				'smtp2go' => $smtp2go_settings['has_key'] && '' !== $smtp2go_settings['from_email'],
 				'brevo' => $brevo_settings['has_key'] && '' !== $brevo_settings['from_email'],
+				'gmail' => $gmail_settings['connected'] && '' !== $gmail_settings['from_email'],
 				default => false,
 			};
 			$providers[] = array(
@@ -79,10 +97,7 @@ final class ProvidersPage {
 				},
 				'transport'  => match ( $id ) {
 					'smtp' => 'SMTP',
-					'sendgrid' => 'API (HTTPS)',
-					'postmark' => 'API (HTTPS)',
-					'smtp2go' => 'API (HTTPS)',
-					'brevo' => 'API (HTTPS)',
+					'sendgrid', 'postmark', 'smtp2go', 'brevo', 'gmail' => 'API (HTTPS)',
 					default => __( 'Not reported', 'scalyn-mail-relay' ),
 				},
 			);

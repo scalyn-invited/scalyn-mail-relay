@@ -144,6 +144,11 @@ final class NamedConfigurations {
 	public static function synchronize( #[\SensitiveParameter] array $before, #[\SensitiveParameter] array $next, CredentialCipher $cipher ): array {
 		$provider = $next['provider']['active'] ?? '';
 		if ( ( $before['provider']['active'] ?? '' ) !== $provider ) {
+			// Providers not covered by NamedConfigurations (e.g. Gmail) have no stored
+			// configurations and can be switched to freely from a named-config context.
+			if ( ! in_array( $provider, self::PROVIDERS, true ) ) {
+				return $next;
+			}
 			foreach ( $before['configurations']['items'] as $id => $item ) {
 				if ( $provider === $item['provider'] && ! $item['archived'] ) {
 					return self::select( $next, $id );

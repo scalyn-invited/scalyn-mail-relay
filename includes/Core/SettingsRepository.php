@@ -267,6 +267,10 @@ final class SettingsRepository {
 			);
 		}
 
+		if ( 'gmail' === $provider_id ) {
+			return $this->get_gmail_config();
+		}
+
 		return array();
 	}
 
@@ -602,6 +606,279 @@ final class SettingsRepository {
 		} catch ( \Throwable $error ) {
 			// Audit observer failure must not repeat or undo an already saved credential.
 			return true;
+		}
+		return true;
+	}
+
+	// -------------------------------------------------------------------------
+	// Gmail OAuth provider
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Credential-free Gmail configuration for Admin display.
+	 *
+	 * @return array{client_id: string, has_secret: bool, connected: bool, expires_at: int, from_email: string, from_name: string}
+	 */
+	public function get_gmail_settings(): array {
+		$config = $this->data['gmail'] ?? array();
+		return array(
+			'client_id'  => is_string( $config['client_id'] ?? null ) ? sanitize_text_field( $config['client_id'] ) : '',
+			'has_secret' => ! empty( $config['secret_cipher'] ),
+			'connected'  => ! empty( $config['access_cipher'] ) && ! empty( $config['refresh_cipher'] ),
+			'expires_at' => is_int( $config['expires_at'] ?? null ) ? $config['expires_at'] : 0,
+			'from_email' => is_string( $config['from_email'] ?? null ) ? sanitize_email( $config['from_email'] ) : '',
+			'from_name'  => is_string( $config['from_name'] ?? null ) ? sanitize_text_field( $config['from_name'] ) : '',
+		);
+	}
+
+	/**
+	 * Returns the full Gmail transport configuration with decrypted credentials.
+	 *
+	 * When the access token is expired and a refresh token is available, this
+	 * method attempts a silent refresh using OAuthClient and saves the new token.
+	 * Callers must treat this return value as sensitive.
+	 *
+	 * @security The returned array contains OAuth tokens. Never log, serialize,
+	 * or expose this value.
+	 *
+	 * @return array{client_id: string, client_secret: string, access_token: string, refresh_token: string, expires_at: int, from_email: string, from_name: string}
+	 * @throws \RuntimeException When credentials are unavailable or unreadable.
+	 */
+	public function get_gmail_config(): array {
+		$config = $this->data['gmail'] ?? array();
+		if ( empty( $config['secret_cipher'] ) || empty( $config['access_cipher'] ) || empty( $config['refresh_cipher'] ) ) {
+			throw new \RuntimeException( 'Gmail credentials are unavailable. Connect a Google account first.' );
+		}
+		$cipher = $this->cipher ?? new CredentialCipher();
+		try {
+			$client_secret = $cipher->decrypt( $config['secret_cipher'], 'gmail-secret' );
+			$access_token  = $cipher->decrypt( $config['access_cipher'], 'gmail-access' );
+			$refresh_token = $cipher->decrypt( $config['refresh_cipher'], 'gmail-refresh' );
+		} catch ( \Throwable $error ) {
+			throw new \RuntimeException( 'Gmail credentials are unavailable. Reconnect the Google account.' );
+		}
+		$client_id  = is_string( $config['client_id'] ?? null ) ? $config['client_id'] : '';
+		$expires_at = is_int( $config['expires_at'] ?? null ) ? $config['expires_at'] : 0;
+
+		// Silently refresh an expired access token when a refresh token is available.
+		if ( $expires_at > 0 && time() >= ( $expires_at - 60 ) ) {
+			try {
+				$refreshed    = ( new \Scalyn\MailRelay\Providers\Gmail\OAuthClient() )->refresh_access_token( $client_id, $client_secret, $refresh_token );
+				$access_token = $refreshed['access_token'];
+				$new_expiry   = time() + (int) $refreshed['expires_in'];
+				$this->save_gmail_tokens( $client_secret, $access_token, $refresh_token, $new_expiry, $cipher );
+				$expires_at = $new_expiry;
+			} catch ( \Throwable $error ) {
+				// Refresh failed; proceed with the existing (expired) token and let the
+				// send/verify attempt fail with an AUTH error requiring reconnect.
+				unset( $error );
+			}
+		}
+
+		return array(
+			'client_id'     => $client_id,
+			'client_secret' => $client_secret,
+			'access_token'  => $access_token,
+			'refresh_token' => $refresh_token,
+			'expires_at'    => $expires_at,
+			'from_email'    => is_string( $config['from_email'] ?? null ) ? $config['from_email'] : '',
+			'from_name'     => is_string( $config['from_name'] ?? null ) ? $config['from_name'] : '',
+		);
+	}
+
+	/**
+	 * Saves the Gmail client credentials (ID and encrypted secret).
+	 *
+	 * Removes any stored OAuth tokens because a changed client ID/secret
+	 * invalidates the existing token grant.
+	 *
+	 * @param string           $client_id     Plain-text OAuth client ID.
+	 * @param string           $client_secret OAuth client secret to encrypt.
+	 * @param CredentialCipher $cipher        Credential protection service.
+	 * @return bool Whether the settings were persisted.
+	 * @throws \InvalidArgumentException When client credentials are invalid.
+	 * @throws \RuntimeException When encryption fails.
+	 */
+	public function save_gmail_client( string $client_id, #[\SensitiveParameter] string $client_secret, CredentialCipher $cipher ): bool {
+		\Scalyn\MailRelay\Agency\ManagedAccess::assert_unlocked( 'providers' );
+		if ( ! preg_match( '/^[A-Za-z0-9._-]{10,200}\.apps\.googleusercontent\.com$/D', $client_id ) ) {
+			throw new \InvalidArgumentException( 'Invalid Google OAuth client ID format. It should end with .apps.googleusercontent.com.' );
+		}
+		if ( strlen( $client_secret ) < 10 || strlen( $client_secret ) > 200 || ! preg_match( '/^[A-Za-z0-9._\-]+$/D', $client_secret ) ) {
+			throw new \InvalidArgumentException( 'Invalid Google OAuth client secret format.' );
+		}
+		$before = $this->data;
+		$old    = $before['gmail'] ?? array();
+		$cipher->initialize_for_write();
+		$secret_cipher = $cipher->encrypt( $client_secret, 'gmail-secret' );
+		$config        = array(
+			'client_id'      => $client_id,
+			'secret_cipher'  => $secret_cipher,
+			'access_cipher'  => '',
+			'refresh_cipher' => '',
+			'expires_at'     => 0,
+			'from_email'     => is_string( $old['from_email'] ?? null ) ? $old['from_email'] : '',
+			'from_name'      => is_string( $old['from_name'] ?? null ) ? $old['from_name'] : '',
+		);
+		$next          = $before;
+		$next['gmail'] = $config;
+		if ( 'gmail' === $this->get_active_provider_id() ) {
+			$next['provider']['verified']               = false;
+			$next['provider']['verified_at']            = null;
+			$next['provider']['test_email_accepted_at'] = null;
+		}
+		$next = $this->with_diagnostic_revision( $before, $next );
+		if ( ! $this->persist( $next ) ) {
+			return false;
+		}
+		$this->data = $next;
+		try {
+			do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'settings_changed', 'changed', '', array( 'gmail.client_id', 'gmail.client_secret' ) ) );
+		} catch ( \Throwable $error ) {
+			unset( $error );
+		}
+		return true;
+	}
+
+	/**
+	 * Returns the decrypted Gmail client secret for OAuth token exchange.
+	 *
+	 * Unlike get_gmail_config() this method does not require access or refresh
+	 * tokens to be present, so it is safe to call during the initial OAuth
+	 * callback before tokens have been stored.
+	 *
+	 * @param CredentialCipher $cipher Credential protection service.
+	 * @return string Decrypted client secret.
+	 * @throws \RuntimeException When no secret is saved or decryption fails.
+	 * @security The return value is a live credential. Never log it.
+	 */
+	public function get_gmail_client_secret( #[\SensitiveParameter] CredentialCipher $cipher ): string {
+		$config = $this->data['gmail'] ?? array();
+		if ( empty( $config['secret_cipher'] ) ) {
+			throw new \RuntimeException( 'Gmail client secret is not saved. Save client credentials first.' );
+		}
+		return $cipher->decrypt( $config['secret_cipher'], 'gmail-secret' );
+	}
+
+	/**
+	 * Saves encrypted Gmail OAuth tokens after a successful authorization exchange.
+	 *
+	 * @param string           $client_secret  Client secret for re-encryption key-binding.
+	 * @param string           $access_token   New access token from Google.
+	 * @param string           $refresh_token  New or existing refresh token.
+	 * @param int              $expires_at     Unix timestamp when the access token expires.
+	 * @param CredentialCipher $cipher         Credential protection service.
+	 * @return bool Whether the settings were persisted.
+	 * @throws \RuntimeException When encryption fails or no client credentials exist.
+	 */
+	public function save_gmail_tokens(
+		#[\SensitiveParameter] string $client_secret,
+		#[\SensitiveParameter] string $access_token,
+		#[\SensitiveParameter] string $refresh_token,
+		int $expires_at,
+		CredentialCipher $cipher
+	): bool {
+		$config = $this->data['gmail'] ?? array();
+		if ( empty( $config['client_id'] ) ) {
+			throw new \RuntimeException( 'No Gmail client credentials found. Save client credentials before storing tokens.' );
+		}
+		$before = $this->data;
+		// Re-encrypt the secret to ensure the same key-file is used if initialization just occurred.
+		$old_secret = $config['secret_cipher'] ?? '';
+		if ( '' === $old_secret ) {
+			throw new \RuntimeException( 'Gmail client secret is missing. Save client credentials first.' );
+		}
+		$access_cipher  = $cipher->encrypt( $access_token, 'gmail-access' );
+		$refresh_cipher = $cipher->encrypt( $refresh_token, 'gmail-refresh' );
+		$next           = $before;
+		$next['gmail']  = array_merge( $config, array(
+			'access_cipher'  => $access_cipher,
+			'refresh_cipher' => $refresh_cipher,
+			'expires_at'     => $expires_at,
+		) );
+		if ( 'gmail' === $this->get_active_provider_id() ) {
+			$next['provider']['verified']               = false;
+			$next['provider']['verified_at']            = null;
+			$next['provider']['test_email_accepted_at'] = null;
+		}
+		$next = $this->with_diagnostic_revision( $before, $next );
+		if ( ! $this->persist( $next ) ) {
+			return false;
+		}
+		$this->data = $next;
+		return true;
+	}
+
+	/**
+	 * Updates only the Gmail sender (from_email, from_name) without touching tokens.
+	 *
+	 * @param string $from_email Authorized Gmail sender address.
+	 * @param string $from_name  Optional display name.
+	 * @return bool Whether the settings were persisted.
+	 * @throws \InvalidArgumentException When the sender address is invalid.
+	 */
+	public function save_gmail_sender( string $from_email, string $from_name ): bool {
+		\Scalyn\MailRelay\Agency\ManagedAccess::assert_unlocked( 'providers' );
+		if ( '' === $from_email || ! filter_var( $from_email, FILTER_VALIDATE_EMAIL ) ) {
+			throw new \InvalidArgumentException( 'A valid authorized Gmail sender address is required.' );
+		}
+		if ( strlen( $from_name ) > 200 || preg_match( '/[\r\n\x00]/', $from_name ) ) {
+			throw new \InvalidArgumentException( 'The sender name is invalid.' );
+		}
+		$before        = $this->data;
+		$next          = $before;
+		$next['gmail'] = array_merge( $this->data['gmail'] ?? array(), array(
+			'from_email' => sanitize_email( $from_email ),
+			'from_name'  => sanitize_text_field( $from_name ),
+		) );
+		if ( 'gmail' === $this->get_active_provider_id() ) {
+			$next['provider']['verified']               = false;
+			$next['provider']['verified_at']            = null;
+			$next['provider']['test_email_accepted_at'] = null;
+		}
+		$next = $this->with_diagnostic_revision( $before, $next );
+		if ( ! $this->persist( $next ) ) {
+			return false;
+		}
+		$this->data = $next;
+		try {
+			do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'settings_changed', 'changed', '', array( 'gmail.from_email', 'gmail.from_name' ) ) );
+		} catch ( \Throwable $error ) {
+			unset( $error );
+		}
+		return true;
+	}
+
+	/**
+	 * Removes stored Gmail tokens, leaving client credentials intact.
+	 *
+	 * Callers should also revoke the token at Google using OAuthClient::revoke().
+	 *
+	 * @return bool Whether the settings were persisted.
+	 */
+	public function disconnect_gmail(): bool {
+		\Scalyn\MailRelay\Agency\ManagedAccess::assert_unlocked( 'providers' );
+		$before        = $this->data;
+		$next          = $before;
+		$next['gmail'] = array_merge( $this->data['gmail'] ?? array(), array(
+			'access_cipher'  => '',
+			'refresh_cipher' => '',
+			'expires_at'     => 0,
+		) );
+		if ( 'gmail' === $this->get_active_provider_id() ) {
+			$next['provider']['verified']               = false;
+			$next['provider']['verified_at']            = null;
+			$next['provider']['test_email_accepted_at'] = null;
+		}
+		$next = $this->with_diagnostic_revision( $before, $next );
+		if ( ! $this->persist( $next ) ) {
+			return false;
+		}
+		$this->data = $next;
+		try {
+			do_action( HookNames::AUDIT_EVENT, new AuditEvent( 'settings_changed', 'changed', '', array( 'gmail.tokens' ) ) );
+		} catch ( \Throwable $error ) {
+			unset( $error );
 		}
 		return true;
 	}
