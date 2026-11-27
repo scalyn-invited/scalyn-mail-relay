@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="150" height="44" viewBox="0 0 150 44">
+  <!-- Gmail M envelope mark -->
+  <rect x="2" y="8" width="30" height="22" rx="2" fill="#EA4335"/>
+  <path d="M2 10 L17 20 L32 10" fill="none" stroke="#fff" stroke-width="2.5"/>
+  <path d="M2 10 L17 20" fill="none" stroke="#fff" stroke-width="2.5"/>
+  <text x="40" y="27" font-family="Arial,sans-serif" font-size="20" font-weight="bold" fill="#202124">Gmail</text>
+</svg>

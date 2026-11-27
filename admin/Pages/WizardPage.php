@@ -70,6 +70,11 @@ final class WizardPage {
 			$brevo_form = new \Scalyn\MailRelay\Admin\Components\BrevoSettingsForm( $settings, $container->get( \Scalyn\MailRelay\Core\CredentialCipher::class ) );
 			$brevo_form->handle();
 		}
+		$gmail_form = null;
+		if ( 3 === $current_step && 'gmail' === $active_provider_id ) {
+			$gmail_form = new \Scalyn\MailRelay\Admin\Components\GmailSettingsForm( $settings, $container->get( \Scalyn\MailRelay\Core\CredentialCipher::class ) );
+			$gmail_form->handle();
+		}
 		$api_webhook_form = null;
 		if ( 3 === $current_step && in_array( $active_provider_id, array( 'smtp2go', 'brevo' ), true ) ) {
 			$api_webhook_form = new \Scalyn\MailRelay\Admin\Components\ApiWebhookForm( $container->get( \Scalyn\MailRelay\Core\ApiWebhookSettings::class . ':' . $active_provider_id ) );
@@ -172,7 +177,12 @@ final class WizardPage {
 		}
 
 		// Step 3: The selected provider must have its own configuration.
-		if ( in_array( $active_provider_id, array( 'sendgrid', 'postmark', 'smtp2go', 'brevo' ), true ) ) {
+		if ( 'gmail' === $active_provider_id ) {
+			$gmail_config = $settings->get_gmail_settings();
+			if ( ! $gmail_config['connected'] || '' === $gmail_config['from_email'] ) {
+				return 3;
+			}
+		} elseif ( in_array( $active_provider_id, array( 'sendgrid', 'postmark', 'smtp2go', 'brevo' ), true ) ) {
 			$public_config = match ( $active_provider_id ) {
 				'postmark' => $settings->get_postmark_settings(),
 				'smtp2go' => $settings->get_smtp2go_settings(),
@@ -182,7 +192,7 @@ final class WizardPage {
 			if ( ! $public_config['has_key'] || '' === $public_config['from_email'] ) {
 				return 3;
 			}
-		} else {
+		} elseif ( 'gmail' !== $active_provider_id ) {
 			$smtp = $settings->get_smtp_settings();
 			if ( '' === trim( $smtp['host'] ?? '' )
 				|| 0 === absint( $smtp['port'] ?? 0 )

@@ -117,7 +117,9 @@ final class WizardController {
 
 		$settings       = $this->get_settings();
 		$configurations = $settings->get_configurations();
-		if ( ! empty( $configurations ) && $provider_id !== $settings->get_active_provider_id() ) {
+		if ( ! empty( $configurations )
+			&& $provider_id !== $settings->get_active_provider_id()
+			&& in_array( $provider_id, \Scalyn\MailRelay\Core\NamedConfigurations::PROVIDERS, true ) ) {
 			$matches = array_filter( $configurations, static fn( $item ) => ! $item['archived'] && $provider_id === $item['provider'] );
 			if ( 1 !== count( $matches ) ) {
 				$url = add_query_arg( 'view', 'configurations', $this->step_url( 2 ) );
@@ -165,7 +167,7 @@ final class WizardController {
 		$settings    = $this->get_settings();
 		$provider_id = $settings->get_active_provider_id();
 		\Scalyn\MailRelay\Agency\ManagedAccess::protect_form( 'smtp' === $provider_id ? 'smtp' : 'providers' );
-		if ( in_array( $provider_id, array( 'sendgrid', 'postmark', 'smtp2go', 'brevo' ), true ) ) {
+		if ( in_array( $provider_id, array( 'sendgrid', 'postmark', 'smtp2go', 'brevo', 'gmail' ), true ) ) {
 			try {
 				$valid = $this->get_registry()->get( $provider_id )->validate_config( $settings->get_provider_config( $provider_id ) )->valid;
 			} catch ( \Throwable $error ) {
@@ -364,11 +366,12 @@ final class WizardController {
 			'smtp2go' => $settings->get_smtp2go_settings(),
 			'brevo' => $settings->get_brevo_settings(),
 			'sendgrid' => $settings->get_sendgrid_settings(),
+			'gmail' => $settings->get_gmail_settings(),
 			default => $settings->get_smtp_config(),
 		};
 		$from_email = (string) ( $sender['from_email'] ?? '' );
 		$from_name  = (string) ( $sender['from_name'] ?? '' );
-		$from       = in_array( $provider_id, array( 'sendgrid', 'postmark', 'smtp2go', 'brevo' ), true ) ? $from_email : ( '' !== $from_name
+		$from       = in_array( $provider_id, array( 'sendgrid', 'postmark', 'smtp2go', 'brevo', 'gmail' ), true ) ? $from_email : ( '' !== $from_name
 			? $from_name . ' <' . $from_email . '>'
 			: $from_email );
 
